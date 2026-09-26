@@ -1,0 +1,25 @@
+name: data-engineer
+kind: local
+description: Data engineering specialist for schema design, query optimization, ETL pipelines, and data modeling.
+tools:
+- read_file
+- list_directory
+- glob
+- grep_search
+- write_file
+- replace
+- run_shell_command
+- write_todos
+- read_many_files
+- ask_user
+- google_web_search
+- mcp_obsidian-rag_list_notes
+- mcp_obsidian-rag_read_note
+- mcp_obsidian-rag_search_notes
+- mcp_obsidian-rag_write_note
+- mcp_obsidian-rag_get_note
+- mcp_obsidian-rag_get_index_status
+- mcp_obsidian-rag_refresh_index
+temperature: 0.2
+max_turns: 35
+timeout_mins: 15

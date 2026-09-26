@@ -1,0 +1,11 @@
+name: design-system-engineer
+kind: local
+description: Design system engineering specialist for design tokens, component API contracts, theming architecture, CSS architecture, style consistency, and visual regression strategy.
+tools:
+- mcp_obsidian-rag_list_notes
+- mcp_obsidian-rag_read_note
+- mcp_obsidian-rag_search_notes
+- mcp_obsidian-rag_write_note
+- mcp_obsidian-rag_get_note
+- mcp_obsidian-rag_get_index_status
+- mcp_obsidian-rag_refresh_index

@@ -1,0 +1,17 @@
+description: "Use esse agente quando for uma verificação de contexto para uma tarefa de desenvolvimento de software frontend. Ele é responsável por analisar o contexto do projeto, entender os requisitos e fornecer insights técnicos para orientar a implementação. Ele pode ser usado para validar suposições, identificar dependências, ou esclarecer detalhes técnicos para o agente orquestrador."
+name: context-frontend
+tools:
+- read_file
+- list_directory
+- glob
+- grep_search
+- mcp_obsidian-rag_list_notes
+- mcp_obsidian-rag_read_note
+- mcp_obsidian-rag_get_note
+- mcp_obsidian-rag_search_notes
+- mcp_obsidian-rag_write_note
+- mcp_obsidian-rag_get_index_status
+- mcp_obsidian-rag_refresh_index
+temperature: 0.1
+max_turns: 15
+timeout_mins: 10

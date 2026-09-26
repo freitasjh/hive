@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>br.com.systec.hive</groupId>
+        <artifactId>hive-commons</artifactId>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>hive-commons-test-support</artifactId>
+    <name>Hive Commons Test Support</name>
+    <packaging>jar</packaging>
+
+    <!--
+      Test-only helpers shared by more than one module's test sources.
+
+      Exists because a guard that has to be correct in two places is a guard that is correct in
+      one. It ships in `main` scope of this module on purpose: Maven has no way to share test
+      classes across modules without either publishing a test-jar or a compile-scoped artifact,
+      and this artifact is only ever put on a *test* classpath by its consumers.
+
+      Nothing here may be depended on by production code. The only test proving that is the
+      reactor: if a `src/main/java` class in another module ever imported this one, the
+      dependency would have to be compile-scoped, and every module here uses test scope.
+    -->
+    <dependencies>
+        <!--
+          `provided`, not `test`: the guard is main-scope code in this artifact and needs AssertJ to
+          state its failures in the house style. AssertJ is not in this project's dependency
+          management — it arrives with spring-boot-starter-test, which is where every other module
+          gets it from too. `provided` is not transitive, so a consumer must bring its own, and every
+          consumer already has it.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+</project>

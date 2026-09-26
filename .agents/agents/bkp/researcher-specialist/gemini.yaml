@@ -1,0 +1,21 @@
+description: "Especialista em pesquisa t\xE9cnica, busca web e estrutura\xE7\xE3o\
+  \ de conhecimento (RAG/Obsidian)."
+name: researcher-specialist
+tools:
+- google_web_search
+- web_fetch
+- read_file
+- list_directory
+- glob
+- grep_search
+- ask_user
+- mcp_obsidian-rag_list_notes
+- mcp_obsidian-rag_read_note
+- mcp_obsidian-rag_search_notes
+- mcp_obsidian-rag_write_note
+- mcp_obsidian-rag_get_note
+- mcp_obsidian-rag_get_index_status
+- mcp_obsidian-rag_refresh_index
+temperature: 0.3
+max_turns: 25
+timeout_mins: 15

@@ -1,0 +1,2 @@
+description: "Use esse agente quando for uma verificação de contexto para uma tarefa de desenvolvimento de software. Ele é responsável por analisar o contexto do projeto, entender os requisitos e fornecer insights técnicos para orientar a implementação. Ele pode ser usado para validar suposições, identificar dependências, ou esclarecer detalhes técnicos para o agente orquestrador"
+mode: all

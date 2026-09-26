@@ -1,0 +1,388 @@
+{
+  "current_feature": "opencode-go-zen",
+  "current_phase": "QualityGate",
+  "previous_phase": "BugAnalysis",
+  "next_phase": "RAG-advanced (B2 aprovado pelo usuario, NAO INICIADO)",
+  "type": "bugfix",
+  "artifacts": {
+    "tasks": ".spec/bugs/agent-delete-cascade/TASKS.md"
+  },
+  "last_update": "2026-09-26T17:35:00Z",
+  "code_review": {
+    "last_invoked_at": "2026-09-26T17:15:00Z",
+    "last_status": "passed",
+    "critical_issues": 0,
+    "attention_issues": 0,
+    "reviewer_notes": "8 reviews. Duas CHANGES_REQUIRED (0 criticos) corrigidas. Padrao recorrente que o reviewer enforce: teste que afirma cobertura que nao tem (serializedBody, Javadoc de convencao), e motivo/tecnica fabricada em comentario."
+  },
+  "overrides": [
+    {
+      "portao": "P4->P5",
+      "motivo": "Backend DOWN por infra ${revision} flatten ausente (pre-existente). Frontend UP, 41 BE + 37 FE tests passam. Aprovado.",
+      "data": "2026-08-26T17:56:40.497002Z"
+    }
+  ],
+  "archived_path": ".spec/archive/20260925-knowledge-base",
+  "previous_feature": "auth-me-500",
+  "gate_P0_P1": {
+    "classification": "Feature",
+    "architect_verdict": "APROVADO (presets, sem enum)",
+    "pm_verdict": "APROVADO COM RESSALVAS (2 enums)",
+    "user_decision": "B: enums OPENCODE_GO + OPENCODE_ZEN",
+    "approved_by": "user"
+  },
+  "analysis": {
+    "started_at": "2026-09-25T14:00:00Z",
+    "ux_designer_required": true,
+    "security_engineer_required": true
+  },
+  "gate_P1_P2": {
+    "spec_score": "9/10",
+    "security": "APROVADO com condições (3 bloqueantes como tasks)",
+    "ux_designer": "APROVADO",
+    "pending_approval": true
+  },
+  "gate_P2_P3": {
+    "plan_tasks": "11 tasks (2 batches)",
+    "microtasks": "12 keys",
+    "pm_verdict": "APROVADO COM RESSALVAS (P1 aplicadas)",
+    "pending_approval": true
+  },
+  "batch1_admin_prompt": {
+    "status": "completed",
+    "tasks": [
+      "INFRA-01",
+      "INFRA-02",
+      "BE-01",
+      "BE-02",
+      "BE-03",
+      "BE-04",
+      "BE-05",
+      "BE-06",
+      "BE-07"
+    ],
+    "review": "passed",
+    "compile": "SUCCESS",
+    "tests": "53 passed (50 impl + 3 api-tools)",
+    "fixes": "HasPermission anyOf + delete TX + extractor per-token + RFC7807"
+  },
+  "batch2_admin_prompt": {
+    "status": "completed",
+    "tasks": [
+      "BE-08",
+      "BE-09",
+      "BE-10",
+      "BE-11",
+      "BE-12",
+      "BE-13",
+      "BE-14"
+    ],
+    "review": "passed",
+    "compile": "SUCCESS",
+    "tests": "54 passed",
+    "fixes": "C1 INSERT false + C2 demotion + C3 clearAutomatically + active true"
+  },
+  "batch3_admin_prompt": {
+    "status": "completed",
+    "tasks": [
+      "BE-15",
+      "BE-16",
+      "BE-17",
+      "BE-18",
+      "BE-19",
+      "BE-20"
+    ],
+    "review": "passed",
+    "compile": "SUCCESS",
+    "tests": "79 passed (56 impl + 23 web)",
+    "fixes": "PUT preserve flags + updateAt toInstant + q server-side + AssertJ"
+  },
+  "batch4_admin_prompt": {
+    "status": "completed",
+    "tasks": [
+      "FE-01",
+      "FE-02",
+      "FE-03",
+      "FE-04",
+      "FE-05",
+      "FE-06"
+    ],
+    "review": "passed",
+    "build": "SUCCESS",
+    "tests": "89 passed (13 files)",
+    "fixes": "promptTemplateId + enums SPRING_AI/LANGCHAIN4J OLLHAMA + collapsible + aria"
+  },
+  "harness": {
+    "screenshots": [
+      ".spec/bugs/credential-baseurl-go-zen/harness/repro-400-baseurl-fixa.png",
+      ".spec/bugs/credential-baseurl-go-zen/harness/pos-fix-200-salvo.png",
+      ".spec/bugs/model-dropdown-validate-timeout/harness/verify-autocomplete.png",
+      ".spec/bugs/model-dropdown-validate-timeout/harness/pos-fix-dropdown-filtrando.png",
+      ".spec/bugs/model-dropdown-validate-timeout/harness/pos-fix-validar-ok.png"
+    ],
+    "console_errors": 0,
+    "processos": "8080 free, 5173 free"
+  },
+  "gate_P4_P5": {
+    "harness": "294 testes verdes, E2E ok",
+    "pending_approval": true
+  },
+  "archived_at": "2026-09-25T12:00:00Z",
+  "gate_P5_P6": {
+    "verify": "3 dimensões ✅ + security pass",
+    "pending_approval": true
+  },
+  "bug_login_500": {
+    "status": "concluído",
+    "severity": "alta",
+    "layer": "backend",
+    "module": "security",
+    "reproduced": true,
+    "root_cause": "LoginServiceImpl catch Exception -> java.lang.SecurityException sem handler (500); AuthenticationServiceImpl embrulha UserNotFoundException em BaseException sem httpStatus",
+    "harness": "backend UP/DOWN ok, 3 cenários 500 confirmados, log /tmp/opencode/hive-backend2.log",
+    "pending_approval": "B1→B2",
+    "review": "APPROVED 0 🔴, fixes A1/A4/S1-S4 aplicados",
+    "tests": "mvn clean install SUCCESS (unit + IT 6/6), npm run test 93/93",
+    "debts": [
+      "DT-1 RefreshTokenNotFoundException",
+      "DT-2 SecurityFilter"
+    ]
+  },
+  "batch1_provider_vendor": {
+    "status": "completed",
+    "tasks": [
+      "INFRA-01",
+      "INFRA-02",
+      "BE-01",
+      "BE-02",
+      "BE-03"
+    ],
+    "review": "APPROVED após fixes A1/A2 (C1 = sequenciamento BE-05)",
+    "tests": "unit 89+7 impl/api, IT 15/15 (CredentialIT 9/9)",
+    "decisions": "DDL=V9/dados=V10; PROVIDER_MASTER_KEY; AiProviderClient rename; SSRF fail-closed; loopback permitido",
+    "audit_INFRA02": "dev: 3x SPRING_AI/OPENAI; nulls exigem decisão na V10"
+  },
+  "batch2_provider_vendor": {
+    "status": "completed",
+    "tasks": [
+      "BE-04",
+      "BE-05",
+      "BE-06",
+      "BE-07",
+      "BE-08"
+    ],
+    "review": "APPROVED zero 🔴, 3 🟡 futuros (executor singleton, SSRF redirect, log exception)",
+    "tests": "unit 101 impl + 25 web + factory/catalog; IT 28/28",
+    "decisions": "NULL llm_model preservado (decisão prod pendente); gpt-4 preservado no catálogo; redirect residual = risco aceito"
+  },
+  "batch3_provider_vendor": {
+    "status": "completed",
+    "tasks": [
+      "FE-01",
+      "FE-02",
+      "FE-03",
+      "FE-04"
+    ],
+    "review": "APPROVED 10/10 UX, 1 🟡 P2 (router guard permission)",
+    "tests": "npm build ok, 114/114 FE",
+    "harness": "E2E Ollama ponta-a-ponta ok; cloud via 422 + ITs; 6 screenshots"
+  },
+  "decisions_F0": {
+    "module": "knowledge/ separado (usuário 2026-09-25)",
+    "framework": "LangChain4j",
+    "store": "pgvector"
+  },
+  "batch1_knowledge": {
+    "status": "completed",
+    "tasks": [
+      "INFRA-01",
+      "INFRA-02",
+      "BE-01..BE-07"
+    ],
+    "review": "APPROVED pós-fixes 4🔴+6🟡 (A1 documentado)",
+    "tests": "unit 206+, IT 41/41",
+    "followup": "KbDimensionMismatchException consistência (🟢)"
+  },
+  "batch2_knowledge": {
+    "status": "completed",
+    "tasks": [
+      "FE-01",
+      "FE-02",
+      "FE-03",
+      "FE-04",
+      "DOC-02"
+    ],
+    "review": "APPROVED 9/9 UX, 2 🟡 corrigidos",
+    "tests": "146/146 FE, knowledge 37/37",
+    "harness": "E2E parcial (Ollama ok; cloud via 422+ITs)"
+  },
+  "harness_kb": {
+    "total": "unit 206+ + IT 41/41 + FE 146/146, 0 falhas",
+    "e2e": "12/12",
+    "console": "0 ERROR",
+    "debts": "M1 P2 (pré-existente), M2 P2 (backlog auth-me-500), M3/M4 P3"
+  },
+  "hardening_dtsec": {
+    "status": "completed",
+    "review": "APPROVED 0🔴, 3🟡 edge aceitos",
+    "tests": "49 unit + 41 IT + 146 FE verdes",
+    "debts_paid": [
+      "DT-SEC-1 (TOCTOU fechado)",
+      "DT-SEC-2 (eviction)",
+      "router next()"
+    ]
+  },
+  "bug_auth_me_500": {
+    "status": "concluído",
+    "review": "APPROVED",
+    "tests": "mvn clean install 219/219"
+  },
+  "batch1_gozen": {
+    "status": "completed",
+    "tasks": [
+      "INFRA-01",
+      "BE-01..BE-05"
+    ],
+    "review": "APPROVED pós-fixes 2🔴+4🟡",
+    "tests": "300+ unit, 55/55 IT",
+    "decisions": "Zen default claude-sonnet-4-5; PinnedHttpClient em commons; session estável; rate limiter genérico"
+  },
+  "batch2_gozen": {
+    "status": "completed",
+    "tasks": [
+      "FE-01..FE-04",
+      "DOC-03"
+    ],
+    "review": "APPROVED pós-fixes (Error object, chips remotos, specs)",
+    "tests": "160/160 FE",
+    "harness": "parcial (sem chave GO; CA-Zen pendente chave real)"
+  },
+  "harness_gozen": {
+    "total": "79 unit + 55 IT + 160 FE, 0 falhas",
+    "e2e": "12/12 possível",
+    "console": "0 errors/warnings",
+    "debts": "nenhum novo; CA-Zen pendente chave"
+  },
+  "bug": {
+    "id": "agent-delete-cascade",
+    "root_cause": "chat_session.agent_id FK sem ON DELETE -> NO ACTION; todo agente com historico e inde deletavel (409)",
+    "extra": "agent_knowledge_base.agent_id SEM FK para agent -> links orfaos apos o cascade",
+    "decision": "usuario aprovou A1 (CASCADE) - destrutivo e irreversivel, mitigado por mensagem explicita",
+    "status": "B1 approved, B2 a delegar"
+  },
+  "e2e_ca_go": {
+    "status": "PASSED",
+    "key": "configured last4=CcgG (ciphertext 108B, nunca em claro)",
+    "discovery": "HTTP 200 - 26 modelos, mimo-v2.5 presente, 16 denylisted por protocolo",
+    "agent": "POST /agents 201 (mimo-v2.5/OPENCODE_GO)",
+    "session": "POST /chat/sessions 201",
+    "chat": "HTTP 200 x2 (multi-turn) - resposta real do MiMo (Xiaomi LLM Core)",
+    "persistencia": "5 linhas em chat_message (3 USER + 2 ASSISTANT)",
+    "erros_backend": "0 (apenas kill do processo)",
+    "processos": ":8080 free, :5173 free"
+  },
+  "bug_closed": [
+    "tls-hostname-verification",
+    "opencode-baseurl-missing-v1",
+    "credential-baseurl-go-zen",
+    "model-dropdown-validate-timeout",
+    "master-key-properties",
+    "chat-timeout-rag-observability",
+    "kb-embedding-prefix-nomic",
+    "kb-threshold-por-modelo",
+    "agent-delete-cascade"
+  ],
+  "testes": {
+    "unit": 505,
+    "it": 118,
+    "frontend": 222,
+    "falhas": 0
+  },
+  "debt_p2": [],
+  "docs_aligned": [
+    "docs/product/SYSTEM_SPECIFICATION.md:93 (URLs + /v1)",
+    "docs/product/SYSTEM_SPECIFICATION.md:94 (TLS endpointIdentification vs stub JDK)",
+    "docs/product/SYSTEM_SPECIFICATION.md:96 (customHeaders na factory; session = UUID da chat_session)",
+    "docs/product/SYSTEM_SPECIFICATION.md:97 (404 JSON vs HTML no diagnostico)",
+    "docs/product/SYSTEM_SPECIFICATION.md:101 (enum legado de 5 removido, contradizia 92)"
+  ],
+  "last_archived": "20260925-opencode-go-zen",
+  "governanca_corrigida": [
+    ".agents/rules/harness-continuous.md - nota OBRIGATORIA: perfil integration desliga surefire (roda 0 unitarios)",
+    ".agents/rules/harness-continuous.md - H1.1/H1.3/H2.2/Anexo A com 3 comandos + -am",
+    ".agents/rules/harness-continuous.md - Suite de integracao isolada com -am (evita jar stale do ~/.m2)",
+    ".agents/rules/workflow-rules.md - suite completa e npm run test",
+    ".agents/agents/orchestrator/AGENT.md - suite completa e npm run test",
+    ".agents/skills/sdd-compiler/{SKILL.md,asserts/verify-gate.md} - npm run test:run inexistente -> npm run test"
+  ],
+  "master_key": {
+    "fonte": "provider.master.key em application-dev.properties (32 bytes base64)",
+    "precedencia": "env PROVIDER_MASTER_KEY > propriedade Spring",
+    "producao": "sem default -> falha no BOOT com mensagem acionavel",
+    "e2e": "boot sem env var OK; PUT provider 200; credencial sobreviveu a restart (200 + discovery 27 modelos + chat 200 \"SOBREVIVI\")",
+    "db": "provider_credential limpo (dados de teste) e recadastrado via UI"
+  },
+  "traceability": {
+    "opencode-go-zen": "SPEC/TASKS 11/11Done, mas 7 bugs pos-archive provam cobertura de requisito insuficiente — VERIFY emendado em .spec/archive/20260925-opencode-go-zen/backend/VERIFY.md",
+    "ca_zen": "PENDENTE — sem credencial real. bugs 4 (dropdown) e 5 (timeout) afetam tambem Zen, nao validados em E2E."
+  },
+  "open_debts": [
+    {
+      "id": "re-medir-threshold",
+      "sev": "P2",
+      "desc": "0.60 calibrado em base de 5 chunks (margem ~0.02). Re-medir com base maior/diversa; definir gatilho objetivo (ex.: >N chunks)."
+    },
+    {
+      "id": "versionar-convencao",
+      "sev": "P2",
+      "desc": "Misturar embeddings de convencoes diferentes = score indefinido. Hoje detectado por GROUP BY metadata->>convention. Versionar por KB evitaria reindex manual."
+    },
+    {
+      "id": "min-score-por-kb",
+      "sev": "P3",
+      "desc": "Coluna min_score por KB permitiria calibrar sem tocar em codigo."
+    },
+    {
+      "id": "ca-zen",
+      "sev": "P1",
+      "desc": "Sem credencial OPENCODE_ZEN real: discovery e chat de Zen nao validados em E2E."
+    },
+    {
+      "id": "grafana-5h",
+      "sev": "P3",
+      "desc": "vite em :5174 rodando ha ~6h, de sessao anterior. Nao e meu; nao encerrei."
+    },
+    {
+      "id": "brain-mcp-410",
+      "sev": "P2",
+      "desc": "Brain MCP fora (HTTP 410) desde ~11:56. Notas pendentes em .spec/bugs/*/brain-pending/."
+    }
+  ],
+  "h6_status": {
+    "suite": "341 unit + 63 IT + 177 FE, 0 falhas",
+    "harness": "E2E com credencial real + 3 reinicios de backend",
+    "code_review": "5x APPROVED, zero critico/atencao",
+    "processos": "8080 free, 5173 free",
+    "brain": "7 sessoes + 5 regras gravadas"
+  },
+  "rag": {
+    "status": "FUNCIONA - validado end-to-end com embedding real",
+    "evidencia": "chat mimo-v2.5 -> ragUsed=true, ragReason=ok, citations=4, resposta citando o PDF",
+    "causas_corrigidas": [
+      "vínculo KB<->agente sem caminho de escrita",
+      "PUT antigo com IDOR (aceitava agentId de outro tenant)",
+      "embeddings sem prefixo de tarefa do nomic (search_document/search_query)",
+      "threshold unico 0.7; nomic precisa 0.60 (medido em 4 sondas)",
+      "linha de log que reportava foundKbs=0 inventado"
+    ],
+    "calibracao": "nomic=0.60 medido (relevante 0.6219 entra, irrelevante 0.5972 fora, margem ~0.02). Pendente: re-medir com base maior - margem estreita."
+  },
+  "e2e_delete": {
+    "DELETE agente com sessao": "204",
+    "sessao em cascata": "0 orfas",
+    "links KB orfaos": "0",
+    "KBs sobrevivem": 4,
+    "mensagem duplicidade": "409 ALREADY_EXISTS \"Ja existe um registro com estes dados...\""
+  },
+  "tech_debt": ".spec/tech-debts/agent-delete-cascade/TASKS.md (6 itens, incluindo workspace sem git)"
+}

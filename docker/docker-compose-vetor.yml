@@ -1,0 +1,22 @@
+version: '3.9'
+services:
+  postgres:
+    image: pgvector/pgvector:pg16 # Use a specific PostgreSQL version tag, e.g., pg17
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dev_user
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: embedding_db
+    ports:
+      - "5432:5432" # Maps container port 5432 to host port 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Named volume for data persistence
+    healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U postgres"]
+          interval: 10s
+          timeout: 5s
+          retries: 5
+
+volumes:
+  postgres_data:

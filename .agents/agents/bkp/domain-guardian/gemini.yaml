@@ -1,0 +1,22 @@
+name: domain-guardian
+kind: local
+description: Guardião da Integridade de Domínio e Linguagem Ubíqua
+tools:
+- read_file
+- read_many_files
+- list_directory
+- glob
+- grep_search
+- write_file
+- replace
+- ask_user
+- mcp_obsidian-rag_list_notes
+- mcp_obsidian-rag_read_note
+- mcp_obsidian-rag_search_notes
+- mcp_obsidian-rag_write_note
+- mcp_obsidian-rag_get_note
+- mcp_obsidian-rag_get_index_status
+- mcp_obsidian-rag_refresh_index
+temperature: 0.1
+max_turns: 35
+timeout_mins: 20
