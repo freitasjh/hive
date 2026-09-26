@@ -212,5 +212,20 @@
       <artifactId>langchain4j-open-ai</artifactId>
       <scope>compile</scope>
     </dependency>
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.opennlp</groupId>
+      <artifactId>opennlp-tools</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.knuddels</groupId>
+      <artifactId>jtokkit</artifactId>
+      <scope>compile</scope>
+    </dependency>
   </dependencies>
 </project>

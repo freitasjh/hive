@@ -11,6 +11,7 @@ import br.com.systec.hive.knowledge.impl.repository.KbDocumentRepository;
 import br.com.systec.hive.knowledge.impl.repository.KnowledgeBaseRepository;
 import br.com.systec.hive.knowledge.impl.security.KbUrlGuard;
 import dev.langchain4j.data.document.Document;
+import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.document.parser.apache.tika.ApacheTikaDocumentParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,23 @@ public class KbIngestionService {
     private final KbEmbeddingPort embeddingPort;
     private final Executor parseExecutor;
     private final String storageDir;
+
+    /**
+     * Built here rather than injected, and that is deliberate.
+     *
+     * <p>An earlier version of this class took a second constructor taking a
+     * {@link KbDocumentChunker}, to satisfy the project's constructor-injection convention. It
+     * broke every Spring context: with two public constructors and no {@code @Autowired} among
+     * them, {@code KbIngestionService} is instantiated through the no-arg constructor, which does
+     * not exist — {@code NoSuchMethodException: KbIngestionService.<init>()}, and with it the whole
+     * application. Unit tests never saw it, because they construct the class directly; the
+     * integration suite did, immediately.
+     *
+     * <p>Injecting it would also mean publishing a {@code KbDocumentChunker} bean for a class that
+     * is stateless, holds no configuration and delegates to a shared immutable tokenizer. The
+     * convention exists so collaborators can be substituted in tests, and nothing here needs to be.
+     */
+    private final KbDocumentChunker chunker = new KbDocumentChunker();
 
     public KbIngestionService(KbDocumentRepository documentRepository,
                               KnowledgeBaseRepository knowledgeBaseRepository,
@@ -85,13 +103,16 @@ public class KbIngestionService {
             KnowledgeBaseEntity kb = knowledgeBaseRepository.findByIdAndTenantId(doc.getKbId(), tenantId)
                     .orElseThrow(() -> new IllegalStateException("knowledge base not found"));
             byte[] bytes = loadBytes(doc, tenantId);
-            String text = parseWithTimeout(bytes, doc.getFileName());
-            text = KbFileValidator.truncateText(text);
+            ParsedDocument parsed = parseWithTimeout(bytes, doc.getFileName());
+            String text = KbFileValidator.truncateText(parsed.text());
             if (text == null || text.isBlank()) {
                 throw new IllegalStateException("no extractable text (scanned-image PDFs unsupported)");
             }
             embeddingStore.removeByDoc(tenantId, docId);
-            List<String> chunks = KbTextSplitter.split(doc.getFileName(), text);
+            // The title is resolved against the truncated text: a cut in the middle of the cover
+            // page must not turn into a chunk header that ends mid-word.
+            List<String> chunks = chunker.chunk(
+                    KbDocumentTitle.resolve(parsed.metadata(), text, doc.getFileName()), doc.getFileName(), text);
             int index = 0;
             int totalTokens = 0;
             // Written on every row: ingestion is async, so a reindex that fails on some documents
@@ -100,7 +121,7 @@ public class KbIngestionService {
             for (String chunk : chunks) {
                 float[] vector = embeddingPort.embedDocument(tenantId, kb.getEmbeddingModel(), kb.getDimension(), chunk);
                 embeddingStore.insert(tenantId, kb.getId(), docId, index, chunk, vector, kb.getDimension(), convention);
-                totalTokens += KbTextSplitter.estimateTokens(chunk);
+                totalTokens += chunker.estimateTokens(chunk);
                 index++;
             }
             setStatus(doc, KbDocumentStatus.READY.name(), null);
@@ -168,12 +189,22 @@ public class KbIngestionService {
         return new KbUrlGuard.RedirectAwareContent(response.body(), contentType, null);
     }
 
-    String parseWithTimeout(byte[] bytes, String fileName) throws Exception {
-        Future<String> future = CompletableFuture.supplyAsync(() -> {
+    /**
+     * A parsed document, with the parser's metadata kept.
+     *
+     * <p>Metadata is the only place a document states its own title (PDF {@code /Title}, DOCX core
+     * properties, HTML {@code <title>}); returning text alone threw it away and left the file name
+     * as the only thing every chunk could say about itself.
+     */
+    record ParsedDocument(String text, Metadata metadata) {
+    }
+
+    ParsedDocument parseWithTimeout(byte[] bytes, String fileName) throws Exception {
+        Future<ParsedDocument> future = CompletableFuture.supplyAsync(() -> {
             ApacheTikaDocumentParser parser = new ApacheTikaDocumentParser();
             try (InputStream in = new ByteArrayInputStream(bytes)) {
                 Document document = parser.parse(in);
-                return document.text();
+                return new ParsedDocument(document.text(), document.metadata());
             } catch (Exception e) {
                 throw new IllegalStateException("parse failed", e);
             }
