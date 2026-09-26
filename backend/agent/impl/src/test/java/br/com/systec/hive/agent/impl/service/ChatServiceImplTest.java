@@ -1,6 +1,7 @@
 package br.com.systec.hive.agent.impl.service;
 
 import br.com.systec.hive.agent.api.diagnostics.ChatTrace;
+import br.com.systec.hive.agent.impl.rag.FollowUpQueryHeuristic;
 import br.com.systec.hive.agent.api.diagnostics.ChatTraceRecorder;
 import br.com.systec.hive.agent.api.domain.Agent;
 import br.com.systec.hive.agent.api.domain.ChatMessage;
@@ -32,7 +33,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -108,7 +108,12 @@ class ChatServiceImplTest {
     @Mock
     private ChatModel chatModel;
 
-    @InjectMocks
+    /**
+     * Built by hand rather than by {@code @InjectMocks}: the class takes a primitive configuration
+     * value in its constructor and Mockito cannot supply one, so it silently gives up and reports "no
+     * default constructor" for every test in the class. Naming the collaborators is also what makes a
+     * new constructor argument a visible change here instead of a mystery.
+     */
     private ChatServiceImpl service;
 
     private UUID tenantId;
@@ -120,6 +125,10 @@ class ChatServiceImplTest {
         tenantId = UUID.randomUUID();
         userId = UUID.randomUUID();
         agentId = UUID.randomUUID();
+        service = new ChatServiceImpl(llmClientFactory, credentialResolver, agentService, chatSessionService,
+                chatMessageService, chatAssistantTxService, defaultAgentService, kbRetrieval, kbLinkPort,
+                chatRateLimiter, discoveryService, traceRecorder, ragRecorder, null,
+                FollowUpQueryHeuristic.ELLIPTICAL_LIMIT);
     }
 
     private Agent openAiAgent() {
@@ -864,7 +873,8 @@ class ChatServiceImplTest {
         };
         ChatServiceImpl service = new ChatServiceImpl(llmClientFactory, credentialResolver, agentService,
                 chatSessionService, chatMessageService, chatAssistantTxService, defaultAgentService,
-                kbRetrieval, kbLinkPort, chatRateLimiter, discoveryService, failingTraces, failingRagRecorder());
+                kbRetrieval, kbLinkPort, chatRateLimiter, discoveryService, failingTraces, failingRagRecorder(),
+                null, FollowUpQueryHeuristic.ELLIPTICAL_LIMIT);
         when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of());
         stubClient("reply");
         when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
