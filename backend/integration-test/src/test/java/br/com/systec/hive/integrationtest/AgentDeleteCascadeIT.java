@@ -9,7 +9,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -18,9 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>Bug P0 de 2026-09-26: {@code chat_session.agent_id} referenciava {@code agent(id)} sem cláusula
  * {@code ON DELETE} (isto é, {@code NO ACTION}), então um agente com uma única sessão respondia 409
- * e nenhum agente do tenant podia ser excluído. A V14 do módulo {@code agent} traz o CASCADE; a V14
- * do módulo {@code knowledge} fecha a outra ponta — {@code agent_knowledge_base.agent_id}, que não
- * tinha foreign key nenhuma e ficaria órfão assim que o CASCADE entrasse.
+ * e nenhum agente do tenant podia ser excluído. A V14 do módulo {@code agent} traz o CASCADE.
  *
  * <p>O CASCADE é destrutivo e irreversível: excluir o agente apaga as conversas e as mensagens sem
  * lixeira. Estes testes existem para travar esse contrato — se alguém remover o CASCADE, o 204
@@ -44,12 +41,9 @@ class AgentDeleteCascadeIT extends WebIntegrationTest {
         UUID sessionId = createSession(token, alvo, "Conversa que vai sumir");
         insertMessage(tenantId, sessionId, "USER", "pergunta que vai sumir");
         insertMessage(tenantId, sessionId, "ASSISTANT", "resposta que vai sumir");
-        UUID kbId = createKb(tenantId, token, "KB do agente");
-        linkKb(token, alvo, kbId);
 
         assertThat(count("SELECT count(*) FROM chat_session WHERE id = ?", sessionId)).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM chat_message WHERE session_id = ?", sessionId)).isEqualTo(2);
-        assertThat(count("SELECT count(*) FROM agent_knowledge_base WHERE agent_id = ?", alvo)).isEqualTo(1);
 
         mockMvc.perform(delete("/v1/agents/{id}", alvo).header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
@@ -57,10 +51,6 @@ class AgentDeleteCascadeIT extends WebIntegrationTest {
         assertThat(count("SELECT count(*) FROM agent WHERE id = ?", alvo)).isZero();
         assertThat(count("SELECT count(*) FROM chat_session WHERE id = ?", sessionId)).isZero();
         assertThat(count("SELECT count(*) FROM chat_message WHERE session_id = ?", sessionId)).isZero();
-        assertThat(count("SELECT count(*) FROM agent_knowledge_base WHERE agent_id = ?", alvo)).isZero();
-
-        // A KB em si sobrevive: o cascade leva o vínculo, não a base de conhecimento.
-        assertThat(count("SELECT count(*) FROM knowledge_base WHERE id = ?", kbId)).isEqualTo(1);
 
         // E o cascade não encosta no agente vizinho, que não tem conversa.
         assertThat(count("SELECT count(*) FROM agent WHERE id = ?", outro)).isEqualTo(1);
@@ -219,7 +209,6 @@ class AgentDeleteCascadeIT extends WebIntegrationTest {
      * domínio, não vazamento. O que não pode aparecer é o identificador da tabela, {@code agent}.
      */
     private void assertNoSchemaLeak(String body) {
-        assertThat(body).doesNotContain("agent_knowledge_base");
         assertThat(body).doesNotContain("chat_session");
         assertThat(body).doesNotContain("chat_message");
         assertThat(body).doesNotContain("prompt_template");
@@ -273,16 +262,6 @@ class AgentDeleteCascadeIT extends WebIntegrationTest {
         return UUID.fromString(body.split("\"id\":\"")[1].split("\"")[0]);
     }
 
-    private UUID createKb(UUID tenantId, String token, String name) throws Exception {
-        String body = mockMvc.perform(post("/v1/knowledge-bases")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"" + name + "\",\"embeddingModel\":\"nomic-embed-text\"}"))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return UUID.fromString(body.split("\"id\":\"")[1].split("\"")[0]);
-    }
-
     private UUID createPrompt(String token, String name, String code, String template) throws Exception {
         String body = mockMvc.perform(post("/v1/prompt-templates")
                         .header("Authorization", "Bearer " + token)
@@ -291,14 +270,6 @@ class AgentDeleteCascadeIT extends WebIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return UUID.fromString(body.split("\"id\":\"")[1].split("\"")[0]);
-    }
-
-    private void linkKb(String token, UUID agentId, UUID kbId) throws Exception {
-        mockMvc.perform(put("/v1/agents/{id}/knowledge-bases", agentId)
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"kbIds\":[\"" + kbId + "\"]}"))
-                .andExpect(status().isOk());
     }
 
     /**

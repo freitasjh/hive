@@ -289,8 +289,3 @@ export interface Page<T> {
  * Result of `PUT /agents/{id}/knowledge-bases`. Names come back so the editor can show the current
  * selection without a second request; ids remain the source of truth because names repeat per tenant.
  */
-export interface AgentKnowledgeBasesLink {
-  agentId: string
-  kbIds: string[]
-  kbNames: string[]
-}

@@ -3,14 +3,11 @@ package br.com.systec.hive.agent.impl.service;
 import br.com.systec.hive.agent.api.diagnostics.ChatTrace;
 import br.com.systec.hive.agent.api.diagnostics.ChatTraceRecorder;
 import br.com.systec.hive.agent.api.port.ChatTurnGateway;
-import br.com.systec.hive.agent.impl.rag.FollowUpQueryHeuristic;
-import br.com.systec.hive.agent.impl.rag.RagTurnResolver;
 import br.com.systec.hive.agent.api.domain.Agent;
 import br.com.systec.hive.agent.api.domain.ChatMessage;
 import br.com.systec.hive.agent.api.domain.ChatRequest;
 import br.com.systec.hive.agent.api.domain.ChatResponse;
 import br.com.systec.hive.agent.api.domain.ChatSession;
-import br.com.systec.hive.agent.api.domain.RagContext;
 import br.com.systec.hive.agent.api.exceptions.ChatSessionNotFoundException;
 import br.com.systec.hive.agent.api.exceptions.ConfigMissingException;
 import br.com.systec.hive.agent.api.exceptions.ModelReturnedEmptyException;
@@ -18,15 +15,7 @@ import br.com.systec.hive.agent.api.exceptions.ProviderException;
 import br.com.systec.hive.agent.api.service.AgentService;
 import br.com.systec.hive.agent.api.service.ChatMessageService;
 import br.com.systec.hive.agent.api.service.ChatSessionService;
-import br.com.systec.hive.commons.testsupport.HardcodedSimilarityCutOffGuard;
-import br.com.systec.hive.knowledge.api.domain.KbChunk;
-import br.com.systec.hive.knowledge.api.domain.RagDiagnostic;
-import br.com.systec.hive.knowledge.api.domain.RagOutcome;
-import br.com.systec.hive.knowledge.api.domain.RagQuerySettings;
-import br.com.systec.hive.knowledge.api.domain.RagRetrievalResult;
-import br.com.systec.hive.knowledge.api.exceptions.KbDimensionMismatchException;
-import br.com.systec.hive.knowledge.api.port.KbRetrievalPort;
-import br.com.systec.hive.knowledge.api.port.RagDiagnosticRecorder;
+import br.com.systec.hive.agent.impl.diagnostics.FailureClassifier;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.ChatRole;
 import br.com.systec.hive.provider.api.LlmClientFactory;
@@ -40,8 +29,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -49,26 +36,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyDouble;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ChatServiceImplTest {
-
-    /**
-     * The reasons the real retrieval reports, reproduced here so a fixture describes an observation
-     * that can actually happen. Written out rather than imported: the point of these fixtures is
-     * that the turn line has something true to carry, and a fixture that invents its own facts is
-     * the bug under test.
-     */
-    private static final String NO_KB_LINKED = "no knowledge base linked or empty query";
-    private static final String NO_KB_FOR_TENANT = "linked knowledge bases do not exist for this tenant";
-    private static final String NOTHING_ABOVE_THRESHOLD =
-            "vector search returned no chunk above the similarity threshold";
 
     @Mock
     private LlmClientFactory<ChatModel> llmClientFactory;
@@ -98,25 +71,13 @@ class ChatServiceImplTest {
     private br.com.systec.hive.provider.api.OpencodeDiscoveryService discoveryService;
 
     @Mock
-    private br.com.systec.hive.knowledge.api.port.KbRetrievalPort kbRetrieval;
-
-    @Mock
-    private br.com.systec.hive.knowledge.api.port.KbAgentLinkPort kbLinkPort;
-
-    @Mock
     private ChatTraceRecorder traceRecorder;
-
-    @Mock
-    private RagDiagnosticRecorder ragRecorder;
 
     @Mock
     private ChatModel chatModel;
 
     /** The real gateway: prompt assembly, the empty-reply guard and the retry policy are production. */
     private ChatTurnGateway turnGateway;
-
-    /** The real resolver, so a retrieval outcome reaches the turn as an outcome. */
-    private RagTurnResolver ragTurnResolver;
 
     /**
      * Built by hand rather than by {@code @InjectMocks}: the class takes a primitive configuration
@@ -139,15 +100,13 @@ class ChatServiceImplTest {
         // assertion about which model was asked, with which limits, still reads as a claim about the
         // real call rather than about a stand-in for the whole gateway.
         turnGateway = new LangChain4jTurnGateway(llmClientFactory);
-        ragTurnResolver = new RagTurnResolver(kbRetrieval, kbLinkPort, ragRecorder, llmClientFactory,
-                null, FollowUpQueryHeuristic.ELLIPTICAL_LIMIT);
         service = newService(traceRecorder);
     }
 
     private ChatServiceImpl newService(ChatTraceRecorder traces) {
         return new ChatServiceImpl(credentialResolver, agentService, chatSessionService, chatMessageService,
                 chatAssistantTxService, defaultAgentService, chatRateLimiter, discoveryService,
-                traces, ragTurnResolver, turnGateway);
+                traces, turnGateway);
     }
 
     private Agent openAiAgent() {
@@ -538,235 +497,6 @@ class ChatServiceImplTest {
         verify(chatAssistantTxService, never()).saveAssistantAndTouch(any(), any(), any());
     }
 
-    // ================================================================= C1: every RAG return is reported
-
-    @Test
-    void when_chat_withRagPortUnlinked_then_recordsNoLinkOutcome() {
-        ChatResponse response = chatWithRag(RagOutcome.NO_LINK, RagRetrievalResult.empty(RagOutcome.NO_LINK, 3L, null, 0, NO_KB_LINKED, null));
-
-        assertThat(lastRagDiagnostic().outcome()).isEqualTo(RagOutcome.NO_LINK);
-        assertThat(lastRagDiagnostic().kbIds()).isEmpty();
-        assertThat(lastRagDiagnostic().agentId()).isEqualTo(agentId);
-        assertThat(lastRagDiagnostic().elapsedMs()).isNotNegative();
-        assertThat(response.isRagUsed()).isFalse();
-    }
-
-    @Test
-    void when_chat_withLinkedKbMissingForTenant_then_recordsKbNotFoundForTenant() {
-        RagRetrievalResult result = RagRetrievalResult.empty(RagOutcome.KB_NOT_FOUND_FOR_TENANT, 4L, null, 0, NO_KB_FOR_TENANT, null);
-
-        chatWithRag(RagOutcome.OK, result);
-
-        RagDiagnostic diagnostic = lastRagDiagnostic();
-        assertThat(diagnostic.outcome()).isEqualTo(RagOutcome.KB_NOT_FOUND_FOR_TENANT);
-        assertThat(diagnostic.kbIds()).containsExactly(linkedKbId);
-        assertThat(diagnostic.tenantId()).isEqualTo(tenantId);
-    }
-
-    @Test
-    void when_chatWithNoChunkAboveThreshold_then_recordsOutcomeAndNeverInventsACutOff() {
-        chatWithRag(RagOutcome.OK, RagRetrievalResult.empty(RagOutcome.NO_CHUNK_ABOVE_THRESHOLD, 5L, null, 1, NOTHING_ABOVE_THRESHOLD, null));
-
-        RagDiagnostic diagnostic = lastRagDiagnostic();
-        assertThat(diagnostic.outcome()).isEqualTo(RagOutcome.NO_CHUNK_ABOVE_THRESHOLD);
-        assertThat(diagnostic.chunks()).isZero();
-        // The retrieval resolved no cut-off, and this class has none of its own to fall back on: the
-        // number that rejected the chunks lives in the knowledge base's model, not here. Reporting a
-        // constant is how a line ends up explaining one threshold while the search used another.
-        assertThat(diagnostic.threshold())
-                .as("no constant to invent from: the retrieval owns the number")
-                .isNull();
-    }
-
-    @Test
-    void when_chatWithCutOffResolvedByRetrieval_then_reportsThatNumberOnDiagnosticAndTrace() {
-        chatWithRag(RagOutcome.OK,
-                RagRetrievalResult.empty(RagOutcome.NO_CHUNK_ABOVE_THRESHOLD, 5L, 0.42, 1, NOTHING_ABOVE_THRESHOLD, null));
-
-        assertThat(lastRagDiagnostic().threshold())
-                .as("the retrieval's cut-off is the only one there is")
-                .isEqualTo(0.42);
-        ArgumentCaptor<ChatTrace> captor = ArgumentCaptor.forClass(ChatTrace.class);
-        verify(traceRecorder, atLeastOnce()).record(captor.capture());
-        assertThat(last(captor.getAllValues()).ragThreshold()).isEqualTo(0.42);
-    }
-
-    /**
-     * The turn asks the retrieval for a cut-off, and does not name one. Anything else puts a number
-     * here that the base's model never agreed to — which is precisely the defect this class used to
-     * carry, on a model whose scores sit below it.
-     */
-    @Test
-    void when_chatRetrieves_then_itDelegatesTheCutOffToTheBaseModel() {
-        prepareChat();
-        when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of(linkedKbId));
-        when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), any()))
-                .thenReturn(RagRetrievalResult.empty(RagOutcome.NO_CHUNK_ABOVE_THRESHOLD, 1L, 0.60, 1, NOTHING_ABOVE_THRESHOLD, null));
-        stubClient("reply");
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
-
-        service.chat(newRequest(), tenantId, userId);
-
-        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(linkedKbId)), eq("Hello world"),
-                eq(RagTurnResolver.RAG_MAX_RESULTS), eq(RagQuerySettings.fromKbConvention()));
-    }
-
-    private static <T> T last(List<T> values) {
-        return values.get(values.size() - 1);
-    }
-
-    @Test
-    void when_chat_withRagTimeout_then_recordsTimeoutOutcome() {
-        chatWithRag(RagOutcome.OK, RagRetrievalResult.empty(RagOutcome.TIMEOUT, 2000L, 0.60, 1, "retrieval exceeded 2s", "TimeoutException:timeout"));
-
-        assertThat(lastRagDiagnostic().outcome()).isEqualTo(RagOutcome.TIMEOUT);
-        assertThat(lastRagDiagnostic().elapsedMs()).isNotNegative();
-    }
-
-    @Test
-    void when_chat_withRetrievalException_then_recordsErrorWithCause() {
-        prepareChat();
-        when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of(linkedKbId));
-        when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), any()))
-                .thenThrow(new IllegalStateException("retrieval failed for query=[PERGUNTA SIGILOSA]"));
-        stubClient("reply");
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
-
-        service.chat(newRequest(), tenantId, userId);
-
-        RagDiagnostic diagnostic = lastRagDiagnostic();
-        assertThat(diagnostic.outcome()).isEqualTo(RagOutcome.ERROR);
-        assertThat(diagnostic.kbIds()).containsExactly(linkedKbId);
-        // class + closed code only: the message is where the user question would leak
-        assertThat(diagnostic.cause()).isEqualTo("IllegalStateException:unexpected");
-        assertThat(diagnostic.cause()).doesNotContain("PERGUNTA SIGILOSA");
-    }
-
-    @Test
-    void when_chat_withLinkLookupException_then_recordsErrorAndKeepsChatWorking() {
-        prepareChat();
-        when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenThrow(new RuntimeException("link table down"));
-        stubClient("reply");
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
-
-        ChatResponse response = service.chat(newRequest(), tenantId, userId);
-
-        assertThat(response.getMessage()).isEqualTo("reply");
-        assertThat(lastRagDiagnostic().outcome()).isEqualTo(RagOutcome.ERROR);
-    }
-
-    /**
-     * The one retrieval outcome that is thrown rather than returned, exercised through the throw.
-     *
-     * <p>Because no result is ever produced for it, this is the single place where the turn builds a
-     * RAG line by hand instead of deriving it — and it used to build that line without
-     * {@code foundKbs}, so a mismatch between two bases that <b>were both found</b> was logged as
-     * {@code foundKbs=0}. Same false arrow as the bug that started all this: the operator goes to the
-     * link table instead of to the dimensions. The count travels on the exception, and the turn has
-     * to read it from there.
-     */
-    @Test
-    void when_chat_withDimensionMismatchThrown_then_theTurnLineCarriesTheCountFromTheException() {
-        prepareChat();
-        when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of(linkedKbId));
-        when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), any()))
-                .thenThrow(new KbDimensionMismatchException(3));
-
-        assertThatThrownBy(() -> service.chat(newRequest(), tenantId, userId))
-                .isInstanceOf(KbDimensionMismatchException.class);
-
-        RagDiagnostic turn = lastRagDiagnostic();
-        assertThat(turn.outcome()).isEqualTo(RagOutcome.DIMENSION_MISMATCH);
-        assertThat(turn.foundKbs())
-                .as("three bases were found and checked; reporting 0 sends the reader to the link table")
-                .isEqualTo(3);
-        assertThat(turn.kbIds()).containsExactly(linkedKbId);
-        assertThat(turn.reason()).isNotBlank();
-        assertThat(turn.cause()).isEqualTo("KbDimensionMismatchException:dimension_mismatch");
-    }
-
-    @Test
-    void when_chat_withChunks_then_recordsCountsAndSystemBlockFromTheRealResult() {
-        chatWithRag(RagOutcome.OK,
-                RagRetrievalResult.of(RagOutcome.OK, List.of(chunk(), chunk()), 42L, 0.60, 1, null, null));
-
-        RagDiagnostic diagnostic = lastRagDiagnostic();
-        assertThat(diagnostic.outcome()).isEqualTo(RagOutcome.OK);
-        assertThat(diagnostic.chunks()).isEqualTo(2);
-        assertThat(diagnostic.kbIds()).containsExactly(linkedKbId);
-        assertThat(diagnostic.foundKbs()).isEqualTo(1);
-        assertThat(diagnostic.threshold()).isEqualTo(0.60);
-        assertThat(diagnostic.systemBlockChars()).isPositive();
-    }
-
-    /**
-     * The two lines a turn emits — the retrieval's and the agent's — used to disagree, and the agent's
-     * was the wrong one: a {@code no_chunk_above_threshold} whose second line claimed
-     * {@code foundKbs=0, reason="empty retrieval"}, i.e. that the bases were never found. An operator
-     * reading it goes and looks at the link table, and the real cause — a cut-off that rejected every
-     * chunk — stays untouched.
-     *
-     * <p>Characterisation, not a string match: for every outcome the retrieval can hand <b>back</b>,
-     * the facts it reported have to arrive unchanged on the turn's line. The turn adds
-     * {@code agentId} and the size of the context block; it may not restate anything.
-     *
-     * <p>Two enum values are deliberately absent, because the production retrieval never returns
-     * them: {@code DIMENSION_MISMATCH} is thrown, and {@code RAG_DISABLED} is raised by the turn
-     * itself when the knowledge module is not wired. Both take a different path into the recorder, and
-     * the thrown one is covered by the test above rather than by a fabricated result here.
-     */
-    @Test
-    void when_everyReturnedOutcomeReachesTheTurnLine_then_itSaysWhatTheRetrievalSaid() {
-        for (RagOutcome outcome : List.of(RagOutcome.OK, RagOutcome.NO_LINK,
-                RagOutcome.KB_NOT_FOUND_FOR_TENANT, RagOutcome.NO_CHUNK_ABOVE_THRESHOLD,
-                RagOutcome.TIMEOUT, RagOutcome.ERROR)) {
-            RagRetrievalResult result = RagRetrievalResult.of(outcome, List.of(), 7L, 0.60, 3,
-                    "reason for " + outcome.wireName(), "Cause:timeout");
-
-            chatWithRag(RagOutcome.OK, result);
-
-            RagDiagnostic turn = lastRagDiagnostic();
-            assertThat(turn.outcome()).as("%s outcome", outcome).isEqualTo(outcome);
-            assertThat(turn.foundKbs()).as("%s foundKbs", outcome).isEqualTo(result.foundKbs()).isEqualTo(3);
-            assertThat(turn.reason()).as("%s reason", outcome).isEqualTo(result.reason());
-            assertThat(turn.cause()).as("%s cause", outcome).isEqualTo(result.cause());
-            assertThat(turn.threshold()).as("%s threshold", outcome).isEqualTo(result.threshold());
-            assertThat(turn.chunks()).as("%s chunks", outcome).isEqualTo(result.chunkCount());
-            assertThat(turn.kbIds()).as("%s kbIds", outcome).containsExactly(linkedKbId);
-            assertThat(turn.agentId()).as("%s agentId", outcome).isEqualTo(agentId);
-        }
-    }
-
-    /** A successful retrieval reports nothing it failed at, so the turn must not invent a reason. */
-    @Test
-    void when_theRetrievalSucceeded_then_theTurnLineCarriesNoReasonOrCause() {
-        chatWithRag(RagOutcome.OK,
-                RagRetrievalResult.of(RagOutcome.OK, List.of(chunk()), 3L, 0.60, 1, null, null));
-
-        RagDiagnostic turn = lastRagDiagnostic();
-        assertThat(turn.reason()).isNull();
-        assertThat(turn.cause()).isNull();
-        assertThat(turn.threshold()).isEqualTo(0.60);
-    }
-
-    /**
-     * The latency is the one field the two lines legitimately differ on: the retrieval measures the
-     * vector search, the turn measures the whole RAG resolution. So the turn line reports the turn's
-     * own time and not the search's — here a value no mocked turn can plausibly reach.
-     */
-    @Test
-    void when_theRetrievalIsReportedOnTheTurnLine_then_theLatencyIsTheTurnsNotTheSearchs() {
-        chatWithRag(RagOutcome.OK,
-                RagRetrievalResult.of(RagOutcome.OK, List.of(chunk()), 9_999L, 0.60, 1, null, null));
-
-        assertThat(lastRagDiagnostic().elapsedMs())
-                .isNotNegative()
-                .isNotEqualTo(9_999L);
-    }
-
     @Test
     void when_chatTrace_then_rendersOneLineWithParametersAndTimings() {
         ChatTrace trace = ChatTrace.builder(UUID.randomUUID(), agentId, AiProvider.OPENAI, "gpt-4o-mini")
@@ -822,7 +552,7 @@ class ChatServiceImplTest {
                 .rag(false, 0, "error", null)
                 .elapsedMs(120000L)
                 .usage(null, null, null, null)
-                .failure(RagDiagnostic.causeOf(new dev.langchain4j.exception.TimeoutException(
+                .failure(FailureClassifier.causeOf(new dev.langchain4j.exception.TimeoutException(
                         new java.net.http.HttpTimeoutException("read timed out"))))
                 .build();
 
@@ -858,17 +588,14 @@ class ChatServiceImplTest {
     }
 
     @Test
-    void when_ragRecorderFails_then_chatStillAnswers() {
+    void when_theTraceRecorderFails_then_chatStillAnswers() {
         prepareChat();
         ChatTraceRecorder failingTraces = trace -> {
             throw new IllegalStateException("trace down");
         };
-        RagTurnResolver failingResolver = new RagTurnResolver(kbRetrieval, kbLinkPort,
-                failingRagRecorder(), llmClientFactory, null, FollowUpQueryHeuristic.ELLIPTICAL_LIMIT);
         ChatServiceImpl service = new ChatServiceImpl(credentialResolver, agentService, chatSessionService,
                 chatMessageService, chatAssistantTxService, defaultAgentService, chatRateLimiter,
-                discoveryService, failingTraces, failingResolver, turnGateway);
-        when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of());
+                discoveryService, failingTraces, turnGateway);
         stubClient("reply");
         when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
         when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
@@ -941,7 +668,12 @@ class ChatServiceImplTest {
         assertThat(trace.totalTokens()).isEqualTo(460);
         assertThat(trace.finishReason()).isEqualTo("STOP");
         assertThat(trace.failure()).isNull();
-        assertThat(trace.ragOutcome()).isNotBlank();
+        // A trace has no retrieval to report: the product does not retrieve. The fields stay on the
+        // record so the rendered line keeps its shape, and they say "none" rather than "unknown".
+        assertThat(trace.ragUsed()).isFalse();
+        assertThat(trace.citationsCount()).isZero();
+        assertThat(trace.ragOutcome()).isNull();
+        assertThat(trace.ragThreshold()).isNull();
     }
 
     @Test
@@ -986,31 +718,6 @@ class ChatServiceImplTest {
 
         // 3 x 30s was the ~90s stall: a read timeout must not be repeated.
         verify(chatModel, times(1)).chat(any(List.class));
-    }
-
-    @Test
-    void when_chatWithoutRag_then_exposesReasonToTheClient() {
-        prepareChat();
-        when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of());
-        stubClient("nao recebi contexto");
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
-
-        ChatResponse response = service.chat(newRequest(), tenantId, userId);
-
-        assertThat(response.isRagUsed()).isFalse();
-        assertThat(response.getCitations()).isEmpty();
-        assertThat(response.getRagReason()).isEqualTo("no_link");
-    }
-
-    @Test
-    void when_chatWithRag_then_exposesOkReasonAlongsideCitations() {
-        ChatResponse response = chatWithRag(RagOutcome.OK,
-                RagRetrievalResult.of(RagOutcome.OK, List.of(chunk()), 7L, 0.60, 1, null, null));
-
-        assertThat(response.isRagUsed()).isTrue();
-        assertThat(response.getRagReason()).isEqualTo("ok");
-        assertThat(response.getCitations()).hasSize(1);
     }
 
     // ================================ RODADA 2 — resposta vazia do modelo (content NOT NULL -> 409)
@@ -1133,10 +840,7 @@ class ChatServiceImplTest {
 
     // ================================================================= helpers
 
-    private UUID linkedKbId;
-
     private void prepareChat() {
-        linkedKbId = UUID.randomUUID();
         ChatSession session = new ChatSession();
         UUID sessionId = UUID.randomUUID();
         session.setId(sessionId);
@@ -1154,61 +858,5 @@ class ChatServiceImplTest {
         request.setMessage("Hello world");
         request.setSessionId(null);
         return request;
-    }
-
-    private ChatResponse chatWithRag(RagOutcome linkOutcome, RagRetrievalResult result) {
-        prepareChat();
-        if (linkOutcome == RagOutcome.OK) {
-            when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of(linkedKbId));
-            when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), any()))
-                    .thenReturn(result);
-        } else {
-            when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of());
-        }
-        stubClient("reply");
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
-
-        return service.chat(newRequest(), tenantId, userId);
-    }
-
-    private KbChunk chunk() {
-        KbChunk chunk = new KbChunk();
-        chunk.setDocId(UUID.randomUUID());
-        chunk.setDocName("manual");
-        chunk.setChunkId(UUID.randomUUID());
-        chunk.setText("trecho");
-        chunk.setScore(0.88);
-        return chunk;
-    }
-
-    private RagDiagnostic lastRagDiagnostic() {
-        ArgumentCaptor<RagDiagnostic> captor = ArgumentCaptor.forClass(RagDiagnostic.class);
-        verify(ragRecorder, atLeastOnce()).record(captor.capture());
-        List<RagDiagnostic> all = captor.getAllValues();
-        return all.get(all.size() - 1);
-    }
-
-    private static RagDiagnosticRecorder failingRagRecorder() {
-        return diagnostic -> {
-            throw new IllegalStateException("rag trace down");
-        };
-    }
-
-    /**
-     * The similarity cut-off is the base's model's, decided in the knowledge module's convention
-     * table. This class used to hold a second copy of it, and that copy was wrong for a model whose
-     * scores sit below it — with nothing in the code able to say so. A literal written here again
-     * would be the same defect with a third location, so it is checked for rather than trusted.
-     *
-     * <p>The pattern and the assertion live in {@code HardcodedSimilarityCutOffGuard}, with the test
-     * that proves the pattern still fires.
-     */
-    @Test
-    void when_thisClassIsScanned_then_noSimilarityCutOffIsHardcodedInIt() throws IOException {
-        HardcodedSimilarityCutOffGuard.assertNoHardcodedCutOff(
-                Path.of("src/main/java/br/com/systec/hive/agent/impl/service/ChatServiceImpl.java"));
-        HardcodedSimilarityCutOffGuard.assertNoHardcodedCutOff(
-                Path.of("src/main/java/br/com/systec/hive/agent/impl/rag/RagTurnResolver.java"));
     }
 }

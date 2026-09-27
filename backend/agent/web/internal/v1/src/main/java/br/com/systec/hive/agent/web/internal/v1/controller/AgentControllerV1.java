@@ -3,15 +3,11 @@ package br.com.systec.hive.agent.web.internal.v1.controller;
 import br.com.systec.hive.agent.api.domain.Agent;
 import br.com.systec.hive.agent.api.domain.AgentValidation;
 import br.com.systec.hive.agent.api.exceptions.DefaultAgentNotFoundException;
-import br.com.systec.hive.agent.api.exceptions.KnowledgeModuleUnavailableException;
 import br.com.systec.hive.agent.api.service.AgentService;
 import br.com.systec.hive.agent.api.service.DefaultAgentService;
 import br.com.systec.hive.agent.api.service.ValidateService;
 import br.com.systec.hive.agent.web.internal.v1.dto.AgentCreateDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.AgentDTO;
-import br.com.systec.hive.agent.web.internal.v1.dto.AgentKnowledgeBasesDTO;
-import br.com.systec.hive.agent.web.internal.v1.dto.AgentKnowledgeBasesDTOResponse;
-import br.com.systec.hive.agent.web.internal.v1.dto.AgentKnowledgePatchDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.AgentUpdateDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.ValidateRequestDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.ValidateResponseDTO;
@@ -34,7 +30,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -43,7 +38,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -55,21 +49,13 @@ public class AgentControllerV1 {
     private final DefaultAgentService defaultAgentService;
     private final ValidateService validateService;
     private final AgentDTOMapper mapper;
-    private final br.com.systec.hive.knowledge.api.service.AgentKbLinkService agentKbLinkService;
-    private final br.com.systec.hive.knowledge.api.port.KbAgentLinkPort kbAgentLinkPort;
 
     public AgentControllerV1(AgentService agentService, DefaultAgentService defaultAgentService,
-                             ValidateService validateService, AgentDTOMapper mapper,
-                             @org.springframework.beans.factory.annotation.Autowired(required = false)
-                             br.com.systec.hive.knowledge.api.service.AgentKbLinkService agentKbLinkService,
-                             @org.springframework.beans.factory.annotation.Autowired(required = false)
-                             br.com.systec.hive.knowledge.api.port.KbAgentLinkPort kbAgentLinkPort) {
+                             ValidateService validateService, AgentDTOMapper mapper) {
         this.agentService = agentService;
         this.defaultAgentService = defaultAgentService;
         this.validateService = validateService;
         this.mapper = mapper;
-        this.agentKbLinkService = agentKbLinkService;
-        this.kbAgentLinkPort = kbAgentLinkPort;
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -157,47 +143,6 @@ public class AgentControllerV1 {
         UUID tenantId = currentTenantId();
         Agent agent = defaultAgentService.setDefault(tenantId, id);
         return ResponseEntity.ok(mapper.toDto(agent));
-    }
-
-    @PatchMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(description = "Vincula KBs ao agente (max 5, por id)")
-    @HasPermission(SecurityConstants.AGENT_MANAGE)
-    public ResponseEntity<AgentDTO> patchKnowledgeBases(@PathVariable UUID id,
-                                                        @RequestBody @Valid AgentKnowledgePatchDTO payload) {
-        UUID tenantId = currentTenantId();
-        agentService.findById(id);
-        if (agentKbLinkService != null) {
-            agentKbLinkService.replaceAll(id, tenantId, payload.knowledgeBaseIds());
-        }
-        return ResponseEntity.ok(mapper.toDto(agentService.findById(id)));
-    }
-
-    /**
-     * Canonical write path for the agent↔knowledge-base link (RN-KB4, max 5).
-     *
-     * <p>It lives in the agent module, and not next to the link table in {@code knowledge}, because
-     * only this side can answer "is this agent mine?". {@code agentService.findById} is tenant-scoped
-     * and raises 404 for an agent of another tenant, which is what keeps the write from being an
-     * IDOR: the knowledge-side port trusts {@code agentId} and would happily insert a link row
-     * pointing at someone else's agent.
-     */
-    @PutMapping(value = "/{id}/knowledge-bases", consumes = MediaType.APPLICATION_JSON_VALUE,
-            produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(description = "Substitui as KBs vinculadas ao agente (max 5; lista vazia desvincula)")
-    @HasPermission(SecurityConstants.AGENT_MANAGE)
-    public ResponseEntity<AgentKnowledgeBasesDTOResponse> replaceKnowledgeBases(
-            @PathVariable UUID id, @RequestBody @Valid AgentKnowledgeBasesDTO payload) {
-        UUID tenantId = currentTenantId();
-        agentService.findById(id);
-        if (kbAgentLinkPort == null) {
-            // Módulo de knowledge ausente: degradar para 200 sem vínculos mentiria para o cliente,
-            // que acabou de receber um 200 de "substituí seus vínculos".
-            throw new KnowledgeModuleUnavailableException();
-        }
-        kbAgentLinkPort.replaceLinks(id, tenantId, payload.kbIds());
-        List<UUID> kbIds = kbAgentLinkPort.linkedKbIds(id, tenantId);
-        return ResponseEntity.ok(new AgentKnowledgeBasesDTOResponse(id, kbIds,
-                kbAgentLinkPort.linkedKbNames(id, tenantId)));
     }
 
     private UUID currentTenantId() {

@@ -37,9 +37,7 @@
     <maven.compiler.target>25</maven.compiler.target>
     <mapstruct.version>1.5.5.Final</mapstruct.version>
     <testcontainers.version>1.20.4</testcontainers.version>
-    <jtokkit.version>1.1.0</jtokkit.version>
     <postgresql.version>42.7.2</postgresql.version>
-    <opennlp.version>2.5.11</opennlp.version>
   </properties>
   <dependencyManagement>
     <dependencies>
@@ -212,17 +210,6 @@
         <scope>provided</scope>
       </dependency>
       <dependency>
-        <groupId>com.knuddels</groupId>
-        <artifactId>jtokkit</artifactId>
-        <version>${jtokkit.version}</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.opennlp</groupId>
-        <artifactId>opennlp-tools</artifactId>
-        <version>${opennlp.version}</version>
-      </dependency>
-      <dependency>
         <groupId>br.com.systec.hive</groupId>
         <artifactId>hive-provider-api</artifactId>
         <version>${project.version}</version>
@@ -333,30 +320,6 @@
       <dependency>
         <groupId>br.com.systec.hive</groupId>
         <artifactId>hive-agent-web-internal-v1</artifactId>
-        <version>${project.version}</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>br.com.systec.hive</groupId>
-        <artifactId>hive-knowledge-api</artifactId>
-        <version>${project.version}</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>br.com.systec.hive</groupId>
-        <artifactId>hive-knowledge-impl</artifactId>
-        <version>${project.version}</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>br.com.systec.hive</groupId>
-        <artifactId>hive-knowledge-dbupdate</artifactId>
-        <version>${project.version}</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>br.com.systec.hive</groupId>
-        <artifactId>hive-knowledge-web-internal-v1</artifactId>
         <version>${project.version}</version>
         <scope>provided</scope>
       </dependency>

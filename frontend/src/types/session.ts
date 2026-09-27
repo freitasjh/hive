@@ -16,23 +16,11 @@ export interface ChatMessageDTO {
   createAt: string
 }
 
-export interface CitationDTO {
-  docId: string
-  docName: string
-  chunkId: string
-  score: number
-}
-
 export interface ChatResponseDTO {
   sessionId: string
   role: string
   message: string
   timestamp: string
-  /** Whether retrieved knowledge was injected into this turn. Optional: older servers omit it. */
-  ragUsed?: boolean
-  /** Why the context was empty when it was. See `types/chat-messages.ts` for the copy per reason. */
-  ragReason?: string
-  citations?: CitationDTO[]
 }
 
 export interface Page<T> {

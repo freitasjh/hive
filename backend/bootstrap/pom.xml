@@ -167,26 +167,6 @@
             <artifactId>hive-agent-dbupdate</artifactId>
             <scope>compile</scope>
         </dependency>
-        <dependency>
-            <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-knowledge-api</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-knowledge-impl</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-knowledge-web-internal-v1</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-knowledge-dbupdate</artifactId>
-            <scope>compile</scope>
-        </dependency>
 
         <!-- Provedores de IA -->
         <dependency>
@@ -215,32 +195,13 @@
             <scope>compile</scope>
         </dependency>
         <!--
-          Official chunking hierarchy used by knowledge ingestion (DocumentSplitters.recursive).
-          Declared here, not only in knowledge/impl, because the rest of dev.langchain4j is `provided`
-          there and a provided dependency does not reach the runtime classpath on its own.
+          The LangChain4j aggregator, needed by the provider module at runtime. Declared at compile
+          scope here because the rest of dev.langchain4j is `provided` in the modules that use it,
+          and a provided dependency does not reach the runtime classpath on its own.
         -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <!--
-          Sentence detector used by DocumentBySentenceSplitter, which the hierarchy above cannot do
-          without. Declared explicitly so the requirement is visible here instead of arriving as an
-          unexamined transitive of `langchain4j`.
-        -->
-        <dependency>
-            <groupId>org.apache.opennlp</groupId>
-            <artifactId>opennlp-tools</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <!--
-          Byte-pair tokenizer used to count tokens when sizing chunks, declared for the same reason
-          as the two above: `provided` in the module that uses it does not reach runtime by itself.
-        -->
-        <dependency>
-            <groupId>com.knuddels</groupId>
-            <artifactId>jtokkit</artifactId>
             <scope>compile</scope>
         </dependency>
     </dependencies>

@@ -23,7 +23,7 @@ import java.util.Objects;
  * {@code finishReason} (a reasoning model that spent its budget reports {@code LENGTH}, an empty
  * string reports {@code null}) and its token usage, both of which live only on the response object.
  *
- * <h3>Null policy — shared with {@link RagContext} and {@link TurnRequest}</h3>
+ * <h3>Null policy — shared with {@link TurnRequest}</h3>
  *
  * <p>Collections are defaulted; a value that carries meaning is required. So {@link #failure} is
  * required on a {@link Status#FAILED} reply and this record coerces nothing else — a {@code null} here
@@ -91,7 +91,7 @@ public record TurnReply(Status status, String text, int promptMessages, int prom
      *
      * <p>{@link #failure} is the provider's own exception, and a LangChain4j {@code HttpException}
      * carries the raw provider payload in its message. That body is echoed into this project's logs by
-     * design, and it is the reason {@code RagDiagnostic} classifies rather than quotes. A generated
+     * design, and it is the reason the failure classifier classifies rather than quotes. A generated
      * {@code toString()} would undo both: one failed assertion, one framework dump, one stray
      * {@code log.debug} and the whole provider response — request echo included — lands in a log file.
      *

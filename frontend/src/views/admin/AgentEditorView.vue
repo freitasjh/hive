@@ -18,13 +18,10 @@ import Toast from 'primevue/toast'
 import Tag from 'primevue/tag'
 import Message from 'primevue/message'
 import InferenceParamsSliders from '../../components/admin/InferenceParamsSliders.vue'
-import KbPicker from '../../components/admin/KbPicker.vue'
 import ProviderSelect from '../../components/ProviderSelect.vue'
 import ConnectionTester from '../../components/ConnectionTester.vue'
 import { agentAdminService } from '../../services/agent-admin.service'
 import { promptService } from '../../services/prompt.service'
-import { knowledgeService } from '../../services/knowledge.service'
-import { KB_MAX_LINKS_MESSAGE, KB_MIXED_DIMENSION_MESSAGE } from '../../types/knowledge'
 import { setBreadcrumbLabel } from '../../utils/breadcrumbOverride'
 import { VENDOR_CATALOG, LGPD_OPENCODE_MESSAGE, toApiError, type AiProvider, type ValidateResponse } from '../../types/agent-admin'
 import { useRemoteModels } from '../../composables/useRemoteModels'
@@ -51,9 +48,6 @@ const temperature = ref<number | null>(0.7)
 const topP = ref<number | null>(0.9)
 const maxTokens = ref<number | null>(2048)
 const tools = ref<string[]>([])
-const knowledgeBases = ref<string[]>([])
-const linkedKbIds = ref<string[]>([])
-const kbPickerRef = ref<{ mixedDimensions: boolean } | null>(null)
 const isDefault = ref(false)
 const active = ref(true)
 const originalIsDefault = ref(false)
@@ -188,10 +182,6 @@ onMounted(async () => {
       topP.value = dto.topP ?? null
       maxTokens.value = dto.maxTokens ?? null
       tools.value = dto.tools ?? []
-      knowledgeBases.value = dto.knowledgeBases ?? []
-      try {
-        linkedKbIds.value = await knowledgeService.listAgentLinks(id.value)
-      } catch { linkedKbIds.value = [] }
       isDefault.value = dto.isDefault
       originalIsDefault.value = dto.isDefault
       active.value = dto.active
@@ -257,10 +247,6 @@ async function save() {
     toast.add({ severity: 'warn', summary: 'Validação', detail: 'Avatar deve ser URL http(s)', life: 3000 })
     return
   }
-  if (kbPickerRef.value?.mixedDimensions) {
-    toast.add({ severity: 'warn', summary: 'Bases incompatíveis', detail: KB_MIXED_DIMENSION_MESSAGE, life: 5000 })
-    return
-  }
   saving.value = true
   const payload = {
     name: name.value.trim(),
@@ -274,32 +260,15 @@ async function save() {
     topP: topP.value,
     maxTokens: maxTokens.value,
     tools: tools.value.length ? tools.value : null,
-    knowledgeBases: null,
     isDefault: isDefault.value,
     active: active.value,
   }
   const testFailed = lastTest.value !== null && !lastTest.value.ok
   try {
-    let savedId = id.value
     if (isEdit.value && id.value) {
       await agentAdminService.update(id.value, payload)
     } else {
-      const created = await agentAdminService.create(payload)
-      savedId = created.id
-    }
-    if (savedId) {
-      // O agente já está salvo neste ponto. Uma falha aqui não pode virar "falha ao salvar" — seria
-      // mentira e faria o usuário repetir o cadastro inteiro. O aviso nomeia o que falhou e a tela
-      // fica aberta, com a seleção do KbPicker intacta para uma nova tentativa.
-      const linked = await linkKnowledgeBases(savedId)
-      if (!linked) {
-        if (testFailed) {
-          toast.add({ severity: 'warn', summary: 'Salvo com aviso', detail: 'Teste de conexão falhou — verifique chave e modelo.', life: 5000 })
-        } else {
-          toast.add({ severity: 'success', summary: isEdit.value ? 'Atualizado' : 'Criado', detail: isEdit.value ? 'Agente atualizado' : 'Agente criado', life: 2000 })
-        }
-        return
-      }
+      await agentAdminService.create(payload)
     }
     if (testFailed) {
       toast.add({ severity: 'warn', summary: 'Salvo com aviso', detail: 'Teste de conexão falhou — verifique chave e modelo.', life: 5000 })
@@ -320,29 +289,6 @@ async function save() {
     }
   } finally {
     saving.value = false
-  }
-}
-
-/**
- * Persists the KbPicker selection on the agent.
- *
- * @returns `true` when the links are in sync, `false` when the user was already warned and should
- *          stay on the screen. It never throws: the agent row is committed at this point and turning
- *          this into an exception would report the whole save as failed.
- */
-async function linkKnowledgeBases(savedId: string): Promise<boolean> {
-  try {
-    await agentAdminService.linkKnowledgeBases(savedId, linkedKbIds.value)
-    return true
-  } catch (err: unknown) {
-    const problem = toApiError(err)
-    toast.add({
-      severity: 'warn',
-      summary: 'Agente salvo, bases não',
-      detail: problem.detail ?? KB_MAX_LINKS_MESSAGE,
-      life: 6000,
-    })
-    return false
   }
 }
 
@@ -578,16 +524,6 @@ const selectedPrompt = computed(() => promptOptions.value.find(p => p.id === pro
                   <div class="flex flex-wrap gap-2">
                     <Chip v-for="(t,idx) in tools" :key="t" :label="t" removable @remove="tools.splice(idx,1)" />
                   </div>
-                </div>
-                <div class="col-12 md:col-6 flex flex-column gap-2">
-                  <label class="text-sm font-medium">Bases de Conhecimento (max 5)</label>
-                  <Message
-                    v-if="isExternalProvider"
-                    severity="info"
-                    :closable="false"
-                    data-testid="kb-external-note"
-                  >{{ LGPD_OPENCODE_MESSAGE }}</Message>
-                  <KbPicker ref="kbPickerRef" v-model="linkedKbIds" data-testid="agent-kb-picker" />
                 </div>
               </div>
             </AccordionContent>

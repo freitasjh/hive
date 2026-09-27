@@ -27,7 +27,6 @@
     <module>security</module>
     <module>agent</module>
     <module>provider</module>
-    <module>knowledge</module>
     <module>integration-test</module>
   </modules>
   <build>

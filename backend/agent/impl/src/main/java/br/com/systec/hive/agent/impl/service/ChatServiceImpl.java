@@ -7,7 +7,6 @@ import br.com.systec.hive.agent.api.domain.ChatMessage;
 import br.com.systec.hive.agent.api.domain.ChatRequest;
 import br.com.systec.hive.agent.api.domain.ChatResponse;
 import br.com.systec.hive.agent.api.domain.ChatSession;
-import br.com.systec.hive.agent.api.domain.RagContext;
 import br.com.systec.hive.agent.api.domain.TurnReply;
 import br.com.systec.hive.agent.api.domain.TurnRequest;
 import br.com.systec.hive.agent.api.exceptions.AgentNotFoundException;
@@ -20,11 +19,10 @@ import br.com.systec.hive.agent.api.service.ChatMessageService;
 import br.com.systec.hive.agent.api.service.ChatService;
 import br.com.systec.hive.agent.api.service.ChatSessionService;
 import br.com.systec.hive.agent.api.service.DefaultAgentService;
-import br.com.systec.hive.agent.impl.rag.RagTurnResolver;
+import br.com.systec.hive.agent.impl.diagnostics.FailureClassifier;
 import br.com.systec.hive.agent.impl.util.ChatTitleUtil;
 import br.com.systec.hive.agent.impl.util.SecurityUtils;
 import br.com.systec.hive.commons.impl.security.TenantContext;
-import br.com.systec.hive.knowledge.api.domain.RagDiagnostic;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.ChatRole;
 import br.com.systec.hive.provider.api.OpencodeDiscoveryService;
@@ -45,11 +43,10 @@ import java.util.UUID;
  *
  * <h3>What this class is for, now that the seams exist</h3>
  *
- * <p>It used to hold six responsibilities and fifteen collaborators. Two of them were large enough to
- * be somebody else's job and are now collaborators with one method each:
- * {@link RagTurnResolver} owns the knowledge context of a turn and its diagnostic, and
- * {@link ChatTurnGateway} owns the prompt, the provider call and the reply. What is left is the part
- * that genuinely belongs to no one else — the ordering, the two transactions, and the telemetry.
+ * <p>It used to hold six responsibilities and fifteen collaborators. One of them was large enough to
+ * be somebody else's job and is now a collaborator with one method each: {@link ChatTurnGateway}
+ * owns the prompt, the provider call and the reply. What is left is the part that genuinely belongs to
+ * no one else — the ordering, the two transactions, and the telemetry.
  *
  * <p><b>The diagnostics stayed here on purpose.</b> {@link #recordTurn} and the two log lines below
  * are what found the six defects this flow was validated against, and they are the only things that
@@ -72,7 +69,7 @@ public class ChatServiceImpl implements ChatService {
 
     /**
      * Failure label written to the trace when the provider answered 200 with no usable text. It is a
-     * literal rather than a {@code Throwable} because {@link RagDiagnostic#causeOf} classifies from
+     * literal rather than a {@code Throwable} because {@link FailureClassifier} classifies from
      * a closed set of exception codes and would degrade it to {@code ...:unexpected}, hiding the one
      * fact the operator needs: the model returned nothing on purpose, it did not crash.
      */
@@ -87,7 +84,6 @@ public class ChatServiceImpl implements ChatService {
     private final ChatRateLimiter chatRateLimiter;
     private final OpencodeDiscoveryService discoveryService;
     private final ChatTraceRecorder traceRecorder;
-    private final RagTurnResolver ragTurnResolver;
     private final ChatTurnGateway turnGateway;
 
     @Autowired
@@ -100,7 +96,6 @@ public class ChatServiceImpl implements ChatService {
                            ChatRateLimiter chatRateLimiter,
                            OpencodeDiscoveryService discoveryService,
                            ChatTraceRecorder traceRecorder,
-                           RagTurnResolver ragTurnResolver,
                            ChatTurnGateway turnGateway) {
         this.credentialResolver = credentialResolver;
         this.agentService = agentService;
@@ -111,7 +106,6 @@ public class ChatServiceImpl implements ChatService {
         this.chatRateLimiter = chatRateLimiter;
         this.discoveryService = discoveryService;
         this.traceRecorder = traceRecorder == null ? ChatTraceRecorder.noop() : traceRecorder;
-        this.ragTurnResolver = ragTurnResolver;
         this.turnGateway = turnGateway;
     }
 
@@ -189,29 +183,22 @@ public class ChatServiceImpl implements ChatService {
 
         // Outside TX: history + provider call
         List<ChatMessage> history = chatMessageService.findLast20(sessionId, tenantId);
-        // Converted once and reused: the RAG augmentation needs the conversation in the provider's own
-        // message type (it is the query transformer's chat memory), and the prompt needs the same list.
-        // Two conversions of the same history would be two chances to disagree about what was said.
+        // Converted once and reused: the gateway's prompt is built from it.
         List<dev.langchain4j.data.message.ChatMessage> conversation = toProviderMessages(history);
 
-        RagContext ragContext = ragTurnResolver.resolve(new RagTurnResolver.RagRequest(
-                tenantId, effectiveAgentId, sessionId, request.getMessage(),
-                provider, model, credential, conversation));
-
         TurnReply reply;
-        // Measured from here so elapsedMs isolates what the provider is asked to do: the prompt
-        // assembly and the RAG resolution are already accounted for elsewhere — the RAG line carries
-        // the search, the compressor carries its own — so a large value here means the provider stalled.
+        // Measured from here so elapsedMs isolates what the provider is asked to do — a large value
+        // here means the provider stalled.
         long startedAt = System.nanoTime();
         reply = turnGateway.execute(new TurnRequest(sessionId, agent, provider, model,
-                credential.apiKey(), credential.baseUrl(), history, conversation, ragContext));
+                credential.apiKey(), credential.baseUrl(), history, conversation));
 
         if (reply.status() == TurnReply.Status.EMPTY_RESPONSE) {
             // Verified empty BEFORE persisting: chat_message.content is NOT NULL, so saving this
             // turned a provider quirk into a 409 data-integrity error that told the user nothing.
             // Reasoning models are the trigger — mimo-v2.5 with max_tokens=32 spends the whole
             // budget on reasoning and returns content=null; glm-5.2 returns "". Both are covered.
-            recordTurn(sessionId, effectiveAgentId, provider, model, agent, history, reply, ragContext,
+            recordTurn(sessionId, effectiveAgentId, provider, model, agent, history, reply,
                     elapsedMs(startedAt), EMPTY_MODEL_RESPONSE);
             log.warn("chat empty model response sessionId={} tenantId={} agentId={} provider={} model={} maxTokens={}",
                     sessionId, tenantId, effectiveAgentId, provider, model, agent.getMaxTokens());
@@ -228,8 +215,8 @@ public class ChatServiceImpl implements ChatService {
             if (failure instanceof br.com.systec.hive.commons.api.exceptions.BaseException base) {
                 throw base;
             }
-            recordTurn(sessionId, effectiveAgentId, provider, model, agent, history, reply, ragContext,
-                    elapsedMs(startedAt), RagDiagnostic.causeOf(failure));
+            recordTurn(sessionId, effectiveAgentId, provider, model, agent, history, reply,
+                    elapsedMs(startedAt), FailureClassifier.causeOf(failure));
             if (LangChain4jTurnGateway.isModelNotFound(failure)) {
                 if (discoveryService != null) {
                     discoveryService.evict(provider);
@@ -251,7 +238,7 @@ public class ChatServiceImpl implements ChatService {
             throw new IllegalStateException("unreachable turn status: " + reply.status());
         }
 
-        recordTurn(sessionId, effectiveAgentId, provider, model, agent, history, reply, ragContext,
+        recordTurn(sessionId, effectiveAgentId, provider, model, agent, history, reply,
                 elapsedMs(startedAt), null);
 
         // TX2: save assistant + touch atomically
@@ -261,11 +248,6 @@ public class ChatServiceImpl implements ChatService {
         chatResponse.setSessionId(sessionId);
         chatResponse.setMessage(reply.text());
         chatResponse.setRole(ChatRole.ASSISTANT);
-        chatResponse.setRagUsed(ragContext.used());
-        chatResponse.setCitations(ragContext.citations());
-        // Motivo do contexto ausente: sem isso a FE só vê ragUsed=false e o modelo inventa uma
-        // explicação ("nao recebi contexto") sem que o usuario saiba a causa real.
-        chatResponse.setRagReason(ragContext.outcome().wireName());
         if (assistantMsg != null && assistantMsg.getCreateAt() != null) {
             chatResponse.setTimestamp(assistantMsg.getCreateAt().toInstant(ZoneOffset.UTC));
         } else {
@@ -287,14 +269,15 @@ public class ChatServiceImpl implements ChatService {
      * @param failureText already-classified failure label, or {@code null} for a healthy turn
      */
     private void recordTurn(UUID sessionId, UUID agentId, AiProvider provider, String model, Agent agent,
-                            List<ChatMessage> history, TurnReply reply, RagContext ragContext,
+                            List<ChatMessage> history, TurnReply reply,
                             long elapsedMs, String failureText) {
         try {
+            // No .rag(...) call: the product has no knowledge context, so the trace's retrieval
+            // fields keep their builder defaults (not used, zero citations, no outcome, no
+            // threshold) and the log line this recorder prints is unchanged in shape.
             traceRecorder.record(ChatTrace.builder(sessionId, agentId, provider, model)
                     .agentLimits(agent.getMaxTokens(), agent.getTopP(), agent.getTemperature())
                     .prompt(history.size(), reply.promptMessages(), reply.promptChars())
-                    .rag(ragContext.used(), ragContext.citations().size(), ragContext.outcome().wireName(),
-                            ragContext.threshold())
                     .elapsedMs(elapsedMs)
                     .usage(reply.promptTokens(), reply.completionTokens(), reply.totalTokens(),
                             reply.finishReason())
@@ -312,13 +295,11 @@ public class ChatServiceImpl implements ChatService {
     /**
      * The conversation in the provider's message type, dropping entries with no content.
      *
-     * <p>System messages are kept in the list but the query transformer ignores them: a system prompt
-     * is an instruction to the model, not something the user said, and a compressor that read it would
-     * rewrite the question into an instruction.
+     * <p>System messages are kept in the list: a system prompt is an instruction to the model, and
+     * the prompt builder places it ahead of the conversation.
      *
-     * <p>Converted once per turn and handed to both collaborators that need it — the resolver (as the
-     * compressor's memory) and the gateway (as the prompt body) — because two conversions of one
-     * history is two chances to disagree about what was said.
+     * <p>Converted once per turn and handed to the gateway, which builds the prompt from it —
+     * converting one history twice would be two chances to disagree about what was said.
      */
     private static List<dev.langchain4j.data.message.ChatMessage> toProviderMessages(List<ChatMessage> history) {
         List<dev.langchain4j.data.message.ChatMessage> messages = new ArrayList<>();

@@ -37,10 +37,6 @@
         </dependency>
         <dependency>
             <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-knowledge-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-identity-api</artifactId>
         </dependency>
         <dependency>

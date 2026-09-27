@@ -29,7 +29,7 @@ docker-compose -f docker-compose-vetor.yml up -d     # PostgreSQL+pgvector on :5
 
 ### Backend Module Structure
 
-Each domain module (`tenant`, `identity`, `security`, `agent`, `provider`, `knowledge`) follows:
+Each domain module (`tenant`, `identity`, `security`, `agent`, `provider`) follows:
 
 ```
 module/
@@ -62,7 +62,6 @@ Each module has its **own migration history table** and **own location**:
 | identity | `classpath:/db/migration/identity_db` | `flyway_schema_history_identity` |
 | tenant | `classpath:/db/migration/tenant_db` | `flyway_schema_history_tenant` |
 | agent | `classpath:/db/migration/agent` | `flyway_schema_history_agent` |
-| knowledge | `classpath:/db/migration/knowledge` | `flyway_schema_history_knowledge` |
 
 Naming: `V{N}__description.sql`. Start at V2 (V1 likely baseline). Use `uuid-ossp` extension for UUID generation.
 

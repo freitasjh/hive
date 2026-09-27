@@ -169,26 +169,6 @@
     </dependency>
     <dependency>
       <groupId>br.com.systec.hive</groupId>
-      <artifactId>hive-knowledge-api</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>br.com.systec.hive</groupId>
-      <artifactId>hive-knowledge-impl</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>br.com.systec.hive</groupId>
-      <artifactId>hive-knowledge-web-internal-v1</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>br.com.systec.hive</groupId>
-      <artifactId>hive-knowledge-dbupdate</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>br.com.systec.hive</groupId>
       <artifactId>hive-provider-api</artifactId>
       <scope>compile</scope>
     </dependency>
@@ -215,16 +195,6 @@
     <dependency>
       <groupId>dev.langchain4j</groupId>
       <artifactId>langchain4j</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.opennlp</groupId>
-      <artifactId>opennlp-tools</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.knuddels</groupId>
-      <artifactId>jtokkit</artifactId>
       <scope>compile</scope>
     </dependency>
   </dependencies>

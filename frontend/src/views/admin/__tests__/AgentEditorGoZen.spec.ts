@@ -102,7 +102,6 @@ describe('AgentEditorView GO/ZEN', () => {
     expect(w.find('[data-testid="lgpd-banner"]').exists()).toBe(true)
     expect(w.find('[data-testid="input-base-url-readonly"]').exists()).toBe(true)
     expect(w.text()).toContain('https://opencode.ai/privacy')
-    expect(w.find('[data-testid="kb-external-note"]').exists()).toBe(true)
   })
 
   it('shows off-catalog badge for stale model without blocking save', async () => {

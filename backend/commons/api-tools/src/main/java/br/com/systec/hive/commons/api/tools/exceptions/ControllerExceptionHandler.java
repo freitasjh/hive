@@ -222,15 +222,16 @@ public class ControllerExceptionHandler {
             // Último ramo de propósito: as constraints nomeadas acima continuam valendo primeiro, e
             // este só pega o que sobrou. Ele existe porque o default fala de "registro referenciado
             // por outros dados", o que é FALSO para violação de chave única — o registro em
-            // conflito é o próprio registro novo, não uma dependência. Sem este ramo, criar duas
-            // bases com o mesmo slug respondia "remova as dependências", e não existe dependência
-            // nenhuma para remover: o operador ficava sem ação possível.
+            // conflito é o próprio registro novo, não uma dependência. Sem este ramo, criar dois
+            // registros com o mesmo valor_UNIQUE respondia "remova as dependências", e não existe
+            // dependência nenhuma para remover: o operador ficava sem ação possível.
             //
-            // Alcançáveis hoje (2026-09-26): uq_knowledge_base_tenant_slug, a cada criação repetida
-            // (o try/catch do KnowledgeBaseServiceImpl não a vê, porque repository.save() não faz
-            // flush e a violação só acontece no commit, fora do bloco); e
-            // uq_kb_document_tenant_sha e uk_provider_credential_tenant_provider, por race de
-            // check-then-act.
+            // Alcançável hoje (2026-09-27): uk_provider_credential_tenant_provider, por race de
+            // check-then-act — o serviço verifica se a credencial existe e o commit de duas requisições
+            // simultâneas ainda pode colidir, porque repository.save() não faz flush e a violação
+            // só acontece no commit. É o único caminho que sobra para este ramo depois que as
+            // constraints de slug de base de conhecimento e de sha de documento saíram com o módulo
+            // knowledge (Batch 1, 2026-09-27); as tabelas continuam no banco, mas nada as popula.
             code = "ALREADY_EXISTS";
             detail = "Já existe um registro com estes dados. Revise os valores informados e tente novamente.";
         }

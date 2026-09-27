@@ -17,22 +17,20 @@ import java.util.UUID;
  *
  * <p>Two fields look redundant and are not. {@code history} is the conversation as it was persisted;
  * {@code conversation} is the same conversation rendered in the provider's message type. They are
- * rendered <b>once</b> by the caller and shared, because the RAG query transformer reads
- * {@code conversation} and the prompt is built from it — rendering it twice would be two chances to
- * disagree about what was said, and this project's diagnosis lines have already been wrong once for
- * being reconstructed rather than carried.
+ * rendered <b>once</b> by the caller and shared, because the prompt is built from it — rendering it
+ * twice would be two chances to disagree about what was said, and this project's diagnosis lines have
+ * already been wrong once for being reconstructed rather than carried.
  *
- * <h3>Null policy — and it is shared with {@link RagContext} and {@link TurnReply}</h3>
+ * <h3>Null policy — and it is shared with {@link TurnReply}</h3>
  *
- * <p>One rule across the three records, because three different rules in three adjacent records is
- * how a reader stops trusting any of them:
+ * <p>One rule across the records, because different rules in adjacent records is how a reader stops
+ * trusting any of them:
  * <ul>
  *   <li><b>A collection is defaulted</b> — {@code null} and empty are the same fact, and coercing
  *       costs nothing.</li>
- *   <li><b>A value that carries meaning is required.</b> A null {@code ragContext} used to be read as
- *       {@code RAG_DISABLED} and reported to the client as a turn with no knowledge — a lie told
- *       about a broken wiring. It is now a construction failure with a stack trace pointing at the
- *       line that forgot it.</li>
+ *   <li><b>A value that carries meaning is required.</b> The agent is required: a turn without one has
+ *       no system prompt and no generation limits, and saying so at construction beats a prompt that
+ *       quietly went out with neither.</li>
  * </ul>
  *
  * @param sessionId   session being answered, for the provider's session-scoped client
@@ -43,22 +41,17 @@ import java.util.UUID;
  * @param baseUrl     resolved endpoint, {@code null} for the vendor default
  * @param history     persisted conversation, counted on the trace as {@code historySize}
  * @param conversation the same conversation in the provider's message type, never {@code null}
- * @param ragContext  what the RAG resolution decided. An empty context is a context that resolved to
- *                    nothing, and conflating the two is how a turn that skipped retrieval starts
- *                    claiming it had none
  */
 public record TurnRequest(UUID sessionId, Agent agent, AiProvider provider, String model,
                           String apiKey, String baseUrl,
                           List<br.com.systec.hive.agent.api.domain.ChatMessage> history,
-                          List<ChatMessage> conversation,
-                          RagContext ragContext) {
+                          List<ChatMessage> conversation) {
 
     public TurnRequest {
         history = history == null ? List.of() : List.copyOf(history);
         conversation = conversation == null ? List.of() : List.copyOf(conversation);
         // Required, not defaulted. See the null policy above.
         agent = Objects.requireNonNull(agent, "agent");
-        ragContext = Objects.requireNonNull(ragContext, "ragContext");
     }
 
     /**
@@ -84,9 +77,6 @@ public record TurnRequest(UUID sessionId, Agent agent, AiProvider provider, Stri
                 + ", apiKey=***"
                 + ", history=" + history.size() + " message(s)"
                 + ", conversation=" + conversation.size() + " message(s)"
-                + ", ragUsed=" + ragContext.used()
-                + ", ragOutcome=" + ragContext.outcome()
-                + ", ragCitations=" + ragContext.citations().size()
                 + "]";
     }
 }

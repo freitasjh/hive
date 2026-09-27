@@ -50,8 +50,20 @@ public class AgentEntity extends AbstractEntity {
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "tools", columnDefinition = "text[]")
     private java.util.List<String> tools;
+    /**
+     * Retired with the agent↔knowledge-base link (Batch 1, 2026-09-27). The column stays — the
+     * migration that created it belongs to this module and dropping it is Batch 2's business — but
+     * it is neither written nor trusted: {@code V13} read the legacy values into real KB rows and
+     * never cleared them, so on any database that lived through the link era this column holds
+     * names of bases that no longer exist.
+     *
+     * <p>Read-only is the point. {@code insertable}/{@code updatable} off means no code path can put
+     * a value there again, and {@code AgentMapperDomain} refuses to map it out, so the API stops
+     * answering with dangling names no matter what the column happens to hold.
+     */
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "knowledge_bases", columnDefinition = "text[]")
+    @Column(name = "knowledge_bases", columnDefinition = "text[]",
+            insertable = false, updatable = false)
     private java.util.List<String> knowledgeBases;
     @Column(name = "is_default", nullable = false)
     private boolean isDefault = false;

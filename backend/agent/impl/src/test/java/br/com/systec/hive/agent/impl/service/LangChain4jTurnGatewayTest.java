@@ -1,11 +1,8 @@
 package br.com.systec.hive.agent.impl.service;
 
 import br.com.systec.hive.agent.api.domain.Agent;
-import br.com.systec.hive.agent.api.domain.RagContext;
 import br.com.systec.hive.agent.api.domain.TurnReply;
 import br.com.systec.hive.agent.api.domain.TurnRequest;
-import br.com.systec.hive.knowledge.api.domain.KbCitation;
-import br.com.systec.hive.knowledge.api.domain.RagOutcome;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.LlmClientFactory;
 import dev.langchain4j.data.message.AiMessage;
@@ -28,7 +25,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -79,13 +75,9 @@ class LangChain4jTurnGatewayTest {
                 any(), any(), eq("sk-test"), any(), eq(sessionId))).thenReturn(chatModel);
     }
 
-    private TurnRequest request(List<ChatMessage> conversation, RagContext rag) {
-        return new TurnRequest(sessionId, agent, AiProvider.OPENAI, "gpt-4o-mini",
-                "sk-test", null, List.of(), conversation, rag);
-    }
-
     private TurnRequest request() {
-        return request(List.of(new UserMessage("pergunta")), RagContext.empty(RagOutcome.NO_LINK));
+        return new TurnRequest(sessionId, agent, AiProvider.OPENAI, "gpt-4o-mini",
+                "sk-test", null, List.of(), List.of(new UserMessage("pergunta")));
     }
 
     /**
@@ -134,32 +126,16 @@ class LangChain4jTurnGatewayTest {
         assertThat(capturedPrompt()).noneMatch(SystemMessage.class::isInstance);
     }
 
-    /** The RAG block is the second thing in the prompt, and only when there is one. */
     @Test
-    void when_theContextWasInjected_then_itSitsBetweenTheSystemPromptAndTheConversation() {
-        RagContext rag = RagContext.of(new SystemMessage("Contexto relevante"), 17,
-                List.of(new KbCitation()), RagOutcome.OK, 0.60);
-        stubClient();
-        when(chatModel.chat(anyPrompt())).thenReturn(answer("resposta", null, null));
-
-        gateway.execute(request(List.of(new UserMessage("pergunta")), rag));
-
-        List<ChatMessage> prompt = capturedPrompt();
-        assertThat(prompt).hasSize(3);
-        assertThat(((SystemMessage) prompt.get(0)).text()).isEqualTo("Voce e um assistente.");
-        assertThat(((SystemMessage) prompt.get(1)).text()).isEqualTo("Contexto relevante");
-        assertThat(((UserMessage) prompt.get(2)).singleText()).isEqualTo("pergunta");
-    }
-
-    @Test
-    void when_theContextWasEmpty_then_noBlockIsAdded() {
+    void when_theTurnIsBuilt_then_theSystemPromptIsTheOnlyThingBeforeTheConversation() {
         stubClient();
         when(chatModel.chat(anyPrompt())).thenReturn(answer("resposta", null, null));
 
         gateway.execute(request());
 
         List<ChatMessage> prompt = capturedPrompt();
-        assertThat(prompt).as("system prompt plus the question, and no context block").hasSize(2);
+        assertThat(prompt).as("system prompt plus the question, and nothing else").hasSize(2);
+        assertThat(((SystemMessage) prompt.get(0)).text()).isEqualTo("Voce e um assistente.");
         assertThat(prompt.get(1)).isInstanceOf(UserMessage.class);
     }
 
@@ -361,7 +337,7 @@ class LangChain4jTurnGatewayTest {
     void when_theRequestIsRendered_then_theCredentialAndTheConversationAreNot() {
         TurnRequest request = new TurnRequest(sessionId, agent, AiProvider.OPENAI, "gpt-4o-mini",
                 "sk-super-secret-value", "https://api.example/v1",
-                List.of(), List.of(new UserMessage("PERGUNTA SIGILOSA do usuario")), ragUsed());
+                List.of(), List.of(new UserMessage("PERGUNTA SIGILOSA do usuario")));
 
         String rendered = request.toString();
 
@@ -400,56 +376,15 @@ class LangChain4jTurnGatewayTest {
                 .hasMessageContaining("failure");
     }
 
-    /** And the same rule as the other two records: a value that carries meaning is not defaulted. */
+    /** And the same rule as the other records: a value that carries meaning is not defaulted. */
     @Test
-    void when_theRequestCarriesNoContext_then_itIsRefusedRatherThanReportedAsRagDisabled() {
-        // Coercing this to RAG_DISABLED used to tell the client a turn had no knowledge when the truth
-        // was that nobody had resolved any — a lie about a broken wiring, reported as a ragReason.
-        assertThatThrownBy(() -> new TurnRequest(sessionId, agent, AiProvider.OPENAI, "gpt-4o-mini",
-                "sk-test", null, List.of(), List.of(), null))
+    void when_theRequestCarriesNoAgent_then_itIsRefusedRatherThanPromptedWithoutOne() {
+        // A null agent would go out with no system prompt and no generation limits, and say nothing.
+        assertThatThrownBy(() -> new TurnRequest(sessionId, null, AiProvider.OPENAI, "gpt-4o-mini",
+                "sk-test", null, List.of(), List.of()))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("ragContext");
+                .hasMessageContaining("agent");
     }
 
-    /**
-     * The third record, and the one that mattered most: {@code RagContext} carries the retrieved
-     * document verbatim, in the exact form the model read it. It was a private nested record before the
-     * seams were cut, and the cut turned it into a public type in {@code agent/api} carried by three
-     * collaborators — so a generated {@code toString()} would have put the customer's document one
-     * {@code log.debug} away from a log file, in a project whose diagnostics exist precisely so that
-     * chunk text never reaches one.
-     */
-    @Test
-    void when_theContextIsRendered_then_theInjectedBlockIsNot() {
-        RagContext context = RagContext.of(new SystemMessage("CONTRATO 2024: multa de 2%. SALARIO DO CEO: 1M"),
-                26, List.of(), RagOutcome.OK, 0.60);
 
-        String rendered = context.toString();
-
-        assertThat(rendered)
-                .doesNotContain("multa de 2%")
-                .doesNotContain("SALARIO DO CEO")
-                .doesNotContain("CONTRATO 2024");
-        // The size survives, because it is the number the diagnostic also reports and an operator reads.
-        assertThat(rendered)
-                .contains("injectedChars=26")
-                .contains("used=true")
-                .contains("outcome=OK")
-                .contains("threshold=0.6");
-    }
-
-    /** An empty context has nothing to leak, and must still read as a diagnosis rather than as null. */
-    @Test
-    void when_anEmptyContextIsRendered_then_itSaysSoWithoutFailing() {
-        assertThat(RagContext.empty(RagOutcome.NO_LINK, 0.60).toString())
-                .contains("used=false")
-                .contains("citations=0")
-                .contains("injectedChars=0")
-                .contains("outcome=NO_LINK");
-    }
-
-    private static RagContext ragUsed() {
-        return RagContext.of(new SystemMessage("Contexto"), 8, List.of(new KbCitation()),
-                RagOutcome.OK, 0.60);
-    }
 }

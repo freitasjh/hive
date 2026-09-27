@@ -111,6 +111,28 @@ npm run test                     # Executar testes unitários
 
 ## 4.4 Base de Conhecimento / RAG — pgvector, módulo `knowledge/` (ADR-010 — 2026-09-25, Aceito)
 
+> ### ⚠️ DECISÃO TEMPORÁRIA — 2026-09-27: código removido, dados intactos
+>
+> **Esta seção descreve uma funcionalidade que não existe mais em código.** O módulo `knowledge/`, o
+> pipeline de RAG do `agent/impl` e os endpoints de vínculo agente↔KB foram **removidos** (Batch 1 de
+> 3) para que o produto volte a ser um Assistant simples: caixa de texto, conversa, prompt escolhido.
+> Decisão registrada em `arquitetura/projetos/hive/decisoes/scope-assistant-sem-rag`.
+>
+> **O que ainda é verdade:** as tabelas continuam no banco, órfãs e intactas —
+> `knowledge_base`, `kb_document`, `agent_knowledge_base`, `kb_embeddings_768`, `kb_embeddings_1536`
+> e a history `flyway_schema_history_knowledge`. **Nenhuma migration de drop foi criada.** Remover
+> código não apaga dado; reaplicar o módulo antigo os reutiliza.
+>
+> **O que não é mais verdade:** os contratos HTTP listados abaixo não existem; os RN-KB1..RN-KB7 não
+> são aplicados; `ChatResponse` não devolve `rag_used`/`rag_reason`/`citations`; o trace do chat não
+> tem linha de recuperação. O texto abaixo é preservado como **registro do que foi removido** — não
+> como especificação vigente.
+>
+> **Escopo desta remoção (Batch 1 de 3):** só o que impedia o `agent` de compilar sem o `knowledge`.
+> O conceito de **Agent** (entidade, serviço, controller, tabela `agent`, `chat_session.agent_id`)
+> permanece — morre no **Batch 2**, junto da promoção de `prompt_template` a entidade principal.
+
+
 - **Bounded context**: módulo `knowledge/` (`api/impl/dbupdate/web/internal/v1`); KBs, documentos, chunks/embeddings, vínculo agente↔KB, playground. `agent/` consome via `knowledge/api` (retrieval no chat).
 - **RN-KB1 (ownership)**: toda KB e documento pertencem a um tenant (`tenant_id NOT NULL`); cross-tenant → 404 uniforme (anti-IDOR).
 - **RN-KB2 (papéis)**: `KNOWLEDGE_MANAGE` (CRUD, upload, URL, reindex, vínculo) e `KNOWLEDGE_READ` (leitura + playground); chat com RAG exige vínculo do agente (só `KNOWLEDGE_READ` não autoriza retrieval arbitrário).

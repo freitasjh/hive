@@ -1,215 +1,163 @@
-# brain_store PENDENTE (MCP brain fora do ar: HTTP 410 em 2026-09-26)
+# PENDENTE — brain_store (2026-09-27)
 
-Duas notas pretendidas para `brain_store` quando o Brain MCP voltar.
-`brain_ping` e `brain_store` retornam `HTTP 410` (endpoint removido) durante todo o refactor.
-
----
-
-## Nota 1 → layer=arquitetura, scope=projetos, path=hive/agent/chat-costuras-rag-e-geracao
-
-# Costuras do chat com RAG — o que foi extraído e por quê (2026-09-26)
-
-Refactor de fronteira pura em `ChatServiceImpl` (15 dependências, 6 responsabilidades).
-Regra dominante: ZERO mudança de comportamento. O fluxo já tinha sido validado em E2E real
-(`ragUsed=true`, retrieval 46-49ms) e 6 bugs encontrados no caminho.
-
-| Costura | Tipo | Dono de |
-|---|---|---|
-| `RagTurnResolver` | classe concreta (`agent/impl/rag`) | link agente↔KB, augmentor, **1 diag por turno**, citations, guard de conteúdo vazio |
-| `ChatTurnGateway` | **porta** `agent/api/port` | prompt, bloco RAG, histórico, chamada ao model, retry, resposta vazia, `isModelNotFound` |
-| `KbVectorStore` | **porta** `knowledge/api/port` | `search`/`insert`/`removeByKb`/`removeByDoc` — a escrita não tinha porta |
-
-### Decisões que NÃO reabrir
-- **Não adotar `EmbeddingStore` do LangChain4j.** `add` retorna `void` em 1.19.0 e `String` em 1.20
-  (impede reconciliar `embedding_id = chunkId`, de que as citations dependem); `removeAll(Filter)`
-  é `default` e lança `UnsupportedOperationException` (delete por KB viraria no-op silencioso).
-- **Não criar `ChatAssistant` nem `AIAgent`.** Não existe tool no backend (`AgentEntity.tools` é
-  `text[]` vazio; nada referencia `@Tool`/`ToolProvider`). O nome colide com `ChatAssistantTxService`.
-- **Não extrair `ModelFailureClassifier`.** `isModelNotFound` é função pura com um call-site.
-
-### Lição 1 — a falha é dado, não exceção, quando a telemetria precisa do que a exceção leva
-`TurnReply` tem `Status.FAILED` e carrega a exceção do provider **desembrulhada**.
-A trace da chamada que falhou precisa de `promptMessages`/`promptChars`, e o prompt é montado
-**dentro** da chamada que falhou. Se a porta lançasse, o chamador reconstruiria um número que nunca
-mediu — a "segunda opinião sobre uma chamada que já aconteceu" que estas linhas foram reescritas
-para evitar. O mesmo vale para `EMPTY_RESPONSE`: `finishReason` e token usage só existem no objeto
-de resposta. Foi assim que um reply vazio virou 409 de integridade no passado.
-`RagDiagnostic.causeOf` é transparente a embrulho (`rootOf` desce à causa mais profunda), mas
-embrulhar mudaria o rótulo — daí a exigência de desembrulhar.
-
-### Lição 2 — a porta é o que torna a troca de store barata, não a abstração
-A leitura já tinha porta (`KbRetrievalPort`); a escrita não: `insert`, `removeByKb`, `removeByDoc`
-eram chamados **direto** por `KbIngestionService`, `KbDocumentServiceImpl` e
-`KnowledgeBaseServiceImpl`. Era isso que travava a portabilidade para Qdrant.
-Ao criar a porta, **pine as queries**: `KbVectorStoreTest` fixa o texto SQL (tabela por dimensão,
-`CAST(? AS vector)`, `ANY(?::uuid[])`, e o `WHERE tenant_id = ?` em cada statement). Uma store que
-mantivesse as 4 assinaturas e derrubasse o predicado de tenant passaria nos testes que ela substitui
-— e seria um vazamento cross-tenant.
-
-### Lição 3 — o sentinela numérico é colisão semântica
-`MIN_SCORE_FROM_KB_CONVENTION = 0d` dizia duas coisas: "ninguém escolheu" e "sem corte".
-`RagQuerySettings` (sealed: `ResolveFromKbConvention` | `Exact(double)`) torna as duas intenções
-irrepresentáveis-uma-como-a-outra.
-Onde mora: **`knowledge/api/domain`**, não `agent/api` — o grafo de módulos força isso, porque
-`agent/api` já depende de `knowledge/api` e a porta que consome o tipo é de lá. Colocar em
-`agent/api` e eliminar o sentinela são mutuamente exclusivos.
-Resolução fica no impl (`EmbeddingTaskConvention` é a única camada que sabe o modelo).
-Efeito colateral **documentado**: `Exact(0)` e `Exact(-1)` agora são honrados verbatim, onde antes
-caíam na convenção. Nenhum call site de produção faz isso; a suíte fixa a semantics nova.
-
-### Lição 4 — onde o prompt é montado decide se a trace sobrevive a uma falha
-O `buildMessages` ficava **fora** do try no original. Ao movê-lo para a porta, foi mantido fora do
-try de propósito: defeito ali é defeito da classe, não falha de provider.
-
-### Lição 5 — dependências: 15 → 11, e o ≤8 não fecha sem uma terceira extração
-Os 11 restantes: 8 serviços de domínio de uso único ou duplo (session, message, tx-assistant, agent,
-defaultAgent, credential, rateLimiter, trace) + `discoveryService` + as 2 costuras novas.
-Chegar a 8 exigiria dissolver 3 serviços distintos numa fachada — abstração nova que o `architect`
-não aprovou. Preferi 11 honestos a 8 com um `TurnCoordinator` inventado.
-
-### Prevenção
-- Ao extrair um método privado que a telemetria observa, verifique **de onde vêm os números que a
-  trace registra**. Se vêm de dentro do que você está movendo, a fronteira precisa devolver medido —
-  não relançado.
-- Ao criar porta de escrita, escreva o teste que fixa o SQL, não só o que a assinatura promete.
-- Sentinelas numéricos em fronteiras (`0` = "não escolhido", `-1` = "ausente") são bugs diferidos;
-  prefira tipo selado desde o primeiro dia.
+O MCP do Brain estava intermitente durante o Batch 1 (410 Gone / timeout em `ping` e `status`).
+O conteúdo abaixo está pronto para ser gravado assim que o servidor voltar.
 
 ---
 
-## Nota 2 → layer=regras, scope=global, path=java/padroes/refactor-de-fronteira-com-telemetria
+## 1) `layer=regras` (ou `estudos`), `scope=global`
 
-# Refactor de fronteira quando existe telemetria que observa a fronteira
+**path:** `estudos/remocao-modulo-acopla-o-chamador`
+**tags:** `arquitetura`, `remocao`, `refactor-destrutivo`, `testes`, `escopo`, `java`
 
-## Regra 1 — a fronteira devolve medido, e medido inclui o caminho de falha
-Extrair `resolveX()` para um colaborador quebra a telemetria se o colaborador só devolve o caminho
-feliz. A trace precisa de números que só existem dentro do que foi movido (`finishReason`,
-`promptChars`, token usage) **e** precisa deles no caminho de erro.
-Forma que funciona: o retorno carrega um estado por desfecho
-(`ANSWERED` / `EMPTY_RESPONSE` / `FAILED`, com a exceção desembrulhada).
-Exceção embrulhada quebra a classificação: `causeOf` lê a causa mais profunda e o `SimpleName` dela
-vai para o log. Embrulhar troca `HttpException:not_found` por `Wrapper:unexpected`.
-
-## Regra 2 — "diagnóstico fora do gateway" é fora do gateway, não fora da classe
-Geração e observação compartilham o vocabulário do transporte. A **regra** (classificação) pertence
-à camada que fala HTTP; o **efeito** (evict de cache, log, 422) pertence à camada que tem sessão e
-tenant. Mover o efeito para dentro cria um log sem session id — o defeito que a separação evitava.
-
-## Regra 3 — a configuração se dissolve nos construtores dos extraídos
-`@Value` de config, `new XFactory()` e `RetryPolicy.defaults()` que viviam no construtor da classe
-grande pertencem ao colaborador que os usa. Contar dependências sem mover isso é contagem de fachada.
-
-## Regra 4 — o teste que existia "por causa" da falta de seam é o indicador de sucesso
-Se existe uma classe de teste cuja única razão de existir é "a unidade só é testável através da
-classe grande", o refactor não terminou quando compila — termina quando aquele teste pode ser
-dividido em testes do colaborador. Verificar: a nova unidade cobre os mesmos caminhos? o teste
-antigo encolheu para o que é de fato da classe grande (a ligação entre as costuras)?
-
-## Prevenção
-- Antes de extrair, liste todo número que a telemetria lê e de qual escopo ele vem.
-- Se a telemetria lê algo que só existe dentro do método extraído, a fronteira precisa de um tipo de
-  retorno com estados — não pode ser `T` nem pode lançar.
-- Teste o caminho de falha da fronteira com a métrica preservada. É o caminho que ninguém cobre.
-
----
-
-## Nota 3 → layer=regras, scope=global, path=java/padroes/record-com-campo-de-segredo
-
-# Record com campo de segredo: `toString()` gerado é um vazamento esperando o momento
+```markdown
+# Remover um módulo acopla o chamador — mapeie quem importa antes de apagar
 
 ## Contexto
-Refactor de fronteira (chat/RAG, 2026-09-26). `TurnRequest` passou a carregar `apiKey` como
-componente de record; `TurnReply` carrega a `Throwable` do provider. O `toString()` autogenerado
-lista tudo. `security-standard.md` proíbe logar segredos.
 
-## O padrão
-Um record **não tem** `toString()` seguro por padrão. Java gera `toString()` com **todos** os
-componentes. Se o record cruza uma fronteira de API (porta, DTO, evento), o objeto é printável.
+Remoção escopada do módulo `knowledge` (RAG) no Hive AI, 2026-09-27. O objetivo era "o módulo
+`agent` passa a compilar e funcionar sem `knowledge`". O plano listava 8 arquivos de `main` para
+corrigir — e os 8 estavam certos, e mesmo assim o corte não fechava, porque o módulo removido tinha
+deixado dependências em lugares que ninguém tinha mapeado.
 
-Antes do refactor, a chave era parâmetro de método e morria no frame. Depois, ela vive num record
-com `toString()` público. Nenhum `log.*(request)` existe hoje — mas **um** `log.debug`, um
-`MDC.put`, um dump de framework, ou um teste que falhe e imprima o objeto escreve a chave num log.
-Log não se desgrava.
+## A regra
 
-## Campos que NUNCA podem entrar no `toString()` gerado
-1. **Credencial** (`apiKey`, `token`, `secret`, `password`) → `apiKey=***`
-2. **`Throwable`** → só `getClass().getSimpleName()`. Motivo específico do LangChain4j:
-   `HttpException.getMessage()` é o **payload bruto do provider** (echo da requisição, às vezes com
-   a chave no corpo). É exatamente o texto que `RagDiagnostic.causeOf` existe para classificar em vez
-   de citar.
-3. **Conteúdo do usuário** (conversation, prompt, histórico) → **tamanho**, nunca texto. Um teste que
-   falha imprime o objeto e põe as palavras do usuário no log de build.
+**Antes de apagar o código de um módulo, grep o uso pelos CHAMADORES, não pelos amigos.** A lista de
+arquivos a corrigir só está completa quando você viu *todo* import do pacote deletado, em `main` e em
+`test`. A lista de arquivos do módulo que você vai deletar é a metade fácil; a metade que vira cascata
+são os `import` que apontam *para* ele.
 
-## O que deixar no `toString()`
-O suficiente para diagnosticar: ids, enums, tamanhos. `sessionId`, `agentId`, `provider`, `model`,
-`ragUsed`, `ragOutcome`, `N message(s)`, `promptChars`.
+Os dois que quase escaparam, e que nenhum plano de escopo adivinharia:
 
-## Regra de coerência entre records vizinhos
-`RagContext` / `TurnRequest` / `TurnReply` tinham regras de null diferentes (um coagulava, outro não).
-**Três regras diferentes em três records adjacentes é como o leitor para de confiar em qualquer uma.**
+1. **`RagDiagnostic.causeOf(Throwable)`** — método de um record de *domínio de KB*, usado por
+   `ChatServiceImpl` para classificar a falha no `ChatTrace`. Não tinha nome de RAG, não vivia em
+   pasta de RAG, e a dependência era invertida: o `agent` dependia do `knowledge` por um método
+   utilitário de nome genérico.
+2. **Dois endpoints de vínculo KB** onde o briefing dizia "o endpoint" (singular). Deixar um dos dois
+   vivo com o serviço já removido é contrato quebrado, não código morto.
 
-Escolha UMA e aplique nos três. A que este projeto adotou:
-- **coleção é defaultada** — `null` e vazio são o mesmo fato
-- **valor que carrega significado é obrigatório** (`Objects.requireNonNull`)
+## O grep que fecha o escopo
 
-O contraexemplo concreto: `ragContext == null` coagulado para `RAG_DISABLED` dizia ao cliente "esta
-rodada não tinha conhecimento" quando a verdade era "ninguém resolveu nada" — uma **mentira** sobre um
-wiring quebrado, reportada como `ragReason`. Virou `NullPointerException` com stack trace.
+    # 1. Quem importa o módulo que vai sumir — main E test.
+    grep -rn "hive\.knowledge\|knowledge\.\(api\|impl\)" backend/ --include="*.java" | grep -v /target/
 
-## Regra (promovida de nota a regra — 3ª ocorrência no mesmo commit)
+    # 2. Quem declara o artefato no build — a lista de poms é maior que a do briefing.
+    grep -rn "hive-knowledge" backend/ --include="pom.xml"
+    grep -rn "hive-knowledge" backend/pom.xml        # <modules> raiz
 
-> **Todo record novo que carregue texto de documento, credencial ou payload de exceção precisa de
-> `toString()` override, no mesmo commit em que o record é criado.**
+    # 3. Quem chama o método removido pelo NOME, dentro e fora da pasta óbvia.
+    grep -rn "<nomeDoMétodoRemovido>" backend/ --include="*.java" | grep -v /target/
 
-A promoção aconteceu porque o defeito apareceu **três vezes** no mesmo commit (2026-09-26), em três
-records diferentes, e **duas** das três vezes passou o code review. Não é um erro que o review
-"pega" — é um erro que o revisor tem que notar sozinho.
+O passo 3 achou o `causeOf`. Os passos 1 e 2 acharam o resto.
 
-### A sequência real, que é a lição
-1. `TurnRequest` — carregava `apiKey`. Revisado como 🟡, corrigido.
-2. `TurnReply` — carregava a `Throwable` do provider. Corrigido **junto**, no mesmo momento.
-3. `RagContext` — **carregava o documento recuperado do cliente, verbatim**. Não foi pego.
+## Sintoma de que você esqueceu o passo 3
 
-Por que o terceiro passou: no momento da correção eu olhei "os records que eu tinha acabado de
-endurecer", não "os records que existem". E `RagContext` era o **pior** dos três — é o único que
-carrega o **conteúdo do documento do cliente** na forma exata em que o modelo o leu. Era
-provavelmente o record mais sensível do pacote inteiro, e era o único sem override.
+O build reclama de `package ...knowledge... does not exist` — mas o arquivo que reclama **não é nenhum
+dos que você editou**. É um consumidor cujo único contato com o módulo era um método de nome genérico.
 
-### O sinal que denuncia
-O `RagContext` era um **record privado aninhado** em `ChatServiceImpl` antes do refactor. Ninguém
-precisava de `toString()` seguro nele. O refactor de fronteira **promoveu a tipo público em
-`agent/api`, carregado por 3 colaboradores**. A mudança de escopo — não a de conteúdo — foi que
-criou o risco.
+## Consequência do não-mapeamento
 
-**Regra derivada:** quando um tipo sai do escopo do arquivo (privado → público no `api/`, local →
-atravessa fronteira de módulo), reavalie `toString()`, `equals`, `hashCode` e serialização. O tipo
-não mudou de conteúdo; mudou de **alcance**, e alcance é o que decide quem pode imprimi-lo.
+O corte vira cascata: você apaga, o build quebra, e a resposta errada é "vou manter o knowledge como
+dependência opcional" — que é exatamente o congelamento que a decisão de produto rejeitou. O custo do
+atalho é maior que o corte.
 
-### Como não deixar escapar de novo
-Ao adicionar um record, listar os componentes **antes** de escrever a classe e perguntar, para cada
-um: "isso pode ser impresso?". A lista é curta:
+## Corolário 1: cobertura viaja com o comportamento, não com o arquivo
 
-| Componente | Pode imprimir? | O que fazer |
-|---|---|---|
-| id, enum, boolean, int/long | sim | manter |
-| `List<X>` de domínio | **depende de X** | contar, ou o nome de X se X for seguro |
-| `String` de credencial | **nunca** | `***` |
-| `Throwable` | **só classe** | `getClass().getSimpleName()` |
-| texto de documento / prompt / conversa | **nunca** | tamanho |
-| `Double` de threshold | sim | manter |
+Ao mover um método utilitário vivo de um módulo para outro, **mover também os testes que o cobriam** —
+ou, se ele nunca teve cobertura direta, **escrever a cobertura nova e dizer isso**. Aqui `causeOf` só
+era testado indiretamente (`ChatServiceImplTest`, `KbRetrievalServiceTest`); `git ls-tree` no tag
+prova que nenhum teste de `RagDiagnostic` existia. Então os 6 testes do `FailureClassifier` são
+**cobertura nova**, não coverage portada — e narrar como "portada" é falsificar o histórico do
+débito. A distinção importa porque "portada" fecha a conta e "nova" aumenta a cobertura.
 
-- **Override no mesmo commit** que cria o record. Não é dívida, é parte do tipo.
-- **Escreva o teste que falha se vazar**, no formato `doesNotContain("<o segredo literal>")`. Ele
-  custa 6 linhas e é a única prova de que o override não foi apagado depois.
-- Se `toString()` é sobrescrito em um record, **o padrão se estende aos vizinhos do mesmo pacote** —
-  pergunte explicitamente "e os outros dois?".
+## Corolário 2: "comportamento idêntico" é uma afirmação que precisa de prova por ambiente
 
-## Prevenção
-- Ao criar um record que carrega segredo, `Throwable` ou texto de usuário: **override `toString()`
-  no mesmo commit**, e escreva o teste que falha se o valor vazar.
-- Ao promover um tipo de privado para público / de intra-módulo para `api/`: reavalie `toString()`,
-  `equals`, `hashCode`, serialização. O conteúdo não mudou; o alcance mudou.
-- Ao endurecer um record, pergunte "quais os **outros** records deste refactor?" — o terceiro do
-  pacote passou o review justamente por essa pergunta não ter sido feita.
-- `throw new IllegalArgumentException` em record curto **no compact constructor**, não no ponto de uso.
-  Quem valida no uso re-cria a colisão silenciosa que o tipo existe para remover.
+Atingi "zero mudança no que sobrevive" e declarei isso no relatório. Era **falso**, e um code review
+achou: a coluna `agent.knowledge_bases` é `ADD COLUMN ... TEXT[]` — nullable, sem `DEFAULT` — e a
+migration `V13` leu dela e **nunca limpou**. Em banco limpo o comportamento era idêntico (`null`),
+então nenhum teste pegou. Em qualquer banco que rodou a era do link, a API passou a devolver nomes de
+KBs que não existiam mais.
+
+**Regra:** "idêntico" só vale se você verificou os *estados достижимые*, não o estado do seu ambiente
+de teste. Um campo nullable sem default habitado por uma migration antiga é um estado alcançável que
+o seu `TRUNCATE` esconde. Pergunte: *qual valor esse campo tem em cada ambiente que já rodou?*
+
+## Corolário 3: meça antes e depois com o MESMO método; não confie na contagem de anotações
+
+`@Test` não é o número de execuções: `@ParameterizedTest` e `@CsvSource` multi-arg rendem mais, e
+parsear anotações à mão erra. A prova é worktree na tag de segurança, rodar o mesmo comando dos
+dois lados, e comparar classe por classe:
+
+    git worktree add /tmp/antes <tag>
+    cd /tmp/antes/backend && mvn -o test
+    mvn -o test
+
+Resultado medido aqui: 306 em classes deletadas + 24 aparados de 3 classes que sobrevivem − 6 novos =
+**−324**, e 700 − 324 = 376 = o "depois" medido. Um teste que desaparece sem entrar nessa conta é um
+teste perdido, e a tabela por classe mostra qual.
+```
+
+---
+
+## 2) `layer=projetos`, `scope=projetos`
+
+**path:** `projetos/hive/batch1-rag-removal-review-lessons`
+**tags:** `hive`, `rag`, `remocao`, `code-review`, `assistant`
+
+```markdown
+# Batch 1 (remoção do RAG) — o que o code review ensina sobre o método
+
+**Data:** 2026-09-27 · **Status:** code review aprovado com 6 🟡, todos de "verdade em comentário".
+
+## O padrão dos 6 achados
+
+**5 dos 6 eram comentários que afirmavam mais do que o código faz.** Nenhum era bug de lógica. O
+reviewer confirmou de forma independente que nada de segurança, permissão, tenant ou transação
+regrediu — e tinha razão: o único achado com consequência real (a API devolvendo `knowledgeBases`
+pendurado) nasceu de eu ter escrito um javadoc que afirmava "o mesmo valor que toda leitura já via".
+
+## A lição central: o danger de uma refatoração não é o que você quebra, é o que você promete
+
+Em refatoração destrutiva, o artefato mais perigoso não é o código — é a frase no relatório e no
+javadoc. "Comportamento idêntico", "zero mudança no que sobrevive", "byte a byte" são afirmações
+verificáveis, e cada uma delas é uma dívida se não for provada. As três correções de relato que o
+reviewer exigiu (branch removida no `causeOf`; testes novos e não portados; contagem 305 vs 306) são
+todas do mesmo tipo: **a aritmética do relato tinha que fechar, e não fechava**.
+
+## Processo que funcionou (e que deve ser padrão)
+
+1. Medir a linha de base em worktree na tag, com o mesmo comando do estado final.
+2. Alterar, medir de novo, comparar **classe por classe**.
+3. Antes de declarar "zero mudança", perguntar por **ambiente**, não por teste: o que esse campo
+   contém em cada banco que já rodou? A resposta estava numa migration de três dias antes.
+4. Toda vez que um comentário for corrigido, verificar a afirmação com grep, não com memória.
+   Foi assim que achei que o javadoc do `agent/api/pom.xml` citava `TurnReply` usando langchain4j —
+   herança do texto antigo, e `TurnReply` nunca importou nada de langchain4j.
+
+## Especificidade do projeto
+
+- **Mapper com `ignore = true` ≠ apagar a linha `@Mapping`.** MapStruct mapeia campos de mesmo nome
+  implicitamente: apagar a linha mantém o mapeamento. O `knowledgeBases` foi "removido" do
+  `toDomain` e continuaria sendo lido da coluna.
+- **`insertable = false, updatable = false` é o guard de escrita que não depende de disciplina.** Um
+  método que "descarta o valor antes de salvar" é convenção; a anotação é o banco recusando. Manter
+  os dois é correto, desde que o comentário não diga que o primeiro basta.
+- **Módulo de teste órfão:** `HardcodedSimilarityCutOffGuard` (commons/test-support) ficou sem
+  consumidor real — o único import era o que o Batch 1 deixou morto. Guard de "não hardcode threshold
+  de similaridade" sem ninguém perguntando sobre threshold. **Reportado, não removido**: decisão de
+  Batch 3.
+- **Dependências mortas com comentário que aponta para código apagado** são a assinatura de remoção
+  parcial: `opennlp-tools` e `jtokkit` sobreviveram porque a revisão de escopo olhou o plano, não o
+  grafo de dependências. O `langchain4j` agregador ficou (o `provider` usa) e só o comentário mentia.
+```
+
+---
+
+## Como gravar
+
+```
+brain_store(layer="estudos",  path="estudos/remocao-modulo-acopla-o-chamador",         scope="global",   tags=[...], content=<corpo da nota 1>)
+brain_store(layer="projetos", path="projetos/hive/batch1-rag-removal-review-lessons",  scope="projetos", tags=[...], content=<corpo da nota 2>)
+```
+
+Depois de gravar, apagar este arquivo.

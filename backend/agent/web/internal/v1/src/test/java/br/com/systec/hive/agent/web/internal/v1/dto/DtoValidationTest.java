@@ -1,15 +1,13 @@
 package br.com.systec.hive.agent.web.internal.v1.dto;
 
 import br.com.systec.hive.provider.api.AiProvider;
+import java.util.List;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -131,56 +129,5 @@ class DtoValidationTest {
     void when_chatRequest_with_blankMessage_then_violation() {
         ChatRequestDTO dto = new ChatRequestDTO(null, null, "");
         assertThat(validator.validate(dto)).isNotEmpty();
-    }
-
-    // ================= RN-KB4 — o limite de 5 precisa ser igual nos dois caminhos de escrita ======
-
-    @Test
-    void when_patchKnowledgeBases_with_sixIds_then_violation() {
-        assertThat(validator.validate(new AgentKnowledgePatchDTO(sixKbIds())))
-                .isNotEmpty();
-    }
-
-    @Test
-    void when_patchKnowledgeBases_with_nullIds_then_violation() {
-        assertThat(validator.validate(new AgentKnowledgePatchDTO(null))).isNotEmpty();
-    }
-
-    @Test
-    void when_patchKnowledgeBases_with_fiveIds_then_noViolations() {
-        // O limite é inclusivo: 5 tem que passar. Um @Size(max = 4) também reprovaria 5 e este
-        // teste pegaria a regressão antes de alguém descobrir no formulário.
-        assertThat(validator.validate(new AgentKnowledgePatchDTO(fiveKbIds()))).isEmpty();
-        assertThat(validator.validate(new AgentKnowledgeBasesDTO(fiveKbIds()))).isEmpty();
-    }
-
-    @Test
-    void when_patchAndPutKnowledgeBases_with_sixIds_then_rejectWithTheSameMessage() {
-        // Os dois caminhos gravam a mesma relação, então a mesma ação do usuário não pode receber
-        // "KB_TOO_MANY_LINKS" numa rota e "VALIDATION_ERROR" na outra.
-        Set<String> patchMessages = messagesOf(new AgentKnowledgePatchDTO(sixKbIds()));
-        Set<String> putMessages = messagesOf(new AgentKnowledgeBasesDTO(sixKbIds()));
-
-        assertThat(patchMessages).isEqualTo(putMessages);
-        assertThat(patchMessages).containsExactly("Máximo de 5 bases de conhecimento por agente");
-    }
-
-    @Test
-    void when_putKnowledgeBases_with_sixIds_then_violation() {
-        assertThat(validator.validate(new AgentKnowledgeBasesDTO(sixKbIds()))).isNotEmpty();
-    }
-
-    private Set<String> messagesOf(Object dto) {
-        return validator.validate(dto).stream()
-                .map(violation -> violation.getMessage())
-                .collect(Collectors.toSet());
-    }
-
-    private static List<java.util.UUID> sixKbIds() {
-        return java.util.stream.IntStream.range(0, 6).mapToObj(i -> java.util.UUID.randomUUID()).toList();
-    }
-
-    private static List<java.util.UUID> fiveKbIds() {
-        return java.util.stream.IntStream.range(0, 5).mapToObj(i -> java.util.UUID.randomUUID()).toList();
     }
 }

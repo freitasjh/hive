@@ -2,7 +2,6 @@ import api from './api'
 import type {
   AgentDTO,
   AgentCreateDTO,
-  AgentKnowledgeBasesLink,
   AgentUpdateDTO,
   AiProvider,
   CredentialStatus,
@@ -93,13 +92,6 @@ export const agentAdminService = {
    * persisting an agent with dangling links. The server enforces the limit and the ownership check,
    * so the client only reports what comes back.
    */
-  async linkKnowledgeBases(id: string, kbIds: string[]): Promise<AgentKnowledgeBasesLink> {
-    try {
-      const res = await api.put(`/agents/${id}/knowledge-bases`, { kbIds })
-      return unwrapData<AgentKnowledgeBasesLink>(res.data)
-    } catch (e) { throw toApiError(e) }
-  },
-
   async validate(payload: ValidateRequest): Promise<ValidateResponse> {
     try {
       // 20s > 15s do backend de propósito: o backend corta a chamada upstream em 15s e devolve

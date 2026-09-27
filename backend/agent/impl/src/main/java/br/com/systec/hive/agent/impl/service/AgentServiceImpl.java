@@ -13,7 +13,6 @@ import br.com.systec.hive.agent.impl.mapper.PromptTemplateDomainMapper;
 import br.com.systec.hive.agent.impl.repository.AgentRepository;
 import br.com.systec.hive.agent.impl.repository.PromptTemplateRepository;
 import br.com.systec.hive.commons.impl.security.TenantContext;
-import br.com.systec.hive.knowledge.api.port.KbAgentLinkPort;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.VendorCatalog;
 import org.slf4j.Logger;
@@ -36,9 +35,7 @@ public class AgentServiceImpl implements br.com.systec.hive.agent.api.service.Ag
     private final PromptTemplateRepository promptTemplateRepository;
     private final AgentMapperDomain mapper;
     private final PromptTemplateDomainMapper promptMapper;
-    private KbAgentLinkPort kbLinkPort;
     private CredentialResolver credentialResolver;
-    private boolean kbMissingWarned;
 
     public AgentServiceImpl(AgentRepository repository,
                             PromptTemplateRepository promptTemplateRepository,
@@ -48,11 +45,6 @@ public class AgentServiceImpl implements br.com.systec.hive.agent.api.service.Ag
         this.promptTemplateRepository = promptTemplateRepository;
         this.mapper = mapper;
         this.promptMapper = promptMapper;
-    }
-
-    @Autowired(required = false)
-    public void setKbLinkPort(KbAgentLinkPort kbLinkPort) {
-        this.kbLinkPort = kbLinkPort;
     }
 
     @Autowired(required = false)
@@ -71,32 +63,25 @@ public class AgentServiceImpl implements br.com.systec.hive.agent.api.service.Ag
         }
     }
 
+    /**
+     * Tells the operator that a client is still sending the retired {@code knowledgeBases} field.
+     *
+     * <p>The write is stopped in two independent places, and this is the second one. The first is
+     * {@code AgentEntity}, where the column is {@code insertable = false, updatable = false} — no
+     * code path can persist a value there again, whatever this method does. What this method adds is
+     * the observation: a client that has not been updated yet is silently losing data otherwise.
+     *
+     * <p>What is <b>not</b> claimed here: that the column is empty, or that it ever gets cleaned.
+     * {@code V13} copied the legacy values into real knowledge-base rows and left the originals
+     * behind, so on a database that lived through the link era the column still holds those names.
+     * The read side is what stopped trusting it — {@code AgentMapperDomain} ignores the field, so
+     * the API reports nothing rather than reporting a base that no longer exists. Clearing the
+     * column is Batch 2's migration to write.
+     */
     private void ignoreLegacyKnowledgeBasesWrite(Agent agent) {
         if (agent.getKnowledgeBases() != null && !agent.getKnowledgeBases().isEmpty()) {
-            // O campo continua sendo ignorado no create/update por compatibilidade com clientes
-            // antigos, mas a rota que ele indica agora existe de fato: é o caminho de escrita
-            // canônico, e é ele que valida o limite de 5 e a posse do agente.
-            log.warn("agent legacy knowledgeBases write ignored agentId={} (use PUT /v1/agents/{{id}}/knowledge-bases)",
-                    agent.getId());
+            log.warn("agent knowledgeBases write ignored agentId={} (knowledge bases are retired)", agent.getId());
             agent.setKnowledgeBases(null);
-        }
-    }
-
-    private void enrichLegacyKnowledgeBasesRead(Agent agent, UUID tenantId) {
-        if (kbLinkPort == null) {
-            if (!kbMissingWarned) {
-                kbMissingWarned = true;
-                log.warn("KB module not available, RAG disabled");
-            }
-            return;
-        }
-        if (tenantId == null || agent == null || agent.getId() == null) {
-            return;
-        }
-        try {
-            agent.setKnowledgeBases(kbLinkPort.linkedKbNames(agent.getId(), tenantId));
-        } catch (Exception e) {
-            log.warn("agent kb link read failed agentId={}", agent.getId(), e);
         }
     }
 
@@ -224,9 +209,7 @@ public class AgentServiceImpl implements br.com.systec.hive.agent.api.service.Ag
             saved.setDefault(true);
         }
 
-        Agent result = mapper.toDomain(saved);
-        enrichLegacyKnowledgeBasesRead(result, tenantId);
-        return result;
+        return mapper.toDomain(saved);
     }
 
     @Override
@@ -314,9 +297,7 @@ public class AgentServiceImpl implements br.com.systec.hive.agent.api.service.Ag
             saved.setDefault(false);
         }
 
-        Agent result = mapper.toDomain(saved);
-        enrichLegacyKnowledgeBasesRead(result, tenantId);
-        return result;
+        return mapper.toDomain(saved);
     }
 
     @Override
@@ -352,9 +333,7 @@ public class AgentServiceImpl implements br.com.systec.hive.agent.api.service.Ag
             UUID tenantId = TenantContext.getCurrentTenant();
             AgentEntity entity = repository.findByIdAndTenantId(agentId, tenantId)
                     .orElseThrow(AgentNotFoundException::new);
-            Agent agent = mapper.toDomain(entity);
-            enrichLegacyKnowledgeBasesRead(agent, tenantId);
-            return agent;
+            return mapper.toDomain(entity);
         } catch (br.com.systec.hive.commons.api.exceptions.TenantNotFountException e) {
             // fallback for non-tenant context (unit tests)
             return repository.findById(agentId)
@@ -386,10 +365,6 @@ public class AgentServiceImpl implements br.com.systec.hive.agent.api.service.Ag
         } else {
             page = repository.findByTenantId(tid, pageable);
         }
-        return page.map(entity -> {
-            Agent agent = mapper.toDomain(entity);
-            enrichLegacyKnowledgeBasesRead(agent, tid);
-            return agent;
-        });
+        return page.map(mapper::toDomain);
     }
 }

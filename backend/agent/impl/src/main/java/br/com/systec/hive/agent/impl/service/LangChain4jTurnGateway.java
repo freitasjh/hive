@@ -1,6 +1,5 @@
 package br.com.systec.hive.agent.impl.service;
 
-import br.com.systec.hive.agent.api.domain.RagContext;
 import br.com.systec.hive.agent.api.domain.TurnReply;
 import br.com.systec.hive.agent.api.domain.TurnRequest;
 import br.com.systec.hive.agent.api.port.ChatTurnGateway;
@@ -21,9 +20,9 @@ import java.util.regex.Pattern;
  * policy, the empty-reply guard and the model-not-found rule.
  *
  * <p>It knows nothing about sessions, tenants, knowledge bases or telemetry. It is handed a
- * {@link TurnRequest} that already carries the RAG decision and returns a {@link TurnReply} already
- * measured in the shape the trace needs — which is the whole reason a caller cannot get this wrong
- * by asking for the wrong thing here.
+ * {@link TurnRequest} and returns a {@link TurnReply} already measured in the shape the trace
+ * needs — which is the whole reason a caller cannot get this wrong by asking for the wrong thing
+ * here.
  *
  * <p>It does not throw. Every outcome, including a failed provider call, comes back as a
  * {@link TurnReply}, because the prompt measurements the caller has to report belong to this class
@@ -125,10 +124,6 @@ public class LangChain4jTurnGateway implements ChatTurnGateway {
             messages.add(new SystemMessage(systemPrompt));
         }
 
-        RagContext ragContext = request.ragContext();
-        if (ragContext.used()) {
-            messages.add(ragContext.injected());
-        }
         messages.addAll(request.conversation());
         return messages;
     }

@@ -16,7 +16,12 @@ public interface AgentMapperDomain {
     @Mapping(target = "topP", source = "topP")
     @Mapping(target = "maxTokens", source = "maxTokens")
     @Mapping(target = "tools", source = "tools")
-    @Mapping(target = "knowledgeBases", source = "knowledgeBases")
+    /**
+     * Ignored, not merely absent: MapStruct maps same-named fields implicitly, so dropping the line
+     * would keep the mapping. The column outlived the link and still carries names of bases that no
+     * longer exist, and reading them out is how the API started answering with dangling values.
+     */
+    @Mapping(target = "knowledgeBases", ignore = true)
     @Mapping(target = "isDefault", source = "isDefault")
     Agent toDomain(AgentEntity agentEntity);
 

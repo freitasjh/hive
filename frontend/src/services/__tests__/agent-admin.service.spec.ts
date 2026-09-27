@@ -104,37 +104,6 @@ describe('agent-admin.service', () => {
     expect(result.isDefault).toBe(true)
   })
 
-  it('linkKnowledgeBases calls PUT /agents/:id/knowledge-bases with the selected ids', async () => {
-    const server = { agentId: 'a1', kbIds: ['kb1', 'kb2'], kbNames: ['Manual', 'Politicas'] }
-    vi.mocked(api.put).mockResolvedValue({ data: server } as never)
-
-    const result = await agentAdminService.linkKnowledgeBases('a1', ['kb1', 'kb2'])
-
-    expect(api.put).toHaveBeenCalledWith('/agents/a1/knowledge-bases', { kbIds: ['kb1', 'kb2'] })
-    expect(result.kbIds).toEqual(['kb1', 'kb2'])
-    expect(result.kbNames).toEqual(['Manual', 'Politicas'])
-  })
-
-  it('linkKnowledgeBases sends an empty list to unlink everything', async () => {
-    vi.mocked(api.put).mockResolvedValue({ data: { agentId: 'a1', kbIds: [], kbNames: [] } } as never)
-
-    await agentAdminService.linkKnowledgeBases('a1', [])
-
-    expect(api.put).toHaveBeenCalledWith('/agents/a1/knowledge-bases', { kbIds: [] })
-  })
-
-  it('linkKnowledgeBases normalises the error so the editor can show the server detail', async () => {
-    vi.mocked(api.put).mockRejectedValue({
-      response: { status: 400, data: { code: 'KB_TOO_MANY_LINKS', detail: 'Máximo de 5 bases de conhecimento por agente.' } },
-    })
-
-    await expect(agentAdminService.linkKnowledgeBases('a1', ['kb1'])).rejects.toMatchObject({
-      status: 400,
-      code: 'KB_TOO_MANY_LINKS',
-      detail: 'Máximo de 5 bases de conhecimento por agente.',
-    })
-  })
-
   it('unwrapPage handles wrapper { data: Page }', async () => {
     const page = { content: [{ id: 'a1' }], totalElements: 1, totalPages: 1, number: 0, size: 20 }
     vi.mocked(api.get).mockResolvedValue({ data: { data: page } } as never)

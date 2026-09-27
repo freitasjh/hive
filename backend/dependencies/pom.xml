@@ -43,8 +43,6 @@
           it no longer is: there is no LangChain4j store in this build.
         -->
         <langchain4j.store.version>1.19.0-beta29</langchain4j.store.version>
-        <jtokkit.version>1.1.0</jtokkit.version>
-        <opennlp.version>2.5.11</opennlp.version>
     </properties>
 
     <dependencyManagement>
@@ -237,32 +235,6 @@
                 <version>${langchain4j.version}</version>
                 <scope>provided</scope>
             </dependency>
-            <!--
-              Byte-pair tokenizer behind OpenAiTokenCountEstimator. Declared explicitly instead of
-              relied upon as a `provided` transitive of langchain4j-open-ai, because the ingestion
-              path needs it at runtime and only this module's pom can say so. `provided` + declared
-              in bootstrap, like the other two artifacts of this same feature, so all three travel
-              to runtime by one mechanism rather than two.
-            -->
-            <dependency>
-                <groupId>com.knuddels</groupId>
-                <artifactId>jtokkit</artifactId>
-                <version>${jtokkit.version}</version>
-                <scope>provided</scope>
-            </dependency>
-            <!--
-              Sentence detector, required by the chunking hierarchy and nothing else:
-              DocumentBySentenceSplitter (langchain4j 1.19.0) imports
-              org.opennlp.tools.sentdetect.SentenceDetectorME, and without it the splitter hierarchy
-              cannot be constructed at all. It arrives transitively through the `langchain4j`
-              aggregate; naming it here makes the runtime requirement deliberate instead of an
-              accident of scope, and bootstrap declares it explicitly for the same reason.
-            -->
-            <dependency>
-                <groupId>org.apache.opennlp</groupId>
-                <artifactId>opennlp-tools</artifactId>
-                <version>${opennlp.version}</version>
-            </dependency>
 
             <!-- Modulos do projeto-->
             <dependency>
@@ -377,30 +349,6 @@
             <dependency>
                 <groupId>br.com.systec.hive</groupId>
                 <artifactId>hive-agent-web-internal-v1</artifactId>
-                <version>${project.version}</version>
-                <scope>provided</scope>
-            </dependency>
-            <dependency>
-                <groupId>br.com.systec.hive</groupId>
-                <artifactId>hive-knowledge-api</artifactId>
-                <version>${project.version}</version>
-                <scope>provided</scope>
-            </dependency>
-            <dependency>
-                <groupId>br.com.systec.hive</groupId>
-                <artifactId>hive-knowledge-impl</artifactId>
-                <version>${project.version}</version>
-                <scope>provided</scope>
-            </dependency>
-            <dependency>
-                <groupId>br.com.systec.hive</groupId>
-                <artifactId>hive-knowledge-dbupdate</artifactId>
-                <version>${project.version}</version>
-                <scope>provided</scope>
-            </dependency>
-            <dependency>
-                <groupId>br.com.systec.hive</groupId>
-                <artifactId>hive-knowledge-web-internal-v1</artifactId>
                 <version>${project.version}</version>
                 <scope>provided</scope>
             </dependency>

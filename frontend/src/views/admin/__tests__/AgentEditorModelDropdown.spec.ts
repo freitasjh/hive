@@ -59,7 +59,6 @@ const stubs = {
   AccordionHeader: { template: '<div><slot /></div>' },
   AccordionContent: { template: '<div><slot /></div>' },
   ConnectionTester: { template: '<div />' },
-  KbPicker: { template: '<div />' },
   InferenceParamsSliders: { template: '<div />' },
   ProviderSelect: { template: '<div />' },
 }

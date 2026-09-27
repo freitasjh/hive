@@ -24,16 +24,13 @@
             <artifactId>hive-provider-api</artifactId>
             <version>${revision}</version>
         </dependency>
-        <dependency>
-            <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-knowledge-api</artifactId>
-        </dependency>
         <!--
           `provided`, like every other dev.langchain4j artifact in dependencies/pom.xml, and needed
-          only because RagContext and TurnRequest/TurnReply speak the provider's message type: the
-          RAG pipeline hands the turn a `dev.langchain4j.data.message.ChatMessage`, and wrapping it
-          in a project type only to unwrap it two lines later would make the block size reported on
-          the diagnostic and the block actually injected two separate facts instead of one.
+          only because TurnRequest speaks the provider's message type: it carries a
+          `dev.langchain4j.data.message.ChatMessage` as `conversation`, alongside the persisted
+          `history` of its own type, and wrapping it in a project type only to unwrap it later would
+          make the block size reported on the diagnostic and the block actually sent two separate
+          facts instead of one. TurnRequest is the only class in this module that needs it.
         -->
         <dependency>
             <groupId>dev.langchain4j</groupId>

@@ -51,15 +51,6 @@
           :timestamp="msg.createAt"
         />
 
-        <Message
-          v-if="ragNotice"
-          :severity="ragNotice.severity"
-          :closable="false"
-          :pt="ragNoticePt"
-        >
-          <span class="text-sm">{{ ragNotice.text }}</span>
-        </Message>
-
         <div v-if="sending" class="flex justify-content-start fade-in-up">
           <div class="assistant-msg-bubble p-3 rounded-2xl shadow-sm flex align-items-center gap-3 bg-surface-0 border-1 border-surface-200 backdrop-blur-md">
             <div class="typing-indicator flex gap-1">
@@ -91,7 +82,6 @@ import { sessionService } from '../services/session.service'
 import { chatService } from '../services/chat.service'
 import type { ChatMessageDTO } from '../types/session'
 import Button from 'primevue/button'
-import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import Toast from 'primevue/toast'
 import Tooltip from 'primevue/tooltip'
@@ -103,7 +93,6 @@ import AgentSelector from '../components/AgentSelector.vue'
 import {
   MODEL_RETURNED_EMPTY_MESSAGE,
   MODEL_RETURNED_EMPTY_TITLE,
-  ragReasonMessage,
 } from '../types/chat-messages'
 
 const vTooltip = Tooltip
@@ -122,33 +111,6 @@ const selectedAgentId = ref<string | null>(null)
 const chatContainer = ref<HTMLElement | null>(null)
 const sidebarRef = ref<InstanceType<typeof ChatSidebar> | null>(null)
 const loadSeq = ref(0)
-
-/**
- * Why the last turn answered without knowledge context, in the user's words.
- *
- * Before this, the response carried `ragReason` and the screen ignored it: the model would claim it
- * had received no context and the user had no way to tell a missing link from a failed search. Null
- * hides the banner entirely, which is also what a successful RAG turn and an unknown reason produce.
- */
-const ragNotice = ref<{ text: string; severity: 'info' | 'warn' } | null>(null)
-
-/**
- * PrimeVue's Message hardcodes `role="alert"` + `aria-live="assertive"`, which is right for an error
- * and wrong here: this notice explains why the answer had no context and interrupts whatever the
- * screen reader was saying. `status` + `polite` announces it without cutting off, and it stays a
- * single live region in this view so the LGPD banner is not announced twice.
- *
- * The test id goes through the PassThrough as well: Message sets `inheritAttrs: false`, so a plain
- * attribute lands on the Transition wrapper and never reaches the element carrying the ARIA role.
- */
-const ragNoticePt = {
-  root: {
-    role: 'status',
-    'aria-live': 'polite',
-    'aria-atomic': 'true',
-    'data-testid': 'rag-notice',
-  },
-} as const
 
 const STORAGE_KEY = 'hive_sessionId'
 
@@ -229,10 +191,6 @@ async function sendMessage() {
       sessionId.value = resp.sessionId
       localStorage.setItem(STORAGE_KEY, resp.sessionId)
     }
-    const reasonText = resp.ragUsed ? null : ragReasonMessage(resp.ragReason)
-    ragNotice.value = reasonText
-      ? { text: reasonText, severity: resp.ragReason === 'no_link' ? 'info' : 'warn' }
-      : null
     messages.value.push({
       id: `assistant-${Date.now()}`,
       sessionId: resp.sessionId,
@@ -244,7 +202,6 @@ async function sendMessage() {
     sidebarRef.value?.refresh()
   } catch (err: unknown) {
     const problem = readApiProblem(err)
-    ragNotice.value = null
     if (problem.code === 'MODEL_RETURNED_EMPTY') {
       // Não é uma falha de envio: a mensagem chegou e o modelo não respondeu. Dizer "erro ao
       // processar" mandaria o usuário procurar problema de rede que não existe — a orientação
