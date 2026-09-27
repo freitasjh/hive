@@ -66,3 +66,7 @@ Thumbs.db
 *.iml
 .env.local
 docker-compose.override.yml
+
+# dumps de banco (podem conter dado real e credencial cifrada)
+.spec/snapshots/
+*.dump

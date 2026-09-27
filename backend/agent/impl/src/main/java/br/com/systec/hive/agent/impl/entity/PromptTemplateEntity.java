@@ -37,7 +37,10 @@ public class PromptTemplateEntity extends AbstractEntity {
     private Integer version;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    // length = 20 reflete o DDL (VARCHAR(20)). Sem ela o Hibernate assumiria 255, e um
+    // PromptStatus novo com nome longo levaria um erro de dimensão críptico em vez de erro de
+    // contrato. Inerte em runtime — `ddl-auto=none` — então o DDL é quem amarra de verdade.
+    @Column(name = "status", nullable = false, length = 20)
     private PromptStatus status;
 
     @Column(name = "description", columnDefinition = "TEXT")

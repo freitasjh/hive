@@ -415,3 +415,74 @@ visível.
 - [ ] Se o número contradiz o que o código sugere, quem está mentindo — o código ou a consulta?
 
 ---
+
+---
+
+# [APPEND 2026-09-27 17:5x] Reescrita do histórico de migrations do módulo `agent`
+
+> `brain_store` falhou com `HTTP 410` (endpoint do Brain MCP fora do ar — o mesmo erro do
+> `brain_search` no início do batch). Registrado aqui para replay quando o MCP voltar.
+
+## Contexto
+12 migrations, das quais 4 existiam só para consertar as anteriores (`fix_*` ×2, a V10 que migrava
+dado criado errado pela V2, a V14 que refazia a FK). O conceito `Agent` saiu do produto. Decisão do
+usuário: reescrever o histórico para o schema nascer no formato final, sem migration de conserto.
+
+## As 3 decisões investigadas
+
+### (a) Versionamento de prompt — as colunas FICAM
+`ADR_Prompt_Versioning.md` diz "não implementada". Verdade do MODELO do ADR (níveis, histórico de
+transições, rollback); FALSO do que o schema e o código fazem. Versionamento inteiro em uso:
+- `PromptTemplateEntity.version` (`nullable = false`)
+- `PromptTemplateServiceImpl:50-51` (create → 1), `:82` (update → +1), `:105` (duplicar → latest+1)
+- `PromptTemplateRepository:27,31,35` (`ORDER BY version DESC`), `:33` (`findByTenantIdAndCodeAndVersion`)
+- `UNIQUE (tenant_id, code, version)` + índice parcial UNIQUE `(tenant_id, code) WHERE status='ACTIVE'`
+
+**Lição: ADR marcado "não implementada" não prova schema morto. Verificar código + schema antes de
+remover coluna.** A nota se autossabotava: reconhecia a coluna `version` e mesmo assim escrevia
+"não existe versionamento de prompt no código".
+
+### (b) Baseline (V1) — não existe arquivo, e reescrever é INVISÍVEL para o Flyway
+`AgentDbUpdateConfig`: `baselineOnMigrate(true)`, `outOfOrder(true)`, e `flyway.repair()` antes do
+`migrate()` (via `initMethod`). **`repair()` realinha checksums e descrições das migrations já
+aplicadas.** Reescrever o histórico sem dropar o schema faz o Flyway realinhar o V2 antigo com o V2
+novo, marcar as versions sumidas como `deleted`, e rodar **ZERO** migrations reportando sucesso.
+
+**Consequência: dropar o schema do módulo é OBRIGATÓRIO.** Sem isso a reescrita é no-op silencioso.
+Mesma família do `max(version)` que já enganou este projeto.
+
+### (c) `provider_credential` fica no módulo `agent`
+Entidade, service, repository, mapper, controller e criptografia estão todos em `agent/`. O módulo
+`provider` **não tem `dbupdate`** (só `api` e `langchain4j`) — não tem como ser dono de tabela. Não
+cita a tabela nenhuma vez. O nome é descritivo (credencial *de um* provider), não de módulo.
+
+## Resultado
+4 migrations, todas `CREATE` puras: `V2__create_prompt_template`, `V3__create_provider_credential`,
+`V4__create_chat_session`, `V5__create_chat_message`. Zero `ALTER`/`DROP`/`fix_`/`drop_`.
+
+## A lição de método: a premissa do diff estava errada
+O critério de aceite esperava 3 diferenças de schema. **Todas as 3 já eram o estado final da série
+antiga** — a V16 dropava `agent`, a V15 renomeava `agent_id` → `agent_id_legacy` e punha
+`prompt_template_id` NOT NULL. A série antiga criava e destruía essas coisas; o fim já era o alvo.
+
+Diff real: **2** diferenças.
+1. `chat_session.agent_id_legacy` — não recriada (é o resto do "agent_id ausente")
+2. `uniq_prompt_active_code_per_tenant` — índice parcial UNIQUE **duplicado**: a V7 recriou o que a V3
+   já tinha, mesmo predicado `(tenant_id, code) WHERE status='ACTIVE'`. Colunas e predicado
+   idênticos: só custava uma escrita extra por linha de `prompt_template`.
+
+**Lição: compare o ESTADO FINAL da série antiga, não o caminho. E se o número de diferenças não bate
+com o esperado, suspeite do critério de aceite antes de maquiar o resultado.**
+
+## Backup e perda
+`pg_dump` completo (custom, com dados) ANTES de dropar:
+`.spec/snapshots/pre-rewrite-20260927-173430-full.dump`. Perdidos 58 `chat_session`, 130
+`chat_message`, 1 `provider_credential` (credencial cifrada — restaurar exige recadastrar, a chave não
+está no dump). `identity` e `tenant` intactos. Nenhum container removido; schema do módulo `agent`
+derrubado por SQL. Resíduo do módulo `knowledge` (deletado em 2026-09-26) também saiu — foi
+obrigatório, `agent_knowledge_base` tinha FK para `agent(id)`.
+
+## Armadilha do Flyway
+A V15 documentava que **nunca se escreva `$$` num arquivo de migration** — o parser de script do
+Flyway corta o arquivo no delimitador, mesmo dentro de comentário. As 4 migrations novas **não usam
+nenhum bloco dollar-quoted**, o que elimina a classe inteira do problema.

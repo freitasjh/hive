@@ -144,12 +144,57 @@ transação, com mensagem autossuficiente, e o reviewer executou ponta a ponta n
 Está sendo removido mesmo assim, porque preservar histórico de dado que ninguém vai ler custa mais do
 que vale.
 
-Um resíduo que a reescrita **deve resolver em vez de carregar adiante**:
-`backend/agent/dbupdate/src/main/resources/db/migration/agent/V9__create_provider_credential.sql`
-cria a tabela de credencial de provedor dentro do histórico de migrations do módulo `agent`. É
-resíduo do ADR-009, que trocou o provider de agente para provedor sem mover a migration. Como a
-reescrita já elimina 8 dos 12 arquivos, é a ocasião de o `provider` voltar a ter o seu próprio
-histórico — e o registro disso pertence à reescrita, não a este ADR, que só registra a dívida.
+### O mecanismo: por que o `DROP SCHEMA` foi obrigatório, e não cauteloso
+
+> Registrado em 2026-09-27 (code review). A decisão acima é o *quê*; isto é o *como*, e é a parte
+> que se re-dispara no próximo batch.
+
+`AgentDbUpdateConfig` chama `flyway.repair()` antes do `migrate()` (via `initMethod`). O `repair()`
+**realinha o checksum e a descrição das migrations já aplicadas** com as disponíveis, e marca como
+`deleted` as versions que sumiram do diretório. Ele **não executa SQL**.
+
+Consequência medida com Flyway 10.10.0: aplicando a série nova sobre um banco que tinha a série
+antiga, **com colisão de número de versão** (nova V2 contra a V2 antiga gravada), o Flyway realinha
+os checksums, executou **zero migrations** e reportou **sucesso** — `migrationsExecuted = 0`, e o
+boot sobe verde com o schema antigo. Sem o `repair()`, o mesmo cenário morre alto e verboso com
+`Migration checksum mismatch for version 2`.
+
+Ou seja: **o `repair()` é o que transforma um erro barulhento em mentira silenciosa.** Reescrever
+migrations sem `DROP SCHEMA` do módulo não é arriscado — é um *no-op* que se apresenta como sucesso.
+
+Os módulos não são iguais nisso: `agent` e `identity` chamam `repair()` e **mentem**; `tenant` não
+chama e **grita** com checksum mismatch. Por isso o procedimento correto de reescrita é
+`DROP SCHEMA` do módulo (tabelas + `flyway_schema_history_{modulo}`) e deixar o boot reaplicar do
+zero — usado nos dois batches de 2026-09-27. Onde há dado a preservar, a alternativa é versionar as
+migrations novas **fora da faixa já aplicada**, para não haver colisão de número.
+
+A armadilha fica registrada em `.agents/rules/db-migration-flyway.md` (que agora documenta a
+configuração **real**, inclusive o `repair()` e o `outOfOrder(true)` que a versão anterior da regra
+não ensinava), e em comentário no próprio `AgentDbUpdateConfig` e no `UserDbUpdateConfig`.
+
+> Uma segunda armadilha, do mesmo batch e da mesma família "log verde que mente": o SQL das
+> migrations vive no **jar**, não no `src/`. `mvn spring-boot:run -pl bootstrap` resolve os módulos
+> irmãos do repositório Maven, então editar uma `.sql` e subir sem `mvn clean install` aplica o SQL
+> antigo — e reporta "Successfully applied 4 migrations". Correção: rebuild antes de subir, e
+> confirmar no `psql`, nunca no log.
+
+### `provider_credential` fica no módulo `agent` — e por quê
+
+Uma versão anterior deste ADR dizia que a reescrita "deve resolver" o resíduo do ADR-009 movendo
+`provider_credential` para o módulo `provider`. **Investigado em 2026-09-27: não é possível, e a
+recomendação está errada.**
+
+| Fato verificado | Consequência |
+|---|---|
+| `ProviderCredentialEntity`, service, repository, mapper, controller e toda a criptografia moram em `agent/` | O dono real é `agent` |
+| O módulo `provider` **não tem `dbupdate`** — só `api` e `langchain4j` | Ele **não tem como** ser dono de uma tabela: onde a migration morasse, ela nasceria no histórico de outro módulo |
+| Os dois históricos Flyway são independentes e sem ordem garantida | Mover criaria uma dependência de ordem que não existe |
+| `provider_credential` não é citada pelo módulo `provider` nenhuma vez | A referência é de mão única |
+
+O nome da tabela é **descritivo** — é a credencial *de um* provider —, não de módulo. Mover a tabela
+para `provider` significaria dar `dbupdate` ao módulo `provider` e mover criptografia, service e
+controller para lá: um batch de arquitetura, não um ajuste de nome. Registrado aqui para que ninguém
+"conserte" o nome depois.
 
 ## O que este ADR não decide
 

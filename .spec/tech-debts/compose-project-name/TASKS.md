@@ -5,6 +5,18 @@
 permanece** e está descrita abaixo.
 **Classe:** ambiente / isolamento.
 
+> **Atualização 2026-09-27 (batch de reescrita de migrations).** Este arquivo citava, como um dos
+> sintomas recorrentes, o "banco de dev perdido (container recriado com volume novo)". Aconteceu de
+> novo, desta vez por decisão: para reescrever o histórico de migrations do módulo `agent` foi
+> preciso **recriar o schema do módulo** (as 4 migrations novas só rodam do zero, e os checksums
+> antigos não batem). Perderam-se 58 `chat_session`, 130 `chat_message` e 1 `provider_credential` —
+> **com `pg_dump` antes**, em `.spec/snapshots/`. O banco `hive` em si **não** foi destruído, e
+> **nenhum container foi removido**: o schema do módulo `agent` foi derrubado por SQL
+> (`DROP TABLE`), e `identity`/`tenant` ficaram intactos. Os volumes `docker_postgres_data` e
+> `docker_redis_data` não foram tocados. Então este incidente **não** é o de namespace de compose —
+> é perda de dado autorizada e com backup, e o risco aqui continua sendo o namespace compartilhado
+> descrito abaixo, não esta reescrita.
+
 > Este incidente **já tinha acontecido duas vezes** e está registrado em `workflow-state.json:363` e
 > em outra linha da mesma lista ("Banco de dev perdido (container recriado com volume novo)"). Ninguém
 > sabia por quê. Não é azar de configuração: é um namespace de compose compartilhado.

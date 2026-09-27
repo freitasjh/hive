@@ -20,7 +20,11 @@ public class ChatSessionEntity extends AbstractEntity {
     private UUID promptTemplateId;
     @Column(name = "title", nullable = false, length = 50)
     private String title;
-    @Column(name = "summary", columnDefinition = "TEXT")
+    // length = 2000 reflete o DDL (VARCHAR(2000)). A anotação anterior dizia
+    // columnDefinition = "TEXT", que não é o que o banco tem — e como `ddl-auto=none` o Hibernate
+    // não valida, a divergência não produzia erro, produzia mentira. Se o produto precisar de
+    // resumo maior, quem muda é o DDL (V4), não esta linha.
+    @Column(name = "summary", length = 2000)
     private String summary;
 
     public UUID getUserId() {

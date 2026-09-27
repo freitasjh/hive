@@ -19,6 +19,12 @@ public class UserDbUpdateConfig {
                 .table("flyway_schema_history_identity")
                 .baselineOnMigrate(true)
                 .load();
+        // Mesmo `repair()` e mesma armadilha de `AgentDbUpdateConfig`: realinha o checksum das
+        // migrations já aplicadas com as disponíveis e marca como `deleted` as versions que
+        // sumiram — SEM executar SQL. Reescrever o histórico deste módulo, portanto, é invisível
+        // para o Flyway: com colisão de número de versão o repair realinha, o migrate roda zero
+        // migrations e reporta sucesso. Para reescrever, DROP SCHEMA do módulo primeiro (ou
+        // versionar as novas fora da faixa já usada). Ver `.agents/rules/db-migration-flyway.md`.
         flyway.repair();
         return flyway;
     }

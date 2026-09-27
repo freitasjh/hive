@@ -1,13 +1,74 @@
-# Decisão pendente — a V15 aborta e o ambiente de dev não sobe (58 sessões órfãs)
+# ~~Decisão pendente~~ RESOLVIDA — a V15 não existe mais (histórico reescrito)
 
 **Registrado em:** 2026-09-27, na verificação H3 do batch de UX do seletor.
-**Status:** 🔴 **bloqueia o ambiente de dev**. Aguarda decisão do usuário.
-**Classe:** **decisão de produto/dado. NÃO é técnica e NÃO é código.**
+**Resolvido em:** 2026-09-27, pelo batch de reescrita do histórico de migrations do módulo `agent`.
+**Status:** ✅ **encerrado** — a causa raiz não existe mais.
+**Classe original:** decisão de produto/dado.
 
-> 🚫 **Nada foi tocado.** As 58 sessões continuam lá. Nenhum template foi criado. Nenhuma migration
-> foi editada. Este arquivo é um **registro de decisão pendente**, não um plano de execução.
+> ## O que mudou
+>
+> A V15 (`V15__chat_session_prompt_template.sql`) **não existe mais**, nem a V16, nem nenhuma outra.
+> O histórico do módulo `agent` foi reescrito de 12 migrations para 4, todas `CREATE` puras:
+>
+> | # | Arquivo | Cria |
+> |---|---------|------|
+> | 1 | `V2__create_prompt_template.sql` | `prompt_template` no formato final |
+> | 2 | `V3__create_provider_credential.sql` | `provider_credential` no formato final |
+> | 3 | `V4__create_chat_session.sql` | `chat_session` com `prompt_template_id` NOT NULL + FK RESTRICT |
+> | 4 | `V5__create_chat_message.sql` | `chat_message` com FK CASCADE para `chat_session` |
+>
+> **Este arquivo inteiro descreve um problema que a reescrita eliminou pela raiz.** O guard da V15
+> existia para se recusar a destruir a associação de sessões que apontavam para um `agent`. Sem a
+> tabela `agent` e sem a coluna `agent_id` — que nunca nascem agora — não há dado legado para
+> backfill, não há órfã possível, e não há o que preservar em `agent_id_legacy`. A perda deixa de ser
+> possível por construção do schema, e não por uma verificação rodada no boot.
+>
+> **O texto abaixo foi preservado como registro do que foi medido e decidido.** Ele vale como
+> histórico do raciocínio, e os números são a medição que justificou a decisão — mas as
+> recomendações dele ("não mexer na V15", "a V15 e a V16 continuam intocadas") **não valem mais**, e
+> foram superadas pela decisão do usuário registrada logo abaixo.
+>
+> ### Decisão do usuário (autorizada, 2026-09-27)
+>
+> > "Como ainda não foi para testes e produção, pode ajustar as migrations para refletir o que for
+> > de criação e configuração, não precisa ter migration para arrumar nenhuma tabela."
+>
+> Isso é a **opção A** (descartar as 58 sessões) mais a **C** (preservar o inventário antes), e foi
+> executada: `pg_dump` completo antes de qualquer coisa, depois o schema do módulo `agent` foi
+> recriado do zero.
+>
+> ### O que foi perdido
+>
+> | dado | quantidade | reversível |
+> |------|-----------|------------|
+> | `chat_session` | 58 | sim, pelo dump |
+> | `chat_message` | 130 | sim, pelo dump |
+> | `provider_credential` (credencial cifrada) | 1 | **não** — a chave de criptografia não está no dump; restaurar exige recadastrar a credencial |
+> | `prompt_template` | 0 (nada a perder) | — |
+>
+> Dump: `.spec/snapshots/pre-rewrite-20260927-173430-full.dump` (formato custom, com dados).
+>
+> ### O que aconteceu com o resto do schema
+>
+> - `identity` (V2, V3) e `tenant` (V2, V3) **não foram tocados** — históricos Flyway intactos.
+> - O resíduo do módulo `knowledge` (deletado em 2026-09-26, sem código no repositório) foi
+>   removido junto: `agent_knowledge_base`, `kb_document`, `kb_embeddings_1536`, `kb_embeddings_768`,
+>   `knowledge_base` e `flyway_schema_history_knowledge`. Foi **obrigatório**, porque
+>   `agent_knowledge_base` tinha `fk_agent_kb_agent` apontando para `agent(id)`.
+> - `flyway_schema_history_agent` foi recriado: baseline V1 + V2, V3, V4, V5, todas `success = true`.
+>
+> ### E o `ChatSessionPromptTemplateMigrationIT`?
+>
+> Removido. Os 5 testes validavam o comportamento da V15 contra um banco no estado V14 — um estado
+> que não existe mais em lugar nenhum. A cobertura de formato de schema não ficou pendente: passou
+> para `ChatSessionIT`, que foi corrigido e ganhou 2 testes
+> (`when_migrationsApplied_then_promptTemplateIdIsNotNullByConstruction` e
+> `when_migrationsApplied_then_promptTemplateHasNoDuplicatedActiveIndex`).
 
 ---
+
+<details>
+<summary>Registro original (2026-09-27, antes da reescrita) — preservado como histórico</summary>
 
 ## O fato medido
 
@@ -154,6 +215,11 @@ problema é o dado que a V15 se recusa a destruir.
 
 ## O que NÃO fazer (registrado para quem for mexer)
 
+> ⚠️ **SUPERADO.** Estas três regras eram sobre a V15, que não existe mais. A guarda de dado que
+> elas defendiam **não foi afrouxada** — ela foi tornado estrutural: `chat_session.prompt_template_id`
+> é NOT NULL no `CREATE TABLE`, então sessão órfã é impossível por construção. As regras 2 e 3 também
+> continuam válidas como regra geral ("conserto de banco de dev não mora em migration versionada").
+
 - ❌ Afrouxar o guard, trocar `RAISE EXCEPTION` por `WARNING`, ou adicionar um `IF NOT EXISTS` que
   masks a sessão órfã. O guard existe **por causa** de sessões assim, e a migração explica isso em
   40 linhas de comentário. Afrouxá-lo converte um abort explícito em perda silenciosa em qualquer
@@ -165,9 +231,24 @@ problema é o dado que a V15 se recusa a destruir.
 
 ## Depois da decisão
 
+> ✅ **EXECUTADO (2026-09-27).** O plano abaixo era o cenário "aplicar V15 e V16 sobre o banco
+> existente". O que aconteceu foi outro: o histórico foi reescrito e o schema do módulo `agent` foi
+> recriado do zero, então não há V15 nem V16 para aplicar. Comparação do executado com o previsto:
+>
+> | # | previsto | executado |
+> |---|----------|-----------|
+> | 1 | dev sobe | ✅ sobe (`Successfully applied 4 migrations ... now at version v5`) |
+> | 2 | histórico vai a 16 | vai a **5** (baseline V1 + V2..V5) |
+> | 3 | `prompt_template_id` NOT NULL + FK; `agent_id` → `agent_id_legacy` | `prompt_template_id` NOT NULL + FK RESTRICT ✅; **`agent_id_legacy` não é criada** (não há o que preservar) |
+> | 4 | tabela `agent` dropada pela V16 | `agent` **nunca é criada** ✅ |
+> | 5 | H3 contra o banco de dev | pendente (fora do escopo deste batch) |
+
 1. `mvn spring-boot:run -pl bootstrap -Dspring-boot.run.profiles=dev` sobe
 2. `flyway_schema_history_agent` sai de **14** e chega a **16** (aplica V15 e V16)
 3. `chat_session` ganha `prompt_template_id` (NOT NULL, FK para `prompt_template`) e perde `agent_id`
    — que **vira `agent_id_legacy`, não é apagada**; a FK `fk_chat_session_agent` cai junto
 4. a tabela `agent` é dropada (V16)
 5. o H3 completo do Bloco B pode rodar contra o banco de dev, sem banco greenfield paralelo
+
+</details>
+
