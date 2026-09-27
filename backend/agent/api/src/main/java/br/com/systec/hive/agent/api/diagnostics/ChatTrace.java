@@ -5,8 +5,8 @@ import br.com.systec.hive.provider.api.AiProvider;
 import java.util.UUID;
 
 /**
- * One line of telemetry per chat message: which agent answered, with which parameters, how big the
- * prompt was, whether RAG contributed, how long it took and what the provider billed.
+ * One line of telemetry per chat message: which prompt answered, with which model, how big the
+ * prompt was, how long it took and what the provider billed.
  *
  * <p>Exists because a chat timeout reported as "the request failed" is not diagnosable: without
  * the effective {@code maxTokens} and the elapsed time nobody can tell a 1500-word request killed
@@ -14,8 +14,15 @@ import java.util.UUID;
  *
  * <p>Carries no prompt or answer text — only sizes and parameter values.
  *
+ * <p>The retrieval fields are gone. They outlived the knowledge base by one batch, and while they
+ * were there {@code ragThreshold=not_resolved} was an <b>assertion</b> in every line of production:
+ * it said a similarity search ran and failed to resolve a cut-off. Nothing in this product
+ * retrieves, so the value was unreachable by design and still printed as if it meant something. A
+ * metric that cannot be true is worse than a missing one: it teaches the operator to read a line
+ * whose vocabulary no longer describes the system.
+ *
  * @param sessionId       chat session
- * @param agentId         agent that answered
+ * @param promptTemplateId template chosen for this conversation
  * @param provider        vendor enum
  * @param model           effective model name
  * @param maxTokens       effective generation ceiling, {@code null} when the provider default applies
@@ -24,17 +31,8 @@ import java.util.UUID;
  * @param historySize     messages replayed from history
  * @param promptChars     total characters of the assembled prompt
  * @param promptMessages  messages in the assembled prompt
- * @param ragUsed         whether a knowledge context was injected
- * @param citationsCount  citations attached to the answer
- * @param ragOutcome      why the RAG resolution ended the way it did, {@code null} when unavailable
- * @param ragThreshold    similarity cut-off the RAG search actually applied, {@code null} when the
- *                        retrieval never resolved one. Reported so that a turn with no context can be
- *                        read: {@code no_chunk_above_threshold} is only explicable next to the
- *                        number that rejected the chunks.
- * @param elapsedMs       wall time of the provider generation call. Deliberately excludes the RAG
- *                        retrieval, which is bounded to 2 s and reported on its own diagnostic —
- *                        a large value here means the provider stalled, which is exactly the
- *                        signal a chat timeout needs.
+ * @param elapsedMs       wall time of the provider generation call — a large value here means the
+ *                        provider stalled, which is exactly the signal a chat timeout needs
  * @param promptTokens    provider-reported input tokens, {@code null} when not reported
  * @param completionTokens provider-reported output tokens, {@code null} when not reported
  * @param totalTokens     provider-reported total tokens, {@code null} when not reported
@@ -43,7 +41,7 @@ import java.util.UUID;
  */
 public record ChatTrace(
         UUID sessionId,
-        UUID agentId,
+        UUID promptTemplateId,
         AiProvider provider,
         String model,
         Integer maxTokens,
@@ -52,10 +50,6 @@ public record ChatTrace(
         int historySize,
         int promptChars,
         int promptMessages,
-        boolean ragUsed,
-        int citationsCount,
-        String ragOutcome,
-        Double ragThreshold,
         long elapsedMs,
         Integer promptTokens,
         Integer completionTokens,
@@ -63,14 +57,14 @@ public record ChatTrace(
         String finishReason,
         String failure) {
 
-    public static Builder builder(UUID sessionId, UUID agentId, AiProvider provider, String model) {
-        return new Builder(sessionId, agentId, provider, model);
+    public static Builder builder(UUID sessionId, UUID promptTemplateId, AiProvider provider, String model) {
+        return new Builder(sessionId, promptTemplateId, provider, model);
     }
 
     public static final class Builder {
 
         private final UUID sessionId;
-        private final UUID agentId;
+        private final UUID promptTemplateId;
         private final AiProvider provider;
         private final String model;
         private Integer maxTokens;
@@ -79,10 +73,6 @@ public record ChatTrace(
         private int historySize;
         private int promptChars;
         private int promptMessages;
-        private boolean ragUsed;
-        private int citationsCount;
-        private String ragOutcome;
-        private Double ragThreshold;
         private long elapsedMs;
         private Integer promptTokens;
         private Integer completionTokens;
@@ -90,9 +80,9 @@ public record ChatTrace(
         private String finishReason;
         private String failure;
 
-        private Builder(UUID sessionId, UUID agentId, AiProvider provider, String model) {
+        private Builder(UUID sessionId, UUID promptTemplateId, AiProvider provider, String model) {
             this.sessionId = sessionId;
-            this.agentId = agentId;
+            this.promptTemplateId = promptTemplateId;
             this.provider = provider;
             this.model = model;
         }
@@ -108,14 +98,6 @@ public record ChatTrace(
             this.historySize = historySize;
             this.promptMessages = promptMessages;
             this.promptChars = promptChars;
-            return this;
-        }
-
-        public Builder rag(boolean ragUsed, int citationsCount, String ragOutcome, Double ragThreshold) {
-            this.ragUsed = ragUsed;
-            this.citationsCount = citationsCount;
-            this.ragOutcome = ragOutcome;
-            this.ragThreshold = ragThreshold;
             return this;
         }
 
@@ -138,9 +120,9 @@ public record ChatTrace(
         }
 
         public ChatTrace build() {
-            return new ChatTrace(sessionId, agentId, provider, model, maxTokens, topP, temperature,
-                    historySize, promptChars, promptMessages, ragUsed, citationsCount, ragOutcome,
-                    ragThreshold, elapsedMs, promptTokens, completionTokens, totalTokens, finishReason, failure);
+            return new ChatTrace(sessionId, promptTemplateId, provider, model, maxTokens, topP, temperature,
+                    historySize, promptChars, promptMessages, elapsedMs, promptTokens, completionTokens,
+                    totalTokens, finishReason, failure);
         }
     }
 }

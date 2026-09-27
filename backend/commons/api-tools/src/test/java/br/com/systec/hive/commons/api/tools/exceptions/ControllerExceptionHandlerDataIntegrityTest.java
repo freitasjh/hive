@@ -30,16 +30,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ControllerExceptionHandlerDataIntegrityTest {
 
     private final ControllerExceptionHandler handler = new ControllerExceptionHandler();
-    private final HttpServletRequest request = new MockHttpServletRequest("DELETE", "/hive/v1/agents/abc");
+    private final HttpServletRequest request = new MockHttpServletRequest("DELETE", "/hive/v1/prompt-templates/abc");
 
     // ============================================================ o caminho genérico
 
     @Test
     void when_unmappedConstraint_then_409WithActionablePtBrMessage() {
-        // Uma constraint que o handler não conhece — a que sobrou depois que o CASCADE resolveu o
-        // bug dos 409 de agente. A resposta ainda tem de ser útil em pt-BR, não "erro desconhecido".
+        // Uma constraint que o handler não conhece. A resposta ainda tem de ser útil em pt-BR,
+        // não "erro desconhecido".
         ResponseEntity<StandardError> response = handler.dataIntegrityViolation(
-                violation("some_new_constraint", "fk_agent_thing", "agent_thing"),
+                violation("some_new_constraint", "fk_widget_thing", "widget_thing"),
                 request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
@@ -54,10 +54,10 @@ class ControllerExceptionHandlerDataIntegrityTest {
     @Test
     void when_unmappedConstraint_then_responseBodyLeaksNoSchemaInformation() {
         // A mensagem real do driver, verbatim. Nada disto pode aparecer no corpo.
-        String driverMessage = "update or delete on table \"agent\" violates foreign key constraint "
-                + "\"fk_chat_session_agent\" on table \"chat_session\"\n"
+        String driverMessage = "update or delete on table \"prompt_template\" violates foreign key constraint "
+                + "\"fk_chat_session_prompt_template\" on table \"chat_session\"\n"
                 + "  Key (id)=(867f0342-b6e8-42b9-8059-54468a20955c) is still referenced from table \"chat_session\".\n"
-                + "  Hint: Referencer is defined as: FOREIGN KEY (agent_id) REFERENCES agent(id)";
+                + "  Hint: Referencer is defined as: FOREIGN KEY (prompt_template_id) REFERENCES prompt_template(id)";
 
         String body = serializedBody(handler.dataIntegrityViolation(violation(driverMessage), request));
 
@@ -68,11 +68,11 @@ class ControllerExceptionHandlerDataIntegrityTest {
 
     @ParameterizedTest(name = "constraint={0} → code={1}")
     @CsvSource({
-            "fk_agent_prompt_template,PROMPT_IN_USE",
-            "uniq_agent_default_per_tenant,CONCURRENT_DEFAULT_UPDATE",
+            "fk_chat_session_prompt_template,PROMPT_IN_USE",
+            "uk_tenant_llm_config_tenant,CONCURRENT_LLM_CONFIG_UPDATE",
             "uniq_prompt_active_code_per_tenant,PROMPT_CODE_DUPLICATE",
             "uk_users_email,EMAIL_DUPLICATE",
-            "sole_default_agent,SOLE_DEFAULT_AGENT"
+            "uk_provider_credential_tenant_provider,ALREADY_EXISTS"
     })
     void when_mappedConstraint_then_409WithSpecificCodeAndNoSchemaLeak(String constraint, String expectedCode) {
         String driverMessage = "duplicate key value violates unique constraint \"" + constraint + "\"";
@@ -171,13 +171,13 @@ class ControllerExceptionHandlerDataIntegrityTest {
     @Test
     void when_violation_then_responseIsProblemJsonWithTheRequestUri() {
         ResponseEntity<StandardError> response = handler.dataIntegrityViolation(
-                violation("fk_chat_session_agent", "chat_session", "agent"),
+                violation("fk_chat_session_prompt_template", "prompt_template", "chat_session"),
                 request);
 
         assertThat(response.getHeaders().getContentType()).isNotNull();
         assertThat(response.getHeaders().getContentType().toString()).contains("application/problem+json");
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getInstance()).isEqualTo("/hive/v1/agents/abc");
+        assertThat(response.getBody().getInstance()).isEqualTo("/hive/v1/prompt-templates/abc");
         assertThat(response.getBody().getStatus()).isEqualTo(409);
     }
 
@@ -231,10 +231,10 @@ class ControllerExceptionHandlerDataIntegrityTest {
 
     /**
      * O corpo inteiro é verificado por identificadores de tabela/constraint e por sintaxe de DDL.
-     * A palavra "agente" não entra: é vocabulário de domínio em pt-BR, não vazamento de schema.
+     * Palavras de domínio em pt-BR não entram: são vocabulário, não vazamento de schema.
      */
     private void assertNoSchemaLeak(String body) {
-        assertThat(body).doesNotContain("agent_knowledge_base");
+        assertThat(body).doesNotContain("tenant_llm_config");
         assertThat(body).doesNotContain("chat_session");
         assertThat(body).doesNotContain("chat_message");
         assertThat(body).doesNotContain("prompt_template");

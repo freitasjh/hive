@@ -1,6 +1,7 @@
 package br.com.systec.hive.agent.impl.service;
 
-import br.com.systec.hive.agent.api.domain.Agent;
+import br.com.systec.hive.agent.api.domain.InferenceParams;
+import br.com.systec.hive.agent.api.domain.PromptTemplate;
 import br.com.systec.hive.agent.api.domain.TurnReply;
 import br.com.systec.hive.agent.api.domain.TurnRequest;
 import br.com.systec.hive.provider.api.AiProvider;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,7 +39,7 @@ import static org.mockito.Mockito.when;
  * <p>These are the paths that found the defects this code was validated against — a reasoning model
  * that answers with nothing, and a {@code 404} that means two different things depending on the body
  * the provider sent. They used to be reachable only through a whole chat turn, where a failure test had
- * to stub a session, an agent and a message store to observe one classification.
+ * to stub a session, a prompt template and a message store to observe one classification.
  */
 @ExtendWith(MockitoExtension.class)
 class LangChain4jTurnGatewayTest {
@@ -48,7 +50,7 @@ class LangChain4jTurnGatewayTest {
     private ChatModel chatModel;
 
     private ChatTurnGatewayUnderTest gateway;
-    private Agent agent;
+    private PromptTemplate template;
     private UUID sessionId;
 
     /** Named so the assertion reads as "the gateway", not as a subclass detail. */
@@ -62,12 +64,10 @@ class LangChain4jTurnGatewayTest {
     void setUp() {
         gateway = new ChatTurnGatewayUnderTest(factory);
         sessionId = UUID.randomUUID();
-        agent = new Agent();
-        agent.setId(UUID.randomUUID());
-        agent.setProvider(AiProvider.OPENAI);
-        agent.setModel("gpt-4o-mini");
-        agent.setTemperature(0.7);
-        agent.setSystemPrompt("Voce e um assistente.");
+        template = new PromptTemplate();
+        template.setId(UUID.randomUUID());
+        template.setTemplate("Voce e um assistente.");
+        template.setInferenceParams(new InferenceParams(0.7, null, null));
     }
 
     private void stubClient() {
@@ -76,7 +76,7 @@ class LangChain4jTurnGatewayTest {
     }
 
     private TurnRequest request() {
-        return new TurnRequest(sessionId, agent, AiProvider.OPENAI, "gpt-4o-mini",
+        return new TurnRequest(sessionId, template, AiProvider.OPENAI, "gpt-4o-mini",
                 "sk-test", null, List.of(), List.of(new UserMessage("pergunta")));
     }
 
@@ -98,7 +98,7 @@ class LangChain4jTurnGatewayTest {
     // ------------------------------------------------------------------ the prompt
 
     @Test
-    void when_theAgentHasASystemPrompt_then_itLeadsThePrompt() {
+    void when_theTemplateHasText_then_itLeadsThePrompt() {
         stubClient();
         when(chatModel.chat(anyPrompt())).thenReturn(answer("resposta", null, null));
 
@@ -110,14 +110,13 @@ class LangChain4jTurnGatewayTest {
     }
 
     /**
-     * An agent with no system prompt contributes nothing. An empty {@code SystemMessage} is an
-     * instruction to the model to be brief, and an agent that never asked for brevity would be
+     * A template with blank text contributes nothing. An empty {@code SystemMessage} is an
+     * instruction to the model to be brief, and a conversation that never asked for brevity would be
      * silently given it.
      */
     @Test
-    void when_theAgentHasNoSystemPrompt_then_noSystemMessageIsAdded() {
-        agent.setSystemPrompt(null);
-        agent.setPrompt(null);
+    void when_theTemplateHasBlankText_then_noSystemMessageIsAdded() {
+        template.setTemplate("   ");
         stubClient();
         when(chatModel.chat(anyPrompt())).thenReturn(answer("resposta", null, null));
 
@@ -168,7 +167,7 @@ class LangChain4jTurnGatewayTest {
      */
     @Test
     void when_theModelReturnsNoText_then_itIsReportedAsEmptyWithTheProvidersOwnFinishReason() {
-        agent.setMaxTokens(32);
+        template.setInferenceParams(new InferenceParams(0.7, null, 32));
         stubClient();
         when(chatModel.chat(anyPrompt()))
                 .thenReturn(dev.langchain4j.model.chat.response.ChatResponse.builder()
@@ -335,7 +334,7 @@ class LangChain4jTurnGatewayTest {
      */
     @Test
     void when_theRequestIsRendered_then_theCredentialAndTheConversationAreNot() {
-        TurnRequest request = new TurnRequest(sessionId, agent, AiProvider.OPENAI, "gpt-4o-mini",
+        TurnRequest request = new TurnRequest(sessionId, template, AiProvider.OPENAI, "gpt-4o-mini",
                 "sk-super-secret-value", "https://api.example/v1",
                 List.of(), List.of(new UserMessage("PERGUNTA SIGILOSA do usuario")));
 
@@ -347,7 +346,7 @@ class LangChain4jTurnGatewayTest {
                 .contains("apiKey=***");
         // Still enough to diagnose a turn with.
         assertThat(rendered)
-                .contains("agentId=" + agent.getId())
+                .contains("promptTemplateId=" + template.getId())
                 .contains("model=gpt-4o-mini")
                 .contains("conversation=1 message(s)");
     }
@@ -378,12 +377,26 @@ class LangChain4jTurnGatewayTest {
 
     /** And the same rule as the other records: a value that carries meaning is not defaulted. */
     @Test
-    void when_theRequestCarriesNoAgent_then_itIsRefusedRatherThanPromptedWithoutOne() {
-        // A null agent would go out with no system prompt and no generation limits, and say nothing.
+    void when_theRequestCarriesNoPromptTemplate_then_itIsRefusedRatherThanPromptedWithoutOne() {
+        // Um template nulo sairia sem prompt de sistema e sem limites de geração, sem dizer nada.
         assertThatThrownBy(() -> new TurnRequest(sessionId, null, AiProvider.OPENAI, "gpt-4o-mini",
                 "sk-test", null, List.of(), List.of()))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("agent");
+                .hasMessageContaining("promptTemplate");
+    }
+
+    @Test
+    void when_theTemplateCarriesNoInferenceParams_then_theProviderDefaultsApply() {
+        // null, e não um InferenceParams vazio Required: os três campos já são null lá dentro, e
+        // fabricar um objeto só para devolver null três vezes esconderia a ausência.
+        template.setInferenceParams(null);
+        when(factory.createClientWithSession(eq(AiProvider.OPENAI), eq("gpt-4o-mini"),
+                isNull(), isNull(), isNull(), eq("sk-test"), any(), eq(sessionId))).thenReturn(chatModel);
+        when(chatModel.chat(anyPrompt())).thenReturn(answer("resposta", null, null));
+
+        gateway.execute(request());
+
+        assertThat(capturedPrompt()).isNotEmpty();
     }
 
 

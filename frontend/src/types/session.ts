@@ -1,7 +1,7 @@
 export interface ChatSessionDTO {
   id: string
   userId: string
-  agentId: string
+  promptTemplateId: string
   title: string
   summary: string | null
   createAt: string
@@ -25,21 +25,6 @@ export interface ChatResponseDTO {
 
 export interface Page<T> {
   content: T[]
-  totalElements: number
-  totalPages: number
-  number: number
-  size: number
-}
-
-export interface AgentDTO {
-  id: string
-  name: string
-  description?: string
-  model?: string
-}
-
-export interface AgentPage {
-  content: AgentDTO[]
   totalElements: number
   totalPages: number
   number: number

@@ -6,7 +6,7 @@ import java.util.UUID;
 public record ChatSessionDTO(
         UUID id,
         UUID userId,
-        UUID agentId,
+        UUID promptTemplateId,
         String title,
         String summary,
         Instant createAt,

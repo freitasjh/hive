@@ -37,11 +37,12 @@ describe('session.service', () => {
     expect(api.delete).toHaveBeenCalledWith('/chat/sessions/s1')
   })
 
-  it('createSession calls POST', async () => {
+  it('createSession calls POST with the prompt template, not an agent', async () => {
+    // O prompt é escolhido na criação da conversa e é NOT NULL lá atrás: sem ele não há sessão.
     const dto = { id: 's1', title: 'hi' }
     vi.mocked(api.post).mockResolvedValue({ data: dto } as never)
-    const result = await sessionService.createSession('a1', 'hi')
-    expect(api.post).toHaveBeenCalledWith('/chat/sessions', { agentId: 'a1', title: 'hi' })
+    const result = await sessionService.createSession('p1', 'hi')
+    expect(api.post).toHaveBeenCalledWith('/chat/sessions', { promptTemplateId: 'p1', title: 'hi' })
     expect(result).toEqual(dto)
   })
 

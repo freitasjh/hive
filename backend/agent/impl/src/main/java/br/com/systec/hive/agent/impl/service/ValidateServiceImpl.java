@@ -1,6 +1,6 @@
 package br.com.systec.hive.agent.impl.service;
 
-import br.com.systec.hive.agent.api.domain.AgentValidation;
+import br.com.systec.hive.agent.api.domain.ModelValidation;
 import br.com.systec.hive.agent.api.service.ValidateService;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.LlmClientFactory;
@@ -56,7 +56,7 @@ public class ValidateServiceImpl implements ValidateService {
     }
 
     @Override
-    public AgentValidation validate(UUID tenantId, AiProvider provider, String model, String baseUrl) {
+    public ModelValidation validate(UUID tenantId, AiProvider provider, String model, String baseUrl) {
         rateLimiter.check(tenantId);
         VendorCatalog.validate(provider, model);
         String requestedBaseUrl = baseUrl == null || baseUrl.isBlank() ? null : baseUrl.trim();
@@ -91,14 +91,14 @@ public class ValidateServiceImpl implements ValidateService {
         try {
             Future<String> future = executor.submit(() -> probe.ping(client));
             future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            return AgentValidation.ok(provider, model.trim(), System.currentTimeMillis() - start);
+            return ModelValidation.ok(provider, model.trim(), System.currentTimeMillis() - start);
         } catch (TimeoutException e) {
             log.warn("validate timeout tenantId={} provider={} model={}", tenantId, provider, model);
-            return AgentValidation.failed(provider, model.trim(), System.currentTimeMillis() - start, "timeout");
+            return ModelValidation.failed(provider, model.trim(), System.currentTimeMillis() - start, "timeout");
         } catch (Exception e) {
             log.warn("validate connection failed tenantId={} provider={} model={}: {}",
                     tenantId, provider, model, e.getClass().getSimpleName());
-            return AgentValidation.failed(provider, model.trim(), System.currentTimeMillis() - start, "connection_failed");
+            return ModelValidation.failed(provider, model.trim(), System.currentTimeMillis() - start, "connection_failed");
         } finally {
             executor.shutdownNow();
         }

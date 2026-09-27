@@ -5,9 +5,10 @@ import java.util.UUID;
 /**
  * Factory of LLM chat clients keyed by vendor.
  *
- * <p>{@code maxTokens} and {@code topP} are the per-agent generation limits. {@code null} means
- * "not configured" and must be left to the provider default — never coerced to {@code 0}, which
- * would make the provider generate nothing or reject the request.
+ * <p>{@code maxTokens} and {@code topP} are the generation limits of the <b>prompt template</b>
+ * that answers the conversation ({@code inference_params}), not of an agent — the agent is gone.
+ * {@code null} means "not configured" and must be left to the provider default — never coerced to
+ * {@code 0}, which would make the provider generate nothing or reject the request.
  */
 public interface LlmClientFactory<T> {
 

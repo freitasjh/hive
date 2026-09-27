@@ -194,18 +194,21 @@ public class ControllerExceptionHandler {
         String detail = "Não foi possível concluir a operação porque o registro é referenciado por outros dados. Remova as dependências e tente novamente.";
         HttpStatus status = HttpStatus.CONFLICT;
 
-        if (lower.contains("uniq_agent_default_per_tenant") || lower.contains("uniq_agent_default")) {
-            code = "CONCURRENT_DEFAULT_UPDATE";
-            detail = "Atualização concorrente do agente padrão. Tente novamente.";
-        } else if (lower.contains("fk_agent_prompt_template") || lower.contains("fk_agent_prompt")) {
+        if (lower.contains("fk_chat_session_prompt_template")) {
+            // A referência que sobra depois que o agente morreu: quem usa um prompt template é uma
+            // sessão de chat. A constraint e a mensagem precisam acompanhar, ou um DELETE direto no
+            // banco responderia "DATA_CONFLICT" genérico em vez de dizer o que está segurando.
             code = "PROMPT_IN_USE";
-            detail = "Prompt em uso por agente, não pode ser removido.";
+            detail = "Prompt em uso por uma sessão de chat, não pode ser removido.";
         } else if (lower.contains("uniq_prompt_active_code_per_tenant") || lower.contains("uk_prompt_template_active_version")) {
             code = "PROMPT_CODE_DUPLICATE";
             detail = "Prompt code já existe no tenant.";
         } else if (lower.contains("uk_prompt_template_tenant_code_version") || lower.contains("uk_prompt_template_tenant_code")) {
             code = "PROMPT_CODE_DUPLICATE";
             detail = "Prompt code já existe no tenant.";
+        } else if (lower.contains("uk_tenant_llm_config_tenant")) {
+            code = "CONCURRENT_LLM_CONFIG_UPDATE";
+            detail = "A configuração de LLM deste tenant foi alterada por outra requisição. Tente novamente.";
         } else if (lower.contains("uk_users_username") || lower.contains("username")) {
             detail = "Username já cadastrado.";
             code = "USERNAME_DUPLICATE";
@@ -215,9 +218,6 @@ public class ControllerExceptionHandler {
         } else if (lower.contains("uk_users_federal_id") || lower.contains("federal_id")) {
             detail = "Documento já cadastrado.";
             code = "DOCUMENT_DUPLICATE";
-        } else if (lower.contains("sole_default_agent")) {
-            code = "SOLE_DEFAULT_AGENT";
-            detail = "Defina outro agente como padrão antes de desativar/excluir o único padrão.";
         } else if (isDuplicateKey(lower)) {
             // Último ramo de propósito: as constraints nomeadas acima continuam valendo primeiro, e
             // este só pega o que sobrou. Ele existe porque o default fala de "registro referenciado

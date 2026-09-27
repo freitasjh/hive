@@ -2,26 +2,27 @@ package br.com.systec.hive.agent.impl.service;
 
 import br.com.systec.hive.agent.api.diagnostics.ChatTrace;
 import br.com.systec.hive.agent.api.diagnostics.ChatTraceRecorder;
-import br.com.systec.hive.agent.api.domain.Agent;
 import br.com.systec.hive.agent.api.domain.ChatMessage;
 import br.com.systec.hive.agent.api.domain.ChatRequest;
 import br.com.systec.hive.agent.api.domain.ChatResponse;
 import br.com.systec.hive.agent.api.domain.ChatSession;
+import br.com.systec.hive.agent.api.domain.InferenceParams;
+import br.com.systec.hive.agent.api.domain.PromptTemplate;
 import br.com.systec.hive.agent.api.domain.TurnReply;
 import br.com.systec.hive.agent.api.domain.TurnRequest;
-import br.com.systec.hive.agent.api.exceptions.AgentNotFoundException;
 import br.com.systec.hive.agent.api.exceptions.ModelReturnedEmptyException;
 import br.com.systec.hive.agent.api.exceptions.ModelUnavailableException;
+import br.com.systec.hive.agent.api.exceptions.PromptTemplateNotFoundException;
 import br.com.systec.hive.agent.api.exceptions.ProviderException;
 import br.com.systec.hive.agent.api.port.ChatTurnGateway;
-import br.com.systec.hive.agent.api.service.AgentService;
 import br.com.systec.hive.agent.api.service.ChatMessageService;
 import br.com.systec.hive.agent.api.service.ChatService;
 import br.com.systec.hive.agent.api.service.ChatSessionService;
-import br.com.systec.hive.agent.api.service.DefaultAgentService;
 import br.com.systec.hive.agent.impl.diagnostics.FailureClassifier;
 import br.com.systec.hive.agent.impl.util.ChatTitleUtil;
 import br.com.systec.hive.agent.impl.util.SecurityUtils;
+import br.com.systec.hive.api.domain.TenantLlmConfig;
+import br.com.systec.hive.api.service.TenantLlmConfigService;
 import br.com.systec.hive.commons.impl.security.TenantContext;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.ChatRole;
@@ -50,7 +51,7 @@ import java.util.UUID;
  *
  * <p><b>The diagnostics stayed here on purpose.</b> {@link #recordTurn} and the two log lines below
  * are what found the six defects this flow was validated against, and they are the only things that
- * can see a session id, a tenant and an agent at the same time. A generation seam that also emitted
+ * can see a session id and a tenant at the same time. A generation seam that also emitted
  * them would have been a seam that owned the explanation, and an explanation with two owners is the
  * condition that produced the bugs in the first place.
  *
@@ -61,6 +62,15 @@ import java.util.UUID;
  * therefore keeps the question — which is what the user needs in order to resend it — and never
  * persists an assistant row, because {@code chat_message.content} is {@code NOT NULL} and a blank
  * model reply used to reach that column and surface as a 409 data-integrity error.
+ *
+ * <h3>Where the two parameters come from</h3>
+ *
+ * <p>The <b>prompt</b> is a property of the conversation: the session names the template, and the
+ * template is what the user picked when the conversation started. The <b>provider and model</b> are a
+ * property of the tenant: there is exactly one row, read through
+ * {@link TenantLlmConfigService#require}, which throws rather than falling back. Both used to be read
+ * off the agent, and the two readings had different lifetimes — a prompt that could differ per
+ * conversation and a model that could not — which is the whole reason the agent had to exist.
  */
 @Service
 public class ChatServiceImpl implements ChatService {
@@ -76,11 +86,10 @@ public class ChatServiceImpl implements ChatService {
     static final String EMPTY_MODEL_RESPONSE = "empty_model_response";
 
     private final CredentialResolver credentialResolver;
-    private final AgentService agentService;
     private final ChatSessionService chatSessionService;
     private final ChatMessageService chatMessageService;
     private final ChatAssistantTxService chatAssistantTxService;
-    private final DefaultAgentService defaultAgentService;
+    private final TenantLlmConfigService tenantLlmConfigService;
     private final ChatRateLimiter chatRateLimiter;
     private final OpencodeDiscoveryService discoveryService;
     private final ChatTraceRecorder traceRecorder;
@@ -88,21 +97,19 @@ public class ChatServiceImpl implements ChatService {
 
     @Autowired
     public ChatServiceImpl(CredentialResolver credentialResolver,
-                           AgentService agentService,
                            ChatSessionService chatSessionService,
                            ChatMessageService chatMessageService,
                            ChatAssistantTxService chatAssistantTxService,
-                           DefaultAgentService defaultAgentService,
+                           TenantLlmConfigService tenantLlmConfigService,
                            ChatRateLimiter chatRateLimiter,
                            OpencodeDiscoveryService discoveryService,
                            ChatTraceRecorder traceRecorder,
                            ChatTurnGateway turnGateway) {
         this.credentialResolver = credentialResolver;
-        this.agentService = agentService;
         this.chatSessionService = chatSessionService;
         this.chatMessageService = chatMessageService;
         this.chatAssistantTxService = chatAssistantTxService;
-        this.defaultAgentService = defaultAgentService;
+        this.tenantLlmConfigService = tenantLlmConfigService;
         this.chatRateLimiter = chatRateLimiter;
         this.discoveryService = discoveryService;
         this.traceRecorder = traceRecorder == null ? ChatTraceRecorder.noop() : traceRecorder;
@@ -130,49 +137,49 @@ public class ChatServiceImpl implements ChatService {
             chatRateLimiter.check(tenantId);
         }
 
-        // Fallback for new session when agentId is null -> resolve default
-        if (request.getSessionId() == null && (request.getAgent() == null || request.getAgent().getId() == null)) {
-            Agent def = defaultAgentService.requireDefault(tenantId);
-            Agent agent = new Agent();
-            agent.setId(def.getId());
-            request.setAgent(agent);
-            log.info("chat fallback to default agentId={} tenantId={}", def.getId(), tenantId);
-        } else if (request.getAgent() == null || request.getAgent().getId() == null) {
-            if (request.getSessionId() == null) {
-                throw new IllegalArgumentException("agentId is required");
-            }
-        }
-
         UUID sessionId;
         ChatSession session;
 
         if (request.getSessionId() == null) {
-            UUID agentId = request.getAgent().getId();
+            // A new conversation has to arrive with the prompt it will be answered by. There is no
+            // default prompt and no template-less conversation: the client resolves the template
+            // before it opens the session, exactly as it used to resolve the default agent.
+            if (request.getPromptTemplateId() == null) {
+                throw new IllegalArgumentException("promptTemplateId is required");
+            }
             String title = ChatTitleUtil.truncate(request.getMessage(), 50);
-            session = chatSessionService.create(agentId, title, tenantId, userId);
+            session = chatSessionService.create(request.getPromptTemplateId(), title, tenantId, userId);
             sessionId = session.getId();
-            log.info("chat new session sessionId={} userId={} tenantId={} agentId={}", sessionId, userId, tenantId, agentId);
+            log.info("chat new session sessionId={} userId={} tenantId={} promptTemplateId={}",
+                    sessionId, userId, tenantId, request.getPromptTemplateId());
         } else {
             sessionId = request.getSessionId();
             session = chatSessionService.getSession(sessionId, tenantId, userId);
-            UUID effectiveAgentId = session.getAgentId();
-            if (request.getAgent() != null && request.getAgent().getId() != null
-                    && !request.getAgent().getId().equals(effectiveAgentId)) {
-                log.info("chat ignore divergent agentId request={} session={} sessionId={}", request.getAgent().getId(), effectiveAgentId, sessionId);
+            if (request.getPromptTemplateId() != null
+                    && !request.getPromptTemplateId().equals(session.getPromptTemplateId())) {
+                // Not an error: the prompt is a property of the conversation, and a client that
+                // still holds a stale one must not be able to retarget a conversation that already
+                // has messages. Logged so the mismatch is visible instead of silent.
+                log.info("chat ignore divergent promptTemplateId request={} session={} sessionId={}",
+                        request.getPromptTemplateId(), session.getPromptTemplateId(), sessionId);
             }
-            log.info("chat existing session sessionId={} userId={} tenantId={} agentId={}", sessionId, userId, tenantId, effectiveAgentId);
+            log.info("chat existing session sessionId={} userId={} tenantId={} promptTemplateId={}",
+                    sessionId, userId, tenantId, session.getPromptTemplateId());
         }
 
-        UUID effectiveAgentId = session.getAgentId();
-        Agent agent = agentService.findById(effectiveAgentId);
-        if (agent == null) {
-            throw new AgentNotFoundException();
+        UUID promptTemplateId = session.getPromptTemplateId();
+        PromptTemplate promptTemplate = chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId);
+        if (promptTemplate == null) {
+            throw new PromptTemplateNotFoundException(promptTemplateId);
         }
 
-        AiProvider provider = agent.getProvider() != null ? agent.getProvider() : AiProvider.OLLAMA;
-        String model = agent.getModel() != null && !agent.getModel().isBlank()
-                ? agent.getModel()
-                : VendorCatalog.defaultModelFor(provider);
+        // The provider and the model are the tenant's, not the conversation's. `require` throws
+        // TenantLlmConfigNotFoundException (422) when the tenant has not configured them: there is
+        // deliberately no fallback, because a silent default would turn a missing configuration into
+        // a conversation answered by a model nobody chose and nobody is paying for.
+        TenantLlmConfig llmConfig = tenantLlmConfigService.require(tenantId);
+        AiProvider provider = llmConfig.getProvider();
+        String model = llmConfig.getModel();
         VendorCatalog.validate(provider, model);
 
         // Ponte credential->chat: resolve (tenant, vendor) -> apiKey/baseUrl; ausente => 422 CONFIG_MISSING.
@@ -190,7 +197,7 @@ public class ChatServiceImpl implements ChatService {
         // Measured from here so elapsedMs isolates what the provider is asked to do — a large value
         // here means the provider stalled.
         long startedAt = System.nanoTime();
-        reply = turnGateway.execute(new TurnRequest(sessionId, agent, provider, model,
+        reply = turnGateway.execute(new TurnRequest(sessionId, promptTemplate, provider, model,
                 credential.apiKey(), credential.baseUrl(), history, conversation));
 
         if (reply.status() == TurnReply.Status.EMPTY_RESPONSE) {
@@ -198,10 +205,10 @@ public class ChatServiceImpl implements ChatService {
             // turned a provider quirk into a 409 data-integrity error that told the user nothing.
             // Reasoning models are the trigger — mimo-v2.5 with max_tokens=32 spends the whole
             // budget on reasoning and returns content=null; glm-5.2 returns "". Both are covered.
-            recordTurn(sessionId, effectiveAgentId, provider, model, agent, history, reply,
+            recordTurn(sessionId, promptTemplateId, provider, model, promptTemplate, history, reply,
                     elapsedMs(startedAt), EMPTY_MODEL_RESPONSE);
-            log.warn("chat empty model response sessionId={} tenantId={} agentId={} provider={} model={} maxTokens={}",
-                    sessionId, tenantId, effectiveAgentId, provider, model, agent.getMaxTokens());
+            log.warn("chat empty model response sessionId={} tenantId={} promptTemplateId={} provider={} model={} maxTokens={}",
+                    sessionId, tenantId, promptTemplateId, provider, model, maxTokensOf(promptTemplate));
             throw new ModelReturnedEmptyException(model);
         }
 
@@ -215,17 +222,17 @@ public class ChatServiceImpl implements ChatService {
             if (failure instanceof br.com.systec.hive.commons.api.exceptions.BaseException base) {
                 throw base;
             }
-            recordTurn(sessionId, effectiveAgentId, provider, model, agent, history, reply,
+            recordTurn(sessionId, promptTemplateId, provider, model, promptTemplate, history, reply,
                     elapsedMs(startedAt), FailureClassifier.causeOf(failure));
             if (LangChain4jTurnGateway.isModelNotFound(failure)) {
                 if (discoveryService != null) {
                     discoveryService.evict(provider);
                 }
-                log.warn("chat model unavailable sessionId={} tenantId={} agentId={} provider={} model={}",
-                        sessionId, tenantId, effectiveAgentId, provider, model);
+                log.warn("chat model unavailable sessionId={} tenantId={} promptTemplateId={} provider={} model={}",
+                        sessionId, tenantId, promptTemplateId, provider, model);
                 throw new ModelUnavailableException(model, String.valueOf(provider));
             }
-            log.error("provider failure sessionId={} tenantId={} agentId={}", sessionId, tenantId, effectiveAgentId, failure);
+            log.error("provider failure sessionId={} tenantId={} promptTemplateId={}", sessionId, tenantId, promptTemplateId, failure);
             throw new ProviderException("LLM provider failure", failure);
         }
 
@@ -238,7 +245,7 @@ public class ChatServiceImpl implements ChatService {
             throw new IllegalStateException("unreachable turn status: " + reply.status());
         }
 
-        recordTurn(sessionId, effectiveAgentId, provider, model, agent, history, reply,
+        recordTurn(sessionId, promptTemplateId, provider, model, promptTemplate, history, reply,
                 elapsedMs(startedAt), null);
 
         // TX2: save assistant + touch atomically
@@ -268,15 +275,15 @@ public class ChatServiceImpl implements ChatService {
      *
      * @param failureText already-classified failure label, or {@code null} for a healthy turn
      */
-    private void recordTurn(UUID sessionId, UUID agentId, AiProvider provider, String model, Agent agent,
-                            List<ChatMessage> history, TurnReply reply,
+    private void recordTurn(UUID sessionId, UUID promptTemplateId, AiProvider provider, String model,
+                            PromptTemplate promptTemplate, List<ChatMessage> history, TurnReply reply,
                             long elapsedMs, String failureText) {
         try {
-            // No .rag(...) call: the product has no knowledge context, so the trace's retrieval
-            // fields keep their builder defaults (not used, zero citations, no outcome, no
-            // threshold) and the log line this recorder prints is unchanged in shape.
-            traceRecorder.record(ChatTrace.builder(sessionId, agentId, provider, model)
-                    .agentLimits(agent.getMaxTokens(), agent.getTopP(), agent.getTemperature())
+            // A linha de trace não tem campo de retrieval: o produto não recupera nada, e um campo
+            // que não pode ser verdadeiro ensina o operador a ler um vocabulário que não descreve mais
+            // o sistema. Ver o javadoc de ChatTrace.
+            traceRecorder.record(ChatTrace.builder(sessionId, promptTemplateId, provider, model)
+                    .agentLimits(maxTokensOf(promptTemplate), topPOf(promptTemplate), temperatureOf(promptTemplate))
                     .prompt(history.size(), reply.promptMessages(), reply.promptChars())
                     .elapsedMs(elapsedMs)
                     .usage(reply.promptTokens(), reply.completionTokens(), reply.totalTokens(),
@@ -286,6 +293,23 @@ public class ChatServiceImpl implements ChatService {
         } catch (Exception e) {
             log.warn("chat trace recorder failed sessionId={}", sessionId, e);
         }
+    }
+
+    private static Integer maxTokensOf(PromptTemplate template) {
+        return inferenceParams(template).getMaxTokens();
+    }
+
+    private static Double topPOf(PromptTemplate template) {
+        return inferenceParams(template).getTopP();
+    }
+
+    private static Double temperatureOf(PromptTemplate template) {
+        return inferenceParams(template).getTemperature();
+    }
+
+    /** Never {@code null}: a template with no parameters still has three absent ones. */
+    private static InferenceParams inferenceParams(PromptTemplate template) {
+        return template.getInferenceParams() != null ? template.getInferenceParams() : new InferenceParams();
     }
 
     private static long elapsedMs(long startedAt) {

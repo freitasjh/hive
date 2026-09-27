@@ -16,6 +16,7 @@ import org.springframework.http.MediaType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -79,6 +80,9 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
 
     private String token;
 
+    /** {@code code} is unique per tenant, so every test in the class needs a distinct one. */
+    private final AtomicInteger codeSeq = new AtomicInteger();
+
     @BeforeEach
     void setUp() {
         replyIsNull = true;
@@ -90,20 +94,21 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
         UUID tenantId = UUID.randomUUID();
         token = tokenFor(tenantId, "empty-null");
         seedCredential(tenantId, token);
-        UUID agentId = createAgent(token, "Agente Vazio");
+        configureTenantLlm(token);
+        UUID promptTemplateId = createPromptTemplate(token, "Prompt Vazio");
         replyIsNull = true;
 
         mockMvc.perform(post("/v1/chat")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"agentId\":\"" + agentId + "\",\"message\":\"pergunta que exige raciocinio\"}"))
+                        .content("{\"promptTemplateId\":\"" + promptTemplateId + "\",\"message\":\"pergunta que exige raciocinio\"}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("MODEL_RETURNED_EMPTY"))
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("não devolveu texto")));
 
-        assertThat(assistantMessageCount(agentId, tenantId)).isZero();
+        assertThat(assistantMessageCount(promptTemplateId, tenantId)).isZero();
         // A mensagem do usuário foi salva em TX1 e é o contexto que ela precisa para reenviar.
-        assertThat(userMessageCount(agentId, tenantId)).isEqualTo(1);
+        assertThat(userMessageCount(promptTemplateId, tenantId)).isEqualTo(1);
     }
 
     @Test
@@ -111,19 +116,20 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
         UUID tenantId = UUID.randomUUID();
         token = tokenFor(tenantId, "empty-blank");
         seedCredential(tenantId, token);
-        UUID agentId = createAgent(token, "Agente Vazio Branco");
+        configureTenantLlm(token);
+        UUID promptTemplateId = createPromptTemplate(token, "Prompt Vazio Branco");
         replyIsNull = false;
         emptyReply = "";
 
         mockMvc.perform(post("/v1/chat")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"agentId\":\"" + agentId + "\",\"message\":\"outra pergunta\"}"))
+                        .content("{\"promptTemplateId\":\"" + promptTemplateId + "\",\"message\":\"outra pergunta\"}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("MODEL_RETURNED_EMPTY"));
 
-        assertThat(assistantMessageCount(agentId, tenantId)).isZero();
-        assertThat(userMessageCount(agentId, tenantId)).isEqualTo(1);
+        assertThat(assistantMessageCount(promptTemplateId, tenantId)).isZero();
+        assertThat(userMessageCount(promptTemplateId, tenantId)).isEqualTo(1);
     }
 
     @Test
@@ -131,18 +137,19 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
         UUID tenantId = UUID.randomUUID();
         token = tokenFor(tenantId, "empty-ws");
         seedCredential(tenantId, token);
-        UUID agentId = createAgent(token, "Agente Vazio Brancos");
+        configureTenantLlm(token);
+        UUID promptTemplateId = createPromptTemplate(token, "Prompt Vazio Brancos");
         replyIsNull = false;
         emptyReply = "   \n\t ";
 
         mockMvc.perform(post("/v1/chat")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"agentId\":\"" + agentId + "\",\"message\":\"mais uma\"}"))
+                        .content("{\"promptTemplateId\":\"" + promptTemplateId + "\",\"message\":\"mais uma\"}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("MODEL_RETURNED_EMPTY"));
 
-        assertThat(assistantMessageCount(agentId, tenantId)).isZero();
+        assertThat(assistantMessageCount(promptTemplateId, tenantId)).isZero();
     }
 
     @Test
@@ -152,18 +159,19 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
         UUID tenantId = UUID.randomUUID();
         token = tokenFor(tenantId, "length-ok");
         seedCredential(tenantId, token);
-        UUID agentId = createAgent(token, "Agente Truncado");
+        configureTenantLlm(token);
+        UUID promptTemplateId = createPromptTemplate(token, "Prompt Truncado");
         replyIsNull = false;
         emptyReply = "resposta truncada mas útil";
 
         mockMvc.perform(post("/v1/chat")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"agentId\":\"" + agentId + "\",\"message\":\"resuma\"}"))
+                        .content("{\"promptTemplateId\":\"" + promptTemplateId + "\",\"message\":\"resuma\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("resposta truncada mas útil"));
 
-        assertThat(assistantMessageCount(agentId, tenantId)).isEqualTo(1);
+        assertThat(assistantMessageCount(promptTemplateId, tenantId)).isEqualTo(1);
     }
 
     @Test
@@ -175,19 +183,20 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
         UUID tenantId = UUID.randomUUID();
         token = tokenFor(tenantId, "no-touch");
         seedCredential(tenantId, token);
-        UUID agentId = createAgent(token, "Agente Sem Touch");
+        configureTenantLlm(token);
+        UUID promptTemplateId = createPromptTemplate(token, "Prompt Sem Touch");
         replyIsNull = false;
         emptyReply = "primeira resposta";
 
-        assertThat(send(token, agentId, "primeira")).isEqualTo(200);
-        LocalDateTime baseline = sessionUpdateAt(agentId, tenantId);
+        assertThat(send(token, promptTemplateId, "primeira")).isEqualTo(200);
+        LocalDateTime baseline = sessionUpdateAt(promptTemplateId, tenantId);
         assertThat(baseline).isNotNull();
 
         Thread.sleep(TOUCH_RESOLUTION_MS);
         replyIsNull = true;
-        assertThat(send(token, agentId, "segunda")).isEqualTo(422);
+        assertThat(send(token, promptTemplateId, "segunda")).isEqualTo(422);
 
-        assertThat(sessionUpdateAt(agentId, tenantId)).isEqualTo(baseline);
+        assertThat(sessionUpdateAt(promptTemplateId, tenantId)).isEqualTo(baseline);
     }
 
     @Test
@@ -197,18 +206,19 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
         UUID tenantId = UUID.randomUUID();
         token = tokenFor(tenantId, "com-touch");
         seedCredential(tenantId, token);
-        UUID agentId = createAgent(token, "Agente Com Touch");
+        configureTenantLlm(token);
+        UUID promptTemplateId = createPromptTemplate(token, "Prompt Com Touch");
         replyIsNull = false;
         emptyReply = "primeira resposta";
 
-        assertThat(send(token, agentId, "primeira")).isEqualTo(200);
-        LocalDateTime baseline = sessionUpdateAt(agentId, tenantId);
+        assertThat(send(token, promptTemplateId, "primeira")).isEqualTo(200);
+        LocalDateTime baseline = sessionUpdateAt(promptTemplateId, tenantId);
 
         Thread.sleep(TOUCH_RESOLUTION_MS);
         emptyReply = "segunda resposta";
-        assertThat(send(token, agentId, "segunda")).isEqualTo(200);
+        assertThat(send(token, promptTemplateId, "segunda")).isEqualTo(200);
 
-        assertThat(sessionUpdateAt(agentId, tenantId)).isAfter(baseline);
+        assertThat(sessionUpdateAt(promptTemplateId, tenantId)).isAfter(baseline);
     }
 
     /**
@@ -217,10 +227,10 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
      * The status is returned instead of asserted because the second turn of the empty-reply pair is
      * expected to be 422.
      */
-    private int send(String token, UUID agentId, String message) throws Exception {
-        UUID sessionId = sessionIdOf(agentId);
+    private int send(String token, UUID promptTemplateId, String message) throws Exception {
+        UUID sessionId = sessionIdOf(promptTemplateId);
         String body = sessionId == null
-                ? "{\"agentId\":\"" + agentId + "\",\"message\":\"" + message + "\"}"
+                ? "{\"promptTemplateId\":\"" + promptTemplateId + "\",\"message\":\"" + message + "\"}"
                 : "{\"sessionId\":\"" + sessionId + "\",\"message\":\"" + message + "\"}";
         return mockMvc.perform(post("/v1/chat")
                         .header("Authorization", "Bearer " + token)
@@ -229,10 +239,10 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
                 .andReturn().getResponse().getStatus();
     }
 
-    private UUID sessionIdOf(UUID agentId) {
+    private UUID sessionIdOf(UUID promptTemplateId) {
         List<UUID> ids = jdbcTemplate.queryForList(
-                "SELECT id FROM chat_session WHERE agent_id = ? ORDER BY create_at",
-                UUID.class, agentId);
+                "SELECT id FROM chat_session WHERE prompt_template_id = ? ORDER BY create_at",
+                UUID.class, promptTemplateId);
         return ids.isEmpty() ? null : ids.get(0);
     }
 
@@ -242,7 +252,7 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
         // contrato com o frontend (que compara com MODEL_RETURNED_EMPTY) quebra em silêncio.
         assertThat(new ModelReturnedEmptyException("mimo-v2.5").getMessage())
                 .contains("mimo-v2.5")
-                .contains("Aumente o limite de tokens do agente");
+                .contains("Aumente o limite de tokens do prompt");
     }
 
     // ------------------------------------------------------------------ helpers
@@ -260,42 +270,59 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    private UUID createAgent(String token, String name) throws Exception {
-        // maxTokens=256 é o menor valor aceito por AgentCreateDTO (@Min(256)). O caso upstream de
-        // max_tokens=32 que produz content=null não é alcançável por esta API, mas 256 continua
-        // vulnerável com pergunta que exige raciocínio — por isso a guarda é testada aqui.
-        String body = mockMvc.perform(post("/v1/agents")
+    /**
+     * The conversation's prompt: a template whose only job here is to exist and to be answerable.
+     * {@code maxTokens=256} is the smallest value {@code InferenceParamsDTO} accepts; the upstream
+     * case of {@code max_tokens=32} that produces {@code content=null} is not reachable through this
+     * API, but 256 stays vulnerable to a question that demands reasoning — which is why the guard is
+     * tested here.
+     */
+    private UUID createPromptTemplate(String token, String name) throws Exception {
+        String body = mockMvc.perform(post("/v1/prompt-templates")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"" + name + "\",\"provider\":\"OPENCODE_GO\","
-                                + "\"model\":\"mimo-v2.5\",\"active\":true,\"maxTokens\":256}"))
+                        .content("{\"name\":\"" + name + "\",\"code\":\"vazio-" + codeSeq.getAndIncrement()
+                                + "\",\"template\":\"Voce e um assistente.\","
+                                + "\"inferenceParams\":{\"temperature\":0.7,\"maxTokens\":256}}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return UUID.fromString(body.split("\"id\":\"")[1].split("\"")[0]);
     }
 
-    private int assistantMessageCount(UUID agentId, UUID tenantId) {
-        return messageCount(agentId, tenantId, "ASSISTANT");
+    /**
+     * The tenant's one default LLM. Before this existed the vendor and model came off the agent; now
+     * they are a row per tenant, and a tenant without one cannot chat at all.
+     */
+    private void configureTenantLlm(String token) throws Exception {
+        mockMvc.perform(put("/v1/tenant/llm-config")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"OPENCODE_GO\",\"model\":\"mimo-v2.5\"}"))
+                .andExpect(status().isOk());
     }
 
-    private int userMessageCount(UUID agentId, UUID tenantId) {
-        return messageCount(agentId, tenantId, "USER");
+    private int assistantMessageCount(UUID promptTemplateId, UUID tenantId) {
+        return messageCount(promptTemplateId, tenantId, "ASSISTANT");
     }
 
-    private int messageCount(UUID agentId, UUID tenantId, String role) {
+    private int userMessageCount(UUID promptTemplateId, UUID tenantId) {
+        return messageCount(promptTemplateId, tenantId, "USER");
+    }
+
+    private int messageCount(UUID promptTemplateId, UUID tenantId, String role) {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM chat_message m"
                         + " JOIN chat_session s ON s.id = m.session_id"
-                        + " WHERE s.agent_id = ? AND s.tenant_id = ? AND m.role = ?",
-                Integer.class, agentId, tenantId, role);
+                        + " WHERE s.prompt_template_id = ? AND s.tenant_id = ? AND m.role = ?",
+                Integer.class, promptTemplateId, tenantId, role);
         return count == null ? 0 : count;
     }
 
-    /** {@code update_at} da sessão do agente, que é o que o touch em TX2 reescreve. */
-    private LocalDateTime sessionUpdateAt(UUID agentId, UUID tenantId) {
+    /** {@code update_at} da sessão do prompt, que é o que o touch em TX2 reescreve. */
+    private LocalDateTime sessionUpdateAt(UUID promptTemplateId, UUID tenantId) {
         return jdbcTemplate.queryForObject(
-                "SELECT update_at FROM chat_session WHERE agent_id = ? AND tenant_id = ?"
+                "SELECT update_at FROM chat_session WHERE prompt_template_id = ? AND tenant_id = ?"
                         + " ORDER BY create_at LIMIT 1",
-                LocalDateTime.class, agentId, tenantId);
+                LocalDateTime.class, promptTemplateId, tenantId);
     }
 }

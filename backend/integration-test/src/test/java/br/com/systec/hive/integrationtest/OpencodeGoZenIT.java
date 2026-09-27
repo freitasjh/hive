@@ -354,13 +354,21 @@ class OpencodeGoZenIT extends WebIntegrationTest {
                         .content("{\"apiKey\":\"go-fake-key\"}"))
                 .andExpect(status().isOk());
 
-        String created = mockMvc.perform(post("/v1/agents")
+        // O provider e o modelo passaram a ser o default do tenant (option (a), tabela dedicada);
+        // o prompt é escolhido por conversa.
+        mockMvc.perform(put("/v1/tenant/llm-config")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Go Agent\",\"provider\":\"OPENCODE_GO\",\"model\":\"mimo-v2.5\"}"))
+                        .content("{\"provider\":\"OPENCODE_GO\",\"model\":\"mimo-v2.5\"}"))
+                .andExpect(status().isOk());
+
+        String created = mockMvc.perform(post("/v1/prompt-templates")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Go Prompt\",\"code\":\"go-prompt\",\"template\":\"Voce e um assistente.\"}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String agentId = new com.fasterxml.jackson.databind.ObjectMapper()
+        String promptTemplateId = new com.fasterxml.jackson.databind.ObjectMapper()
                 .readTree(created).get("id").asText();
 
         StubConfig.clientBehavior.set(params -> {
@@ -372,7 +380,7 @@ class OpencodeGoZenIT extends WebIntegrationTest {
         mockMvc.perform(post("/v1/chat")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"agentId\":\"" + agentId + "\",\"message\":\"hello go\"}"))
+                        .content("{\"promptTemplateId\":\"" + promptTemplateId + "\",\"message\":\"hello go\"}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("MODEL_UNAVAILABLE"))
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("mimo-v2.5")));

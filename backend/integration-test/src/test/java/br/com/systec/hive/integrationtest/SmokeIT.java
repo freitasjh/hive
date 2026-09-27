@@ -25,7 +25,7 @@ class SmokeIT extends WebIntegrationTest {
 
     @Test
     void when_accessProtectedResourceWithoutToken_then_returnsUnauthorized() throws Exception {
-        mockMvc.perform(get("/v1/agents"))
+        mockMvc.perform(get("/v1/chat/sessions"))
                 .andExpect(status().isUnauthorized());
     }
 

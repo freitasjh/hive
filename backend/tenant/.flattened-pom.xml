@@ -21,5 +21,6 @@
     <module>api</module>
     <module>impl</module>
     <module>dbupdate</module>
+    <module>web</module>
   </modules>
 </project>

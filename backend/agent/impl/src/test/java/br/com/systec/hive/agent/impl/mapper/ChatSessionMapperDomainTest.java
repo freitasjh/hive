@@ -19,11 +19,11 @@ class ChatSessionMapperDomainTest {
         ChatSessionEntity entity = new ChatSessionEntity();
         UUID id = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        UUID agentId = UUID.randomUUID();
+        UUID promptTemplateId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
         entity.setId(id);
         entity.setUserId(userId);
-        entity.setAgentId(agentId);
+        entity.setPromptTemplateId(promptTemplateId);
         entity.setTenantId(tenantId);
         entity.setTitle("Test Title");
         entity.setSummary("summary");
@@ -35,7 +35,7 @@ class ChatSessionMapperDomainTest {
         assertThat(domain).isNotNull();
         assertThat(domain.getId()).isEqualTo(id);
         assertThat(domain.getUserId()).isEqualTo(userId);
-        assertThat(domain.getAgentId()).isEqualTo(agentId);
+        assertThat(domain.getPromptTemplateId()).isEqualTo(promptTemplateId);
         assertThat(domain.getTenantId()).isEqualTo(tenantId);
         assertThat(domain.getTitle()).isEqualTo("Test Title");
         assertThat(domain.getSummary()).isEqualTo("summary");
@@ -47,10 +47,10 @@ class ChatSessionMapperDomainTest {
         ChatSession domain = new ChatSession();
         UUID id = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        UUID agentId = UUID.randomUUID();
+        UUID promptTemplateId = UUID.randomUUID();
         domain.setId(id);
         domain.setUserId(userId);
-        domain.setAgentId(agentId);
+        domain.setPromptTemplateId(promptTemplateId);
         domain.setTitle("Domain Title");
         domain.setSummary("domain summary");
         domain.setTenantId(UUID.randomUUID());
@@ -61,7 +61,7 @@ class ChatSessionMapperDomainTest {
         assertThat(entity).isNotNull();
         assertThat(entity.getId()).isEqualTo(id);
         assertThat(entity.getUserId()).isEqualTo(userId);
-        assertThat(entity.getAgentId()).isEqualTo(agentId);
+        assertThat(entity.getPromptTemplateId()).isEqualTo(promptTemplateId);
         assertThat(entity.getTitle()).isEqualTo("Domain Title");
         assertThat(entity.getSummary()).isEqualTo("domain summary");
         assertThat(entity.getCreateAt()).isNull();
@@ -70,17 +70,17 @@ class ChatSessionMapperDomainTest {
     }
 
     @Test
-    void when_toDomain_with_agentEntity_then_mapsAgentId() {
+    void when_toDomain_with_agentEntity_then_mapsPromptTemplateId() {
         ChatSessionEntity entity = new ChatSessionEntity();
-        UUID agentId = UUID.randomUUID();
+        UUID promptTemplateId = UUID.randomUUID();
         entity.setId(UUID.randomUUID());
         entity.setUserId(UUID.randomUUID());
-        entity.setAgentId(agentId);
+        entity.setPromptTemplateId(promptTemplateId);
         entity.setTitle("Title");
         entity.setTenantId(UUID.randomUUID());
 
         ChatSession domain = mapper.toDomain(entity);
 
-        assertThat(domain.getAgentId()).isEqualTo(agentId);
+        assertThat(domain.getPromptTemplateId()).isEqualTo(promptTemplateId);
     }
 }

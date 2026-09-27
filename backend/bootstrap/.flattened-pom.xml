@@ -114,6 +114,11 @@
     </dependency>
     <dependency>
       <groupId>br.com.systec.hive</groupId>
+      <artifactId>hive-tenant-web-internal-v1</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>br.com.systec.hive</groupId>
       <artifactId>hive-identity-api</artifactId>
       <scope>compile</scope>
     </dependency>

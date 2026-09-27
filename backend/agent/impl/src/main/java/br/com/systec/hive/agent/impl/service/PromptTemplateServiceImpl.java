@@ -9,7 +9,7 @@ import br.com.systec.hive.agent.api.exceptions.PromptTemplateNotFoundException;
 import br.com.systec.hive.agent.api.service.PromptTemplateService;
 import br.com.systec.hive.agent.impl.entity.PromptTemplateEntity;
 import br.com.systec.hive.agent.impl.mapper.PromptTemplateDomainMapper;
-import br.com.systec.hive.agent.impl.repository.AgentRepository;
+import br.com.systec.hive.agent.impl.repository.ChatSessionRepository;
 import br.com.systec.hive.agent.impl.repository.PromptTemplateRepository;
 import br.com.systec.hive.agent.impl.util.PromptVariableExtractor;
 import br.com.systec.hive.commons.impl.security.TenantContext;
@@ -26,12 +26,12 @@ import java.util.UUID;
 public class PromptTemplateServiceImpl implements PromptTemplateService {
     private final PromptTemplateRepository repository;
     private final PromptTemplateDomainMapper mapper;
-    private final AgentRepository agentRepository;
+    private final ChatSessionRepository chatSessionRepository;
 
-    public PromptTemplateServiceImpl(PromptTemplateRepository repository, PromptTemplateDomainMapper mapper, AgentRepository agentRepository) {
+    public PromptTemplateServiceImpl(PromptTemplateRepository repository, PromptTemplateDomainMapper mapper, ChatSessionRepository chatSessionRepository) {
         this.repository = repository;
         this.mapper = mapper;
-        this.agentRepository = agentRepository;
+        this.chatSessionRepository = chatSessionRepository;
     }
 
     @Override
@@ -156,7 +156,7 @@ public class PromptTemplateServiceImpl implements PromptTemplateService {
         UUID tenantId = TenantContext.getCurrentTenant();
         PromptTemplateEntity entity = repository.findByIdAndTenantId(obj.getId(), tenantId)
                 .orElseThrow(PromptTemplateNotFoundException::new);
-        boolean inUse = agentRepository.existsByPromptTemplate_IdAndTenantId(entity.getId(), tenantId);
+        boolean inUse = chatSessionRepository.existsByPromptTemplateIdAndTenantId(entity.getId(), tenantId);
         if (inUse) {
             throw new PromptInUseException(entity.getId().toString());
         }
@@ -169,7 +169,7 @@ public class PromptTemplateServiceImpl implements PromptTemplateService {
         UUID tenantId = TenantContext.getCurrentTenant();
         PromptTemplateEntity entity = repository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(PromptTemplateNotFoundException::new);
-        boolean inUse = agentRepository.existsByPromptTemplate_IdAndTenantId(entity.getId(), tenantId);
+        boolean inUse = chatSessionRepository.existsByPromptTemplateIdAndTenantId(entity.getId(), tenantId);
         if (inUse) {
             throw new PromptInUseException(entity.getId().toString());
         }

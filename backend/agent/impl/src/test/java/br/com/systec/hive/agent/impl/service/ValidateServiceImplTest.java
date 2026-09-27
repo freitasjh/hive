@@ -1,6 +1,6 @@
 package br.com.systec.hive.agent.impl.service;
 
-import br.com.systec.hive.agent.api.domain.AgentValidation;
+import br.com.systec.hive.agent.api.domain.ModelValidation;
 import br.com.systec.hive.agent.api.exceptions.ConfigMissingException;
 import br.com.systec.hive.agent.api.exceptions.ValidateRateLimitException;
 import br.com.systec.hive.provider.api.AiProvider;
@@ -62,7 +62,7 @@ class ValidateServiceImplTest {
                 .thenReturn(chatModel);
         when(probe.ping(chatModel)).thenReturn("pong");
 
-        AgentValidation result = service.validate(tenantId, AiProvider.OPENAI, "gpt-4o-mini", null);
+        ModelValidation result = service.validate(tenantId, AiProvider.OPENAI, "gpt-4o-mini", null);
 
         assertThat(result.isOk()).isTrue();
         assertThat(result.getProvider()).isEqualTo(AiProvider.OPENAI);
@@ -79,7 +79,7 @@ class ValidateServiceImplTest {
         when(llmClientFactory.createClient(any(), any(), any(), any(), any(), any(), any())).thenReturn(chatModel);
         when(probe.ping(chatModel)).thenThrow(new RuntimeException("vendor down"));
 
-        AgentValidation result = service.validate(tenantId, AiProvider.OPENAI, "gpt-4o-mini", null);
+        ModelValidation result = service.validate(tenantId, AiProvider.OPENAI, "gpt-4o-mini", null);
 
         assertThat(result.isOk()).isFalse();
         assertThat(result.getReason()).isEqualTo("connection_failed");
@@ -126,7 +126,7 @@ class ValidateServiceImplTest {
                 .thenReturn(chatModel);
         when(probe.ping(chatModel)).thenReturn("pong");
 
-        AgentValidation result = service.validate(tenantId, AiProvider.OPENCODE_GO, "mimo-v2.5", null);
+        ModelValidation result = service.validate(tenantId, AiProvider.OPENCODE_GO, "mimo-v2.5", null);
 
         assertThat(result.isOk()).isTrue();
         assertThat(result.getProvider()).isEqualTo(AiProvider.OPENCODE_GO);
@@ -151,7 +151,7 @@ class ValidateServiceImplTest {
                 .thenReturn(chatModel);
         when(probe.ping(chatModel)).thenReturn("pong");
 
-        AgentValidation result = service.validate(tenantId, AiProvider.OPENCODE_GO, "mimo-v2.5",
+        ModelValidation result = service.validate(tenantId, AiProvider.OPENCODE_GO, "mimo-v2.5",
                 "https://opencode.ai/zen/go/v1");
 
         assertThat(result.isOk()).isTrue();
@@ -196,7 +196,7 @@ class ValidateServiceImplTest {
             return "pong";
         });
 
-        AgentValidation result = service.validate(tenantId, AiProvider.OPENCODE_GO, "mimo-v2.5", null);
+        ModelValidation result = service.validate(tenantId, AiProvider.OPENCODE_GO, "mimo-v2.5", null);
 
         assertThat(result.isOk()).isTrue();
         assertThat(result.getLatencyMs()).isGreaterThanOrEqualTo(300L);

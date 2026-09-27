@@ -24,7 +24,7 @@
         <h1 class="text-2xl font-bold m-0 text-900">Hive Assistant</h1>
       </div>
       <div class="flex align-items-center gap-2">
-        <AgentSelector v-model="selectedAgentId" :disabled="!!sessionId" class="w-18rem" data-testid="agent-selector" />
+        <PromptSelector v-model="selectedPromptTemplateId" :disabled="!!sessionId" class="w-18rem" />
       </div>
     </div>
 
@@ -40,7 +40,7 @@
           </div>
           <h2 class="text-900 text-3xl font-bold mb-2 tracking-tight">Bem-vindo ao <span class="text-primary">Hive AI</span></h2>
           <p class="text-surface-500 max-w-20rem m-auto line-height-3">Sua orquestração inteligente começa aqui. Como posso acelerar seus fluxos de trabalho hoje?</p>
-          <p v-if="!selectedAgentId" class="text-sm text-amber-600 mt-3">Selecione um agente acima para começar.</p>
+          <p v-if="!selectedPromptTemplateId" class="text-sm text-amber-600 mt-3">Escolha um prompt acima para começar.</p>
         </div>
 
         <ChatMessage
@@ -89,8 +89,9 @@ import { useToast } from 'primevue/usetoast'
 import ChatSidebar from '../components/ChatSidebar.vue'
 import ChatMessage from '../components/ChatMessage.vue'
 import ChatInput from '../components/ChatInput.vue'
-import AgentSelector from '../components/AgentSelector.vue'
+import PromptSelector from '../components/PromptSelector.vue'
 import {
+  LLM_CONFIG_NOT_FOUND_TITLE,
   MODEL_RETURNED_EMPTY_MESSAGE,
   MODEL_RETURNED_EMPTY_TITLE,
 } from '../types/chat-messages'
@@ -107,7 +108,7 @@ const sending = ref(false)
 const loadingHistory = ref(false)
 const sidebarVisible = ref(false)
 const sessionId = ref<string | null>(localStorage.getItem('hive_sessionId'))
-const selectedAgentId = ref<string | null>(null)
+const selectedPromptTemplateId = ref<string | null>(null)
 const chatContainer = ref<HTMLElement | null>(null)
 const sidebarRef = ref<InstanceType<typeof ChatSidebar> | null>(null)
 const loadSeq = ref(0)
@@ -137,7 +138,7 @@ async function selectSession(id: string) {
     messages.value = page.content
     const session = await sessionService.getSession(id).catch(() => null)
     if (seq !== loadSeq.value) return
-    if (session?.agentId) selectedAgentId.value = session.agentId
+    if (session?.promptTemplateId) selectedPromptTemplateId.value = session.promptTemplateId
     await scrollToBottom()
   } catch {
     if (seq !== loadSeq.value) return
@@ -150,6 +151,10 @@ async function selectSession(id: string) {
 function newChat() {
   sessionId.value = null
   messages.value = []
+  // A conversa nova precisa de um prompt novo: o da conversa anterior não é "um prompt escolhido
+  // nesta tela", é o da outra conversa. Deixá-lo marcado faria a primeira mensagem responder com o
+  // prompt que o usuário não escolheu agora.
+  selectedPromptTemplateId.value = null
   localStorage.removeItem(STORAGE_KEY)
 }
 
@@ -164,12 +169,12 @@ async function sendMessage() {
     toast.add({ severity: 'warn', summary: 'Mensagem muito longa', detail: 'Máximo 4000 caracteres', life: 3000 })
     return
   }
-  if (!selectedAgentId.value) {
-    toast.add({ severity: 'warn', summary: 'Selecione um agente', detail: 'Escolha um agente antes de enviar', life: 3000 })
+  if (!selectedPromptTemplateId.value) {
+    toast.add({ severity: 'warn', summary: 'Escolha um prompt', detail: 'Selecione um prompt antes de enviar', life: 3000 })
     return
   }
 
-  const agentId = selectedAgentId.value
+  const promptTemplateId = selectedPromptTemplateId.value
   const currentSession = sessionId.value
   const userMsgText = text
   userInput.value = ''
@@ -186,7 +191,7 @@ async function sendMessage() {
   await scrollToBottom()
 
   try {
-    const resp = await chatService.sendMessage(agentId, currentSession, userMsgText)
+    const resp = await chatService.sendMessage(promptTemplateId, currentSession, userMsgText)
     if (!currentSession && resp.sessionId) {
       sessionId.value = resp.sessionId
       localStorage.setItem(STORAGE_KEY, resp.sessionId)
@@ -212,6 +217,10 @@ async function sendMessage() {
         detail: MODEL_RETURNED_EMPTY_MESSAGE,
         life: 6000,
       })
+    } else if (problem.code === 'TENANT_LLM_CONFIG_NOT_FOUND') {
+      // A configuração de LLM é do tenant e não tem fallback. A mensagem do servidor já diz onde
+      // configurar; repetir aqui com outro texto seria duas verdades para o mesmo erro.
+      toast.add({ severity: 'warn', summary: LLM_CONFIG_NOT_FOUND_TITLE, detail: problem.detail, life: 8000 })
     } else {
       toast.add({ severity: 'error', summary: 'Erro', detail: problem.detail, life: 4000 })
     }
@@ -256,7 +265,7 @@ onMounted(async () => {
       messages.value = page.content
       const session = await sessionService.getSession(stored).catch(() => null)
       if (seq !== loadSeq.value) return
-      if (session?.agentId) selectedAgentId.value = session.agentId
+      if (session?.promptTemplateId) selectedPromptTemplateId.value = session.promptTemplateId
       await scrollToBottom()
     } catch {
       if (seq !== loadSeq.value) return

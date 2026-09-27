@@ -1,6 +1,10 @@
 package br.com.systec.hive.agent.web.internal.v1.controller;
 
+import br.com.systec.hive.agent.api.domain.ModelValidation;
 import br.com.systec.hive.agent.api.service.ValidateRateLimitPolicy;
+import br.com.systec.hive.agent.api.service.ValidateService;
+import br.com.systec.hive.agent.web.internal.v1.dto.ValidateRequestDTO;
+import br.com.systec.hive.agent.web.internal.v1.dto.ValidateResponseDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.ProviderModelsDTO;
 import br.com.systec.hive.agent.web.internal.v1.mapper.ProviderModelsDTOMapper;
 import br.com.systec.hive.commons.api.tools.controller.RestControllerTool;
@@ -17,7 +21,10 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,19 +34,39 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping(RestPath.V1 + "/providers")
-@Tag(name = "Hive Agent - Provider Models", description = "Descoberta de modelos remotos OpenCode GO/Zen")
+@Tag(name = "Hive Providers", description = "Modelos remotos e probe de conectividade do provedor")
 public class ProviderModelsControllerV1 {
 
     private final OpencodeDiscoveryService discoveryService;
+    private final ValidateService validateService;
     private final ValidateRateLimitPolicy rateLimiter;
     private final ProviderModelsDTOMapper mapper;
 
     public ProviderModelsControllerV1(OpencodeDiscoveryService discoveryService,
+                                      ValidateService validateService,
                                       ValidateRateLimitPolicy rateLimiter,
                                       ProviderModelsDTOMapper mapper) {
         this.discoveryService = discoveryService;
+        this.validateService = validateService;
         this.rateLimiter = rateLimiter;
         this.mapper = mapper;
+    }
+
+    /**
+     * Was {@code POST /v1/agents/validate}, on a controller that no longer exists. The probe has
+     * nothing to do with agents — it asks a vendor whether a model answers — so it moved here
+     * rather than disappearing with its old host, and the credentials screen that already called it
+     * keeps working against a name that is true.
+     */
+    @PostMapping(value = "/validate", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(description = "Testa a conexão com o provedor sem persistir nada")
+    @HasPermission(SecurityConstants.AGENT_MANAGE)
+    public ResponseEntity<ValidateResponseDTO> validate(@RequestBody @Valid ValidateRequestDTO payload) {
+        ModelValidation validation = validateService.validate(currentTenantId(), payload.provider(),
+                payload.model(), payload.baseUrl());
+        return RestControllerTool.of().buildSuccessResponse(new ValidateResponseDTO(validation.isOk(),
+                validation.getProvider(), validation.getModel(), validation.getLatencyMs(), validation.getReason()));
     }
 
     @GetMapping(value = "/{provider}/models", produces = MediaType.APPLICATION_JSON_VALUE)

@@ -2,20 +2,23 @@ package br.com.systec.hive.agent.impl.service;
 
 import br.com.systec.hive.agent.api.diagnostics.ChatTrace;
 import br.com.systec.hive.agent.api.diagnostics.ChatTraceRecorder;
-import br.com.systec.hive.agent.api.port.ChatTurnGateway;
-import br.com.systec.hive.agent.api.domain.Agent;
 import br.com.systec.hive.agent.api.domain.ChatMessage;
 import br.com.systec.hive.agent.api.domain.ChatRequest;
 import br.com.systec.hive.agent.api.domain.ChatResponse;
 import br.com.systec.hive.agent.api.domain.ChatSession;
+import br.com.systec.hive.agent.api.domain.InferenceParams;
+import br.com.systec.hive.agent.api.domain.PromptTemplate;
 import br.com.systec.hive.agent.api.exceptions.ChatSessionNotFoundException;
 import br.com.systec.hive.agent.api.exceptions.ConfigMissingException;
 import br.com.systec.hive.agent.api.exceptions.ModelReturnedEmptyException;
 import br.com.systec.hive.agent.api.exceptions.ProviderException;
-import br.com.systec.hive.agent.api.service.AgentService;
+import br.com.systec.hive.agent.api.port.ChatTurnGateway;
 import br.com.systec.hive.agent.api.service.ChatMessageService;
 import br.com.systec.hive.agent.api.service.ChatSessionService;
 import br.com.systec.hive.agent.impl.diagnostics.FailureClassifier;
+import br.com.systec.hive.api.domain.TenantLlmConfig;
+import br.com.systec.hive.api.exceptions.TenantLlmConfigNotFoundException;
+import br.com.systec.hive.api.service.TenantLlmConfigService;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.ChatRole;
 import br.com.systec.hive.provider.api.LlmClientFactory;
@@ -50,9 +53,6 @@ class ChatServiceImplTest {
     private CredentialResolver credentialResolver;
 
     @Mock
-    private AgentService agentService;
-
-    @Mock
     private ChatSessionService chatSessionService;
 
     @Mock
@@ -62,7 +62,7 @@ class ChatServiceImplTest {
     private ChatAssistantTxService chatAssistantTxService;
 
     @Mock
-    private br.com.systec.hive.agent.api.service.DefaultAgentService defaultAgentService;
+    private TenantLlmConfigService tenantLlmConfigService;
 
     @Mock
     private ChatRateLimiter chatRateLimiter;
@@ -89,13 +89,20 @@ class ChatServiceImplTest {
 
     private UUID tenantId;
     private UUID userId;
-    private UUID agentId;
+    private UUID promptTemplateId;
+
+    /**
+     * The template this test's turns are answered by. Resolved through an {@code Answer} rather than
+     * a second stubbing so a test that changes the template mid-flight changes the value instead of
+     * shadowing a stub and leaving Mockito to report the old one as unused.
+     */
+    private PromptTemplate template;
 
     @BeforeEach
     void setUp() {
         tenantId = UUID.randomUUID();
         userId = UUID.randomUUID();
-        agentId = UUID.randomUUID();
+        promptTemplateId = UUID.randomUUID();
         // The two seams are the production ones. Only the factory they share stays a mock, so every
         // assertion about which model was asked, with which limits, still reads as a claim about the
         // real call rather than about a stand-in for the whole gateway.
@@ -104,18 +111,32 @@ class ChatServiceImplTest {
     }
 
     private ChatServiceImpl newService(ChatTraceRecorder traces) {
-        return new ChatServiceImpl(credentialResolver, agentService, chatSessionService, chatMessageService,
-                chatAssistantTxService, defaultAgentService, chatRateLimiter, discoveryService,
+        return new ChatServiceImpl(credentialResolver, chatSessionService, chatMessageService,
+                chatAssistantTxService, tenantLlmConfigService, chatRateLimiter, discoveryService,
                 traces, turnGateway);
     }
 
-    private Agent openAiAgent() {
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        agent.setProvider(AiProvider.OPENAI);
-        agent.setModel("gpt-4o-mini");
-        agent.setTemperature(0.7);
-        return agent;
+    /** The tenant's one default: vendor and model, verbatim. No fallback is exercised anywhere here. */
+    private TenantLlmConfig openAiConfig() {
+        TenantLlmConfig config = new TenantLlmConfig();
+        config.setProvider(AiProvider.OPENAI);
+        config.setModel("gpt-4o-mini");
+        return config;
+    }
+
+    private TenantLlmConfig openCodeGoConfig() {
+        TenantLlmConfig config = new TenantLlmConfig();
+        config.setProvider(AiProvider.OPENCODE_GO);
+        config.setModel("mimo-v2.5");
+        return config;
+    }
+
+    private PromptTemplate openAiTemplate() {
+        PromptTemplate template = new PromptTemplate();
+        template.setId(promptTemplateId);
+        template.setTemplate("Voce e um assistente.");
+        template.setInferenceParams(new InferenceParams(0.7, null, null));
+        return template;
     }
 
     private void stubCredential() {
@@ -132,21 +153,17 @@ class ChatServiceImplTest {
 
     @Test
     void when_chat_with_noSessionId_then_createsSessionAndSavesTwoMessages() {
-        ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
-        request.setMessage("Hello world");
-        request.setSessionId(null);
+        ChatRequest request = newRequest();
 
         ChatSession session = new ChatSession();
         UUID sessionId = UUID.randomUUID();
         session.setId(sessionId);
-        session.setAgentId(agentId);
+        session.setPromptTemplateId(promptTemplateId);
         session.setTenantId(tenantId);
-        when(chatSessionService.create(eq(agentId), any(String.class), eq(tenantId), eq(userId))).thenReturn(session);
+        when(chatSessionService.create(eq(promptTemplateId), any(String.class), eq(tenantId), eq(userId))).thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
 
-        when(agentService.findById(agentId)).thenReturn(openAiAgent());
+        stubTenantConfig(openAiConfig());
         stubCredential();
         stubClient("assistant reply");
 
@@ -162,27 +179,59 @@ class ChatServiceImplTest {
         assertThat(response).isNotNull();
         assertThat(response.getSessionId()).isEqualTo(sessionId);
         assertThat(response.getMessage()).isEqualTo("assistant reply");
-        verify(chatSessionService).create(eq(agentId), any(String.class), eq(tenantId), eq(userId));
+        verify(chatSessionService).create(eq(promptTemplateId), any(String.class), eq(tenantId), eq(userId));
         verify(chatMessageService).save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), eq("Hello world"));
         verify(chatAssistantTxService).saveAssistantAndTouch(eq(sessionId), eq(tenantId), eq("assistant reply"));
     }
 
     @Test
+    void when_chat_with_newSessionAndNoPromptTemplate_then_refusedBeforeAnythingIsPersisted() {
+        ChatRequest request = newRequest();
+        request.setPromptTemplateId(null);
+
+        assertThatThrownBy(() -> service.chat(request, tenantId, userId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("promptTemplateId");
+
+        // Não há prompt padrão: uma conversa sem template não é criada, não fica "para depois".
+        verify(chatSessionService, never()).create(any(), any(), any(), any());
+        verify(chatMessageService, never()).save(any(), any(), any(), any());
+    }
+
+    @Test
+    void when_chat_with_tenantWithoutLlmConfig_then_422TellingWhatToConfigureAndNothingPersisted() {
+        ChatRequest request = newRequest();
+        ChatSession session = new ChatSession();
+        UUID sessionId = UUID.randomUUID();
+        session.setId(sessionId);
+        session.setPromptTemplateId(promptTemplateId);
+        when(chatSessionService.create(eq(promptTemplateId), any(String.class), eq(tenantId), eq(userId)))
+                .thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
+        when(tenantLlmConfigService.require(tenantId)).thenThrow(new TenantLlmConfigNotFoundException());
+
+        assertThatThrownBy(() -> service.chat(request, tenantId, userId))
+                .isInstanceOf(TenantLlmConfigNotFoundException.class)
+                .hasMessageContaining("Configurações > Provedores");
+
+        // Nenhum fallback global: sem config não há conversa, e a falha acontece antes da TX1.
+        verify(chatMessageService, never()).save(any(), any(), any(), any());
+        verify(llmClientFactory, never()).createClientWithSession(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void when_chat_with_existingSession_then_passesSessionIdToFactory() {
         UUID sessionId = UUID.randomUUID();
-        ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
-        request.setMessage("stable header");
+        ChatRequest request = newRequest();
         request.setSessionId(sessionId);
 
         ChatSession session = new ChatSession();
         session.setId(sessionId);
-        session.setAgentId(agentId);
+        session.setPromptTemplateId(promptTemplateId);
         when(chatSessionService.getSession(sessionId, tenantId, userId)).thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
 
-        when(agentService.findById(agentId)).thenReturn(openAiAgent());
+        stubTenantConfig(openAiConfig());
         stubCredential();
         stubClient("reply");
         when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(new ChatMessage());
@@ -195,20 +244,19 @@ class ChatServiceImplTest {
     }
 
     @Test
-    void when_chat_with_sessionId_then_appendsAndSendsHistory() {        UUID sessionId = UUID.randomUUID();
-        ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
+    void when_chat_with_sessionId_then_appendsAndSendsHistory() {
+        UUID sessionId = UUID.randomUUID();
+        ChatRequest request = newRequest();
         request.setMessage("second message");
         request.setSessionId(sessionId);
 
         ChatSession session = new ChatSession();
         session.setId(sessionId);
-        session.setAgentId(agentId);
+        session.setPromptTemplateId(promptTemplateId);
         when(chatSessionService.getSession(sessionId, tenantId, userId)).thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
 
-        when(agentService.findById(agentId)).thenReturn(openAiAgent());
+        stubTenantConfig(openAiConfig());
         stubCredential();
         stubClient("assistant2");
 
@@ -228,30 +276,29 @@ class ChatServiceImplTest {
         assertThat(response.getSessionId()).isEqualTo(sessionId);
         ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
         verify(chatModel).chat(captor.capture());
-        assertThat(captor.getValue()).hasSize(3);
+        // system do template + as três mensagens da conversa
+        assertThat(captor.getValue()).hasSize(4);
     }
 
     @Test
-    void when_chat_with_divergentAgentId_then_ignoresNewAgent() {
+    void when_chat_with_divergentPromptTemplateId_then_theSessionWins() {
+        // O prompt é propriedade da conversa. Um cliente que ainda manda o id antigo não consegue
+        // redirecionar uma conversa que já tem mensagens; o log deixa a divergência visível.
         UUID sessionId = UUID.randomUUID();
-        UUID originalAgentId = UUID.randomUUID();
-        UUID divergentAgentId = UUID.randomUUID();
+        UUID divergentId = UUID.randomUUID();
 
-        ChatRequest request = new ChatRequest();
-        Agent divergentAgent = new Agent();
-        divergentAgent.setId(divergentAgentId);
-        request.setAgent(divergentAgent);
+        ChatRequest request = newRequest();
         request.setMessage("hi");
         request.setSessionId(sessionId);
+        request.setPromptTemplateId(divergentId);
 
         ChatSession session = new ChatSession();
         session.setId(sessionId);
-        session.setAgentId(originalAgentId);
+        session.setPromptTemplateId(promptTemplateId);
         when(chatSessionService.getSession(sessionId, tenantId, userId)).thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
 
-        Agent originalAgent = openAiAgent();
-        originalAgent.setId(originalAgentId);
-        when(agentService.findById(originalAgentId)).thenReturn(originalAgent);
+        stubTenantConfig(openAiConfig());
         stubCredential();
         stubClient("reply");
         when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(new ChatMessage());
@@ -259,26 +306,42 @@ class ChatServiceImplTest {
 
         service.chat(request, tenantId, userId);
 
-        verify(agentService).findById(originalAgentId);
-        verify(agentService, never()).findById(divergentAgentId);
+        // O template resolvido é o da sessão; o divergente nunca é consultado.
+        verify(chatSessionService).resolvePromptTemplate(sessionId, tenantId, userId);
+        verify(chatSessionService, never()).create(any(), any(), any(), any());
+    }
+
+    @Test
+    void when_chat_with_sessionTemplateMissing_then_404AndNothingPersisted() {
+        UUID sessionId = UUID.randomUUID();
+        ChatRequest request = newRequest();
+        request.setSessionId(sessionId);
+
+        ChatSession session = new ChatSession();
+        session.setId(sessionId);
+        session.setPromptTemplateId(promptTemplateId);
+        when(chatSessionService.getSession(sessionId, tenantId, userId)).thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(null);
+
+        assertThatThrownBy(() -> service.chat(request, tenantId, userId))
+                .isInstanceOf(br.com.systec.hive.agent.api.exceptions.PromptTemplateNotFoundException.class);
+
+        verify(chatMessageService, never()).save(any(), any(), any(), any());
     }
 
     @Test
     void when_chat_with_providerFailure_then_preservesUserMsgAndThrows502() {
-        ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
+        ChatRequest request = newRequest();
         request.setMessage("hello");
-        request.setSessionId(null);
 
         ChatSession session = new ChatSession();
         UUID sessionId = UUID.randomUUID();
         session.setId(sessionId);
-        session.setAgentId(agentId);
+        session.setPromptTemplateId(promptTemplateId);
         when(chatSessionService.create(any(), any(), eq(tenantId), eq(userId))).thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
 
-        when(agentService.findById(agentId)).thenReturn(openAiAgent());
+        stubTenantConfig(openAiConfig());
         stubCredential();
         when(llmClientFactory.createClientWithSession(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(chatModel);
         when(chatModel.chat(any(List.class))).thenThrow(new RuntimeException("LLM down"));
@@ -295,19 +358,17 @@ class ChatServiceImplTest {
     @Test
     void when_chat_with_historyMoreThan20_then_sendsOnlyLast20() {
         UUID sessionId = UUID.randomUUID();
-        ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
+        ChatRequest request = newRequest();
         request.setMessage("msg25");
         request.setSessionId(sessionId);
 
         ChatSession session = new ChatSession();
         session.setId(sessionId);
-        session.setAgentId(agentId);
+        session.setPromptTemplateId(promptTemplateId);
         when(chatSessionService.getSession(sessionId, tenantId, userId)).thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
 
-        when(agentService.findById(agentId)).thenReturn(openAiAgent());
+        stubTenantConfig(openAiConfig());
         stubCredential();
         stubClient("reply");
         when(chatMessageService.save(any(), any(), eq(ChatRole.USER), any())).thenReturn(new ChatMessage());
@@ -325,17 +386,14 @@ class ChatServiceImplTest {
 
         ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
         verify(chatModel).chat(captor.capture());
-        assertThat(captor.getValue()).hasSize(20);
+        // system do template + as 20 últimas mensagens. O teto é da conversa; o system entra antes.
+        assertThat(captor.getValue()).hasSize(21);
     }
 
     @Test
     void when_chat_with_nonExistingSessionId_then_throw404() {
         UUID sessionId = UUID.randomUUID();
-        ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
-        request.setMessage("hi");
+        ChatRequest request = newRequest();
         request.setSessionId(sessionId);
 
         when(chatSessionService.getSession(sessionId, tenantId, userId)).thenThrow(new ChatSessionNotFoundException(sessionId));
@@ -346,19 +404,15 @@ class ChatServiceImplTest {
 
     @Test
     void when_chat_withoutCredential_then_throwsConfigMissingAndNeverCallsFactory() {
-        ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
-        request.setMessage("hello");
-        request.setSessionId(null);
+        ChatRequest request = newRequest();
 
         ChatSession session = new ChatSession();
         UUID sessionId = UUID.randomUUID();
         session.setId(sessionId);
-        session.setAgentId(agentId);
+        session.setPromptTemplateId(promptTemplateId);
         when(chatSessionService.create(any(), any(), eq(tenantId), eq(userId))).thenReturn(session);
-        when(agentService.findById(agentId)).thenReturn(openAiAgent());
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
+        stubTenantConfig(openAiConfig());
         when(credentialResolver.resolve(tenantId, AiProvider.OPENAI))
                 .thenThrow(new ConfigMissingException("OPENAI"));
 
@@ -370,22 +424,20 @@ class ChatServiceImplTest {
     }
 
     @Test
-    void when_chat_with_modelOutsideCatalog_then_throwsModelNotSupported() {        ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
-        request.setMessage("hello");
-        request.setSessionId(null);
+    void when_chat_with_modelOutsideCatalog_then_throwsModelNotSupported() {
+        ChatRequest request = newRequest();
 
         ChatSession session = new ChatSession();
         UUID sessionId = UUID.randomUUID();
         session.setId(sessionId);
-        session.setAgentId(agentId);
+        session.setPromptTemplateId(promptTemplateId);
         when(chatSessionService.create(any(), any(), eq(tenantId), eq(userId))).thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
 
-        Agent badAgent = openAiAgent();
-        badAgent.setModel("llama3.2");
-        when(agentService.findById(agentId)).thenReturn(badAgent);
+        TenantLlmConfig bad = new TenantLlmConfig();
+        bad.setProvider(AiProvider.OPENAI);
+        bad.setModel("llama3.2");
+        stubTenantConfig(bad);
 
         assertThatThrownBy(() -> service.chat(request, tenantId, userId))
                 .isInstanceOf(ModelNotSupportedForProviderException.class);
@@ -398,11 +450,7 @@ class ChatServiceImplTest {
     void when_chat_with_rateLimited_then_throws429AndCreatesNothing() {
         doThrow(new br.com.systec.hive.agent.api.exceptions.ChatRateLimitException())
                 .when(chatRateLimiter).check(tenantId);
-        ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
-        request.setMessage("hello");
+        ChatRequest request = newRequest();
 
         assertThatThrownBy(() -> service.chat(request, tenantId, userId))
                 .isInstanceOf(br.com.systec.hive.agent.api.exceptions.ChatRateLimitException.class);
@@ -413,25 +461,17 @@ class ChatServiceImplTest {
 
     @Test
     void when_chat_with_staleModel_then_evictsAndThrows422PreservingUserMsg() {
-        ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
+        ChatRequest request = newRequest();
         request.setMessage("hello");
-        request.setSessionId(null);
 
         ChatSession session = new ChatSession();
         UUID sessionId = UUID.randomUUID();
         session.setId(sessionId);
-        session.setAgentId(agentId);
+        session.setPromptTemplateId(promptTemplateId);
         when(chatSessionService.create(any(), any(), eq(tenantId), eq(userId))).thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
 
-        Agent goAgent = new Agent();
-        goAgent.setId(agentId);
-        goAgent.setProvider(AiProvider.OPENCODE_GO);
-        goAgent.setModel("mimo-v2.5");
-        goAgent.setTemperature(0.7);
-        when(agentService.findById(agentId)).thenReturn(goAgent);
+        stubTenantConfig(openCodeGoConfig());
         when(credentialResolver.resolve(tenantId, AiProvider.OPENCODE_GO))
                 .thenReturn(new CredentialResolver.ResolvedCredential("go-fake", null));
         when(llmClientFactory.createClientWithSession(eq(AiProvider.OPENCODE_GO), eq("mimo-v2.5"), any(), any(), any(), eq("go-fake"), any(), any()))
@@ -460,25 +500,16 @@ class ChatServiceImplTest {
 
     @Test
     void when_chat_with_html404Route_then_throwsProviderExceptionAndKeepsCache() {
-        ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
-        request.setMessage("hello");
-        request.setSessionId(null);
+        ChatRequest request = newRequest();
 
         ChatSession session = new ChatSession();
         UUID sessionId = UUID.randomUUID();
         session.setId(sessionId);
-        session.setAgentId(agentId);
+        session.setPromptTemplateId(promptTemplateId);
         when(chatSessionService.create(any(), any(), eq(tenantId), eq(userId))).thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
 
-        Agent goAgent = new Agent();
-        goAgent.setId(agentId);
-        goAgent.setProvider(AiProvider.OPENCODE_GO);
-        goAgent.setModel("mimo-v2.5");
-        goAgent.setTemperature(0.7);
-        when(agentService.findById(agentId)).thenReturn(goAgent);
+        stubTenantConfig(openCodeGoConfig());
         when(credentialResolver.resolve(tenantId, AiProvider.OPENCODE_GO))
                 .thenReturn(new CredentialResolver.ResolvedCredential("go-fake", null));
         when(llmClientFactory.createClientWithSession(eq(AiProvider.OPENCODE_GO), eq("mimo-v2.5"), any(), any(), any(), eq("go-fake"), any(), any()))
@@ -499,15 +530,15 @@ class ChatServiceImplTest {
 
     @Test
     void when_chatTrace_then_rendersOneLineWithParametersAndTimings() {
-        ChatTrace trace = ChatTrace.builder(UUID.randomUUID(), agentId, AiProvider.OPENAI, "gpt-4o-mini")
+        ChatTrace trace = ChatTrace.builder(UUID.randomUUID(), promptTemplateId, AiProvider.OPENAI, "gpt-4o-mini")
                 .agentLimits(1500, 0.42, 0.7)
                 .prompt(4, 6, 2048)
-                .rag(false, 0, "no_link", 0.55)
                 .elapsedMs(1201L)
                 .usage(120, 340, 460, "STOP")
                 .build();
 
         assertThat(LoggingChatTraceRecorder.format(trace))
+                .contains("promptTemplateId=" + promptTemplateId)
                 .contains("provider=OPENAI")
                 .contains("model=gpt-4o-mini")
                 .contains("maxTokens=1500")
@@ -515,41 +546,37 @@ class ChatServiceImplTest {
                 .contains("temperature=0.7")
                 .contains("historySize=4")
                 .contains("promptChars=2048")
-                .contains("ragUsed=false")
-                .contains("citationsCount=0")
-                .contains("ragOutcome=no_link")
-                .contains("ragThreshold=0.55")
                 .contains("elapsedMs=1201")
                 .contains("promptTokens=120")
                 .contains("completionTokens=340")
                 .contains("finishReason=STOP");
     }
 
-    /**
-     * A turn that retrieved nothing has to say which cut-off rejected everything. The retrieval owns
-     * that number — it may have fallen back to its own default — so the trace reports what it
-     * resolved, not the constant this class happens to pass in.
-     */
     @Test
-    void when_chatTraceWithoutResolvedCutOff_then_saysNotResolvedInsteadOfInventingOne() {
-        ChatTrace trace = ChatTrace.builder(UUID.randomUUID(), agentId, AiProvider.OPENAI, "gpt-4o-mini")
-                .agentLimits(null, null, null)
+    void when_chatTrace_then_theLineCarriesNoRetrievalVocabularyAtAll() {
+        // `ragThreshold=not_resolved` afirmava que uma busca de similaridade rodou e não resolveu
+        // um corte. Não existe retrieval no produto: o valor era inalcançável por design e ainda
+        // impresso em toda linha de produção. Uma métrica que não pode ser verdadeira é pior que
+        // uma métrica ausente — ela ensina a ler um vocabulário que não descreve mais o sistema.
+        ChatTrace trace = ChatTrace.builder(UUID.randomUUID(), promptTemplateId, AiProvider.OPENAI, "gpt-4o-mini")
+                .agentLimits(1500, 0.42, 0.7)
                 .prompt(0, 1, 11)
-                .rag(false, 0, "no_link", null)
                 .elapsedMs(10L)
                 .build();
 
-        assertThat(LoggingChatTraceRecorder.format(trace))
-                .contains("ragThreshold=not_resolved")
-                .doesNotContain("ragThreshold=provider-default");
+        String line = LoggingChatTraceRecorder.format(trace);
+        assertThat(line)
+                .doesNotContain("ragUsed")
+                .doesNotContain("citationsCount")
+                .doesNotContain("ragOutcome")
+                .doesNotContain("ragThreshold");
     }
 
     @Test
     void when_chatTraceWithProviderDefaultAndFailure_then_saysSoWithoutQuotingTheFailureMessage() {
-        ChatTrace trace = ChatTrace.builder(UUID.randomUUID(), agentId, AiProvider.OPENAI, "gpt-4o-mini")
+        ChatTrace trace = ChatTrace.builder(UUID.randomUUID(), promptTemplateId, AiProvider.OPENAI, "gpt-4o-mini")
                 .agentLimits(null, null, 0.7)
                 .prompt(0, 1, 11)
-                .rag(false, 0, "error", null)
                 .elapsedMs(120000L)
                 .usage(null, null, null, null)
                 .failure(FailureClassifier.causeOf(new dev.langchain4j.exception.TimeoutException(
@@ -565,13 +592,12 @@ class ChatServiceImplTest {
 
     @Test
     void when_chatTraceWithoutTokenUsage_then_reportsNotReportedNotProviderDefault() {
-        // "provider-default" é o teto que o agente não mandou. Contagem de token não tem default:
+        // "provider-default" é o teto que o prompt template não mandou. Contagem de token não tem default:
         // ou o provider reportou, ou não reportou. Dizer "provider-default" numa contagem sugere
         // que houve um valor padrão, e o operador perde a informação de que o provider omitiu.
-        ChatTrace trace = ChatTrace.builder(UUID.randomUUID(), agentId, AiProvider.OPENAI, "gpt-4o-mini")
+        ChatTrace trace = ChatTrace.builder(UUID.randomUUID(), promptTemplateId, AiProvider.OPENAI, "gpt-4o-mini")
                 .agentLimits(2048, null, null)
                 .prompt(0, 1, 11)
-                .rag(false, 0, "no_link", null)
                 .elapsedMs(900L)
                 .usage(null, null, null, "LENGTH")
                 .build();
@@ -593,8 +619,8 @@ class ChatServiceImplTest {
         ChatTraceRecorder failingTraces = trace -> {
             throw new IllegalStateException("trace down");
         };
-        ChatServiceImpl service = new ChatServiceImpl(credentialResolver, agentService, chatSessionService,
-                chatMessageService, chatAssistantTxService, defaultAgentService, chatRateLimiter,
+        ChatServiceImpl service = new ChatServiceImpl(credentialResolver, chatSessionService,
+                chatMessageService, chatAssistantTxService, tenantLlmConfigService, chatRateLimiter,
                 discoveryService, failingTraces, turnGateway);
         stubClient("reply");
         when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
@@ -608,10 +634,9 @@ class ChatServiceImplTest {
     @Test
     void when_chat_withLimitsConfigured_then_passesMaxTokensAndTopPToFactory() {
         prepareChat();
-        Agent agent = openAiAgent();
-        agent.setMaxTokens(1500);
-        agent.setTopP(0.42);
-        when(agentService.findById(agentId)).thenReturn(agent);
+        PromptTemplate template = openAiTemplate();
+        template.setInferenceParams(new InferenceParams(0.7, 0.42, 1500));
+        withTemplate(template);
         stubClient("reply");
         when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
         when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
@@ -636,6 +661,28 @@ class ChatServiceImplTest {
     }
 
     @Test
+    void when_chat_then_theTemplatesSystemPromptLeadsThePrompt() {
+        prepareChat();
+        stubClient("reply");
+        ChatMessage asked = new ChatMessage();
+        asked.setRole(ChatRole.USER);
+        asked.setContent("pergunta");
+        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(asked);
+        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(asked));
+
+        service.chat(newRequest(), tenantId, userId);
+
+        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        verify(chatModel).chat(captor.capture());
+        List<?> prompt = captor.getValue();
+        assertThat(prompt).hasSize(2);
+        assertThat(prompt.get(0)).isInstanceOf(dev.langchain4j.data.message.SystemMessage.class);
+        assertThat(((dev.langchain4j.data.message.SystemMessage) prompt.get(0)).text())
+                .isEqualTo("Voce e um assistente.");
+        assertThat(prompt.get(1)).isInstanceOf(dev.langchain4j.data.message.UserMessage.class);
+    }
+
+    @Test
     void when_chat_then_recordsSingleTraceWithParametersTimingsAndUsage() {
         ChatMessage userMsg = new ChatMessage();
         userMsg.setContent("Hello world");
@@ -656,7 +703,7 @@ class ChatServiceImplTest {
         verify(traceRecorder, times(1)).record(captor.capture());
         ChatTrace trace = captor.getValue();
         assertThat(trace.sessionId()).isNotNull();
-        assertThat(trace.agentId()).isEqualTo(agentId);
+        assertThat(trace.promptTemplateId()).isEqualTo(promptTemplateId);
         assertThat(trace.provider()).isEqualTo(AiProvider.OPENAI);
         assertThat(trace.model()).isEqualTo("gpt-4o-mini");
         assertThat(trace.temperature()).isEqualTo(0.7);
@@ -668,12 +715,6 @@ class ChatServiceImplTest {
         assertThat(trace.totalTokens()).isEqualTo(460);
         assertThat(trace.finishReason()).isEqualTo("STOP");
         assertThat(trace.failure()).isNull();
-        // A trace has no retrieval to report: the product does not retrieve. The fields stay on the
-        // record so the rendered line keeps its shape, and they say "none" rather than "unknown".
-        assertThat(trace.ragUsed()).isFalse();
-        assertThat(trace.citationsCount()).isZero();
-        assertThat(trace.ragOutcome()).isNull();
-        assertThat(trace.ragThreshold()).isNull();
     }
 
     @Test
@@ -702,9 +743,9 @@ class ChatServiceImplTest {
     @Test
     void when_chatWithReadTimeout_then_callsProviderExactlyOnce() {
         prepareChat();
-        Agent agent = openAiAgent();
-        agent.setMaxTokens(1500);
-        when(agentService.findById(agentId)).thenReturn(agent);
+        PromptTemplate template = openAiTemplate();
+        template.setInferenceParams(new InferenceParams(0.7, null, 1500));
+        withTemplate(template);
         when(llmClientFactory.createClientWithSession(any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(chatModel);
         when(chatModel.chat(any(List.class)))
@@ -770,11 +811,11 @@ class ChatServiceImplTest {
     @Test
     void when_chat_withEmptyModelText_then_recordsTraceWithEmptyReasonAndLimits() {
         stubEmptyModelReply(null, dev.langchain4j.model.output.FinishReason.LENGTH);
-        // Aplica o teto depois do stub: prepareChat() devolve um agente sem maxTokens e sobrescreveria
-        // o agente com 32 se fosse antes.
-        Agent agent = openAiAgent();
-        agent.setMaxTokens(32);
-        when(agentService.findById(agentId)).thenReturn(agent);
+        // Aplica o teto depois do stub: prepareChat() devolve um template sem maxTokens e
+        // sobrescreveria o teto de 32 se fosse antes.
+        PromptTemplate template = openAiTemplate();
+        template.setInferenceParams(new InferenceParams(0.7, null, 32));
+        withTemplate(template);
 
         assertThatThrownBy(() -> service.chat(newRequest(), tenantId, userId))
                 .isInstanceOf(ModelReturnedEmptyException.class);
@@ -792,9 +833,9 @@ class ChatServiceImplTest {
         // mimo-v2.5 com max_tokens=256: finish_reason=length mas 610 chars de conteúdo. Truncamento
         // é sucesso normal — não pode virar 422.
         prepareChat();
-        Agent agent = openAiAgent();
-        agent.setMaxTokens(256);
-        when(agentService.findById(agentId)).thenReturn(agent);
+        PromptTemplate template = openAiTemplate();
+        template.setInferenceParams(new InferenceParams(0.7, null, 256));
+        withTemplate(template);
         when(llmClientFactory.createClientWithSession(any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(chatModel);
         when(chatModel.chat(any(List.class))).thenReturn(
@@ -840,21 +881,33 @@ class ChatServiceImplTest {
 
     // ================================================================= helpers
 
+    private void stubTenantConfig(TenantLlmConfig config) {
+        when(tenantLlmConfigService.require(tenantId)).thenReturn(config);
+    }
+
+    private void stubTemplate(PromptTemplate template) {
+        this.template = template;
+    }
+
+    private void withTemplate(PromptTemplate template) {
+        this.template = template;
+    }
+
     private void prepareChat() {
+        stubTemplate(openAiTemplate());
         ChatSession session = new ChatSession();
-        UUID sessionId = UUID.randomUUID();
-        session.setId(sessionId);
-        session.setAgentId(agentId);
+        session.setId(UUID.randomUUID());
+        session.setPromptTemplateId(promptTemplateId);
         when(chatSessionService.create(any(), any(), eq(tenantId), eq(userId))).thenReturn(session);
-        when(agentService.findById(agentId)).thenReturn(openAiAgent());
+        lenient().when(chatSessionService.resolvePromptTemplate(any(), eq(tenantId), eq(userId)))
+                .thenAnswer(i -> this.template);
+        stubTenantConfig(openAiConfig());
         stubCredential();
     }
 
     private ChatRequest newRequest() {
         ChatRequest request = new ChatRequest();
-        Agent agent = new Agent();
-        agent.setId(agentId);
-        request.setAgent(agent);
+        request.setPromptTemplateId(promptTemplateId);
         request.setMessage("Hello world");
         request.setSessionId(null);
         return request;

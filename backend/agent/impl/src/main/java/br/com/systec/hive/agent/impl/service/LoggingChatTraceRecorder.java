@@ -34,7 +34,7 @@ public class LoggingChatTraceRecorder implements ChatTraceRecorder {
     static String format(ChatTrace trace) {
         StringBuilder sb = new StringBuilder(220);
         sb.append("chat turn sessionId=").append(trace.sessionId())
-                .append(" agentId=").append(trace.agentId())
+                .append(" promptTemplateId=").append(trace.promptTemplateId())
                 .append(" provider=").append(trace.provider())
                 .append(" model=").append(trace.model())
                 .append(" maxTokens=").append(orProviderDefault(trace.maxTokens()))
@@ -43,10 +43,6 @@ public class LoggingChatTraceRecorder implements ChatTraceRecorder {
                 .append(" historySize=").append(trace.historySize())
                 .append(" promptMessages=").append(trace.promptMessages())
                 .append(" promptChars=").append(trace.promptChars())
-                .append(" ragUsed=").append(trace.ragUsed())
-                .append(" citationsCount=").append(trace.citationsCount())
-                .append(" ragOutcome=").append(trace.ragOutcome() == null ? "n/a" : trace.ragOutcome())
-                .append(" ragThreshold=").append(orNotResolved(trace.ragThreshold()))
                 .append(" elapsedMs=").append(trace.elapsedMs())
                 .append(" promptTokens=").append(orNotReported(trace.promptTokens()))
                 .append(" completionTokens=").append(orNotReported(trace.completionTokens()))
@@ -59,8 +55,8 @@ public class LoggingChatTraceRecorder implements ChatTraceRecorder {
     }
 
     /**
-     * Label for a sampling <b>ceiling</b> the agent did not send. The provider then applies its own
-     * default, so {@code provider-default} is the accurate description of that field.
+     * Label for a sampling <b>ceiling</b> the prompt template did not send. The provider then applies
+     * its own default, so {@code provider-default} is the accurate description of that field.
      */
     private static String orProviderDefault(Number value) {
         return value == null ? "provider-default" : String.valueOf(value);
@@ -68,19 +64,10 @@ public class LoggingChatTraceRecorder implements ChatTraceRecorder {
 
     /**
      * Label for a token <b>count</b>. A count has no default: the provider either reported it or did
-     * not. Printing {@code provider-default} here claimed a value existed, hiding the fact that the
-     * provider omitted usage entirely — which is exactly the case when a turn stalls.
+     * not. Printing {@code provider-default} here claimed a value existed, hiding the fact that
+     * the provider omitted usage entirely — which is exactly the case when a turn stalls.
      */
     private static String orNotReported(Number value) {
         return value == null ? "not_reported" : String.valueOf(value);
-    }
-
-    /**
-     * Label for the similarity cut-off of a RAG search. There is no default: either a retrieval
-     * resolved one and this is the number that ran, or the turn never reached the vector search.
-     * Printing {@code provider-default} here would be a lie — nothing defaulted it.
-     */
-    private static String orNotResolved(Number value) {
-        return value == null ? "not_resolved" : String.valueOf(value);
     }
 }

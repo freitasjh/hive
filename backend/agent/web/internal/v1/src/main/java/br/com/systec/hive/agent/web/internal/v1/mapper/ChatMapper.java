@@ -11,7 +11,6 @@ import org.mapstruct.Named;
 @Mapper(componentModel = "spring")
 public interface ChatMapper {
 
-    @Mapping(target = "agent.id", source = "agentId")
     ChatRequest toDomain(ChatRequestDTO dto);
 
     @Mapping(target = "role", source = "role", qualifiedByName = "roleToString")

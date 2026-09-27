@@ -46,6 +46,19 @@
             <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+          Flyway como biblioteca, e não só como bean do boot: ChatSessionPromptTemplateMigrationIT
+          precisa aplicar V2..V14 e depois V15 num banco dedicado, para provar que o guard da V15
+          aborta e que o rollback é inteiro. Nenhum outro caminho exercita isso.
+        -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>

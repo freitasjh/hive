@@ -1,12 +1,14 @@
 package br.com.systec.hive.agent.impl.service;
 
 import br.com.systec.hive.agent.api.domain.ChatSession;
-import br.com.systec.hive.agent.api.exceptions.ChatAgentNotFoundException;
+import br.com.systec.hive.agent.api.domain.PromptTemplate;
 import br.com.systec.hive.agent.api.exceptions.ChatSessionNotFoundException;
+import br.com.systec.hive.agent.api.exceptions.PromptTemplateNotFoundException;
 import br.com.systec.hive.agent.api.service.ChatSessionService;
 import br.com.systec.hive.agent.impl.entity.ChatSessionEntity;
 import br.com.systec.hive.agent.impl.mapper.ChatSessionMapperDomain;
-import br.com.systec.hive.agent.impl.repository.AgentRepository;
+import br.com.systec.hive.agent.impl.mapper.PromptTemplateDomainMapper;
+import br.com.systec.hive.agent.impl.repository.PromptTemplateRepository;
 import br.com.systec.hive.agent.impl.repository.ChatSessionRepository;
 import br.com.systec.hive.agent.impl.util.ChatTitleUtil;
 import org.springframework.data.domain.Page;
@@ -23,28 +25,34 @@ import java.util.UUID;
 public class ChatSessionServiceImpl implements ChatSessionService {
 
     private final ChatSessionRepository chatSessionRepository;
-    private final AgentRepository agentRepository;
+    private final PromptTemplateRepository promptTemplateRepository;
     private final ChatSessionMapperDomain mapper;
+    private final PromptTemplateDomainMapper promptTemplateMapper;
 
     public ChatSessionServiceImpl(ChatSessionRepository chatSessionRepository,
-                                  AgentRepository agentRepository,
-                                  ChatSessionMapperDomain mapper) {
+                                  PromptTemplateRepository promptTemplateRepository,
+                                  ChatSessionMapperDomain mapper,
+                                  PromptTemplateDomainMapper promptTemplateMapper) {
         this.chatSessionRepository = chatSessionRepository;
-        this.agentRepository = agentRepository;
+        this.promptTemplateRepository = promptTemplateRepository;
         this.mapper = mapper;
+        this.promptTemplateMapper = promptTemplateMapper;
     }
 
     @Override
     @Transactional
-    public ChatSession create(UUID agentId, String title, UUID tenantId, UUID userId) {
-        agentRepository.findByIdAndTenantId(agentId, tenantId)
-                .orElseThrow(() -> new ChatAgentNotFoundException(agentId));
+    public ChatSession create(UUID promptTemplateId, String title, UUID tenantId, UUID userId) {
+        // The template is validated on the way in, not just by the FK. A session pointing at another
+        // tenant's template is a 404 here and a confusing generation failure later; and the read
+        // carries the tenant, so a foreign id is indistinguishable from a missing one (anti-IDOR).
+        promptTemplateRepository.findByIdAndTenantId(promptTemplateId, tenantId)
+                .orElseThrow(() -> new PromptTemplateNotFoundException(promptTemplateId));
 
         String truncatedTitle = ChatTitleUtil.truncate(title, 50);
 
         ChatSessionEntity entity = new ChatSessionEntity();
         entity.setUserId(userId);
-        entity.setAgentId(agentId);
+        entity.setPromptTemplateId(promptTemplateId);
         entity.setTitle(truncatedTitle);
         entity.setTenantId(tenantId);
 
@@ -65,6 +73,16 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         ChatSessionEntity entity = chatSessionRepository.findByIdAndTenantIdAndUserId(id, tenantId, userId)
                 .orElseThrow(() -> new ChatSessionNotFoundException(id));
         return mapper.toDomain(entity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PromptTemplate resolvePromptTemplate(UUID sessionId, UUID tenantId, UUID userId) {
+        ChatSessionEntity session = chatSessionRepository.findByIdAndTenantIdAndUserId(sessionId, tenantId, userId)
+                .orElseThrow(() -> new ChatSessionNotFoundException(sessionId));
+        return promptTemplateRepository.findByIdAndTenantId(session.getPromptTemplateId(), tenantId)
+                .map(promptTemplateMapper::toDomain)
+                .orElse(null);
     }
 
     @Override

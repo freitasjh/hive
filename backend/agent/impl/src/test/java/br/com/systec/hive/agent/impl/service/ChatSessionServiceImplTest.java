@@ -1,13 +1,15 @@
 package br.com.systec.hive.agent.impl.service;
 
 import br.com.systec.hive.agent.api.domain.ChatSession;
-import br.com.systec.hive.agent.api.exceptions.ChatAgentNotFoundException;
+import br.com.systec.hive.agent.api.domain.PromptTemplate;
+import br.com.systec.hive.agent.api.exceptions.PromptTemplateNotFoundException;
 import br.com.systec.hive.agent.api.exceptions.ChatSessionNotFoundException;
 import br.com.systec.hive.agent.impl.entity.ChatSessionEntity;
 import br.com.systec.hive.agent.impl.mapper.ChatSessionMapperDomain;
-import br.com.systec.hive.agent.impl.repository.AgentRepository;
+import br.com.systec.hive.agent.impl.mapper.PromptTemplateDomainMapper;
+import br.com.systec.hive.agent.impl.repository.PromptTemplateRepository;
 import br.com.systec.hive.agent.impl.repository.ChatSessionRepository;
-import br.com.systec.hive.agent.impl.entity.AgentEntity;
+import br.com.systec.hive.agent.impl.entity.PromptTemplateEntity;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -37,24 +39,27 @@ class ChatSessionServiceImplTest {
     private ChatSessionRepository chatSessionRepository;
 
     @Mock
-    private AgentRepository agentRepository;
+    private PromptTemplateRepository promptTemplateRepository;
 
     @Mock
     private ChatSessionMapperDomain mapper;
+
+    @Mock
+    private PromptTemplateDomainMapper promptTemplateMapper;
 
     @InjectMocks
     private ChatSessionServiceImpl service;
 
     @Test
-    void when_create_with_validAgent_then_successAndTitleTruncated50() {
-        UUID agentId = UUID.randomUUID();
+    void when_create_with_validPromptTemplate_then_successAndTitleTruncated50() {
+        UUID promptTemplateId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         String longTitle = "a".repeat(60);
 
-        AgentEntity agentEntity = new AgentEntity();
-        agentEntity.setId(agentId);
-        when(agentRepository.findByIdAndTenantId(agentId, tenantId)).thenReturn(Optional.of(agentEntity));
+        PromptTemplateEntity template = new PromptTemplateEntity();
+        template.setId(promptTemplateId);
+        when(promptTemplateRepository.findByIdAndTenantId(promptTemplateId, tenantId)).thenReturn(Optional.of(template));
 
         ChatSessionEntity savedEntity = new ChatSessionEntity();
         savedEntity.setId(UUID.randomUUID());
@@ -65,7 +70,7 @@ class ChatSessionServiceImplTest {
         domain.setId(savedEntity.getId());
         when(mapper.toDomain(savedEntity)).thenReturn(domain);
 
-        ChatSession result = service.create(agentId, longTitle, tenantId, userId);
+        ChatSession result = service.create(promptTemplateId, longTitle, tenantId, userId);
 
         assertThat(result).isNotNull();
         ArgumentCaptor<ChatSessionEntity> captor = ArgumentCaptor.forClass(ChatSessionEntity.class);
@@ -75,29 +80,100 @@ class ChatSessionServiceImplTest {
     }
 
     @Test
-    void when_create_with_nonExistingAgent_then_throwAgentNotFound() {
-        UUID agentId = UUID.randomUUID();
+    void when_create_with_nonExistingPromptTemplate_then_throwPromptTemplateNotFound() {
+        UUID promptTemplateId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        when(agentRepository.findByIdAndTenantId(agentId, tenantId)).thenReturn(Optional.empty());
+        when(promptTemplateRepository.findByIdAndTenantId(promptTemplateId, tenantId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.create(agentId, "title", tenantId, userId))
-                .isInstanceOf(ChatAgentNotFoundException.class);
+        assertThatThrownBy(() -> service.create(promptTemplateId, "title", tenantId, userId))
+                .isInstanceOf(PromptTemplateNotFoundException.class);
+    }
+
+    @Test
+    void when_create_with_promptTemplateOfAnotherTenant_then_throwNotFound() {
+        // Anti-IDOR: o read carrega o tenant, então um template alheio é indistinguível de um
+        // inexistente. 404 nos dois casos, nunca 403.
+        UUID promptTemplateId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        when(promptTemplateRepository.findByIdAndTenantId(promptTemplateId, tenantId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.create(promptTemplateId, "title", tenantId, userId))
+                .isInstanceOf(PromptTemplateNotFoundException.class);
+    }
+
+    @Test
+    void when_resolvePromptTemplate_with_sessionPointingToTemplate_then_returnsIt() {
+        UUID sessionId = UUID.randomUUID();
+        UUID promptTemplateId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(sessionId);
+        session.setPromptTemplateId(promptTemplateId);
+        when(chatSessionRepository.findByIdAndTenantIdAndUserId(sessionId, tenantId, userId))
+                .thenReturn(Optional.of(session));
+
+        PromptTemplateEntity template = new PromptTemplateEntity();
+        template.setId(promptTemplateId);
+        when(promptTemplateRepository.findByIdAndTenantId(promptTemplateId, tenantId))
+                .thenReturn(Optional.of(template));
+        PromptTemplate expected = new PromptTemplate();
+        expected.setId(promptTemplateId);
+        when(promptTemplateMapper.toDomain(template)).thenReturn(expected);
+
+        PromptTemplate result = service.resolvePromptTemplate(sessionId, tenantId, userId);
+
+        assertThat(result).isSameAs(expected);
+    }
+
+    @Test
+    void when_resolvePromptTemplate_with_deletedTemplate_then_returnsNull() {
+        // A coluna é NOT NULL e a FK é RESTRICT, então isto exige um DELETE direto no banco. O
+        // retorno null — e não uma exceção — é o que permite ao chamador nomear a causa exata.
+        UUID sessionId = UUID.randomUUID();
+        UUID promptTemplateId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(sessionId);
+        session.setPromptTemplateId(promptTemplateId);
+        when(chatSessionRepository.findByIdAndTenantIdAndUserId(sessionId, tenantId, userId))
+                .thenReturn(Optional.of(session));
+        when(promptTemplateRepository.findByIdAndTenantId(promptTemplateId, tenantId)).thenReturn(Optional.empty());
+
+        assertThat(service.resolvePromptTemplate(sessionId, tenantId, userId)).isNull();
+    }
+
+    @Test
+    void when_resolvePromptTemplate_with_otherTenantSession_then_throwSessionNotFound() {
+        UUID sessionId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        when(chatSessionRepository.findByIdAndTenantIdAndUserId(sessionId, tenantId, userId))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.resolvePromptTemplate(sessionId, tenantId, userId))
+                .isInstanceOf(ChatSessionNotFoundException.class);
     }
 
     @Test
     void when_create_with_titleLongerThan50_then_truncatesWithoutEllipsis() {
-        UUID agentId = UUID.randomUUID();
+        UUID promptTemplateId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         String title51 = "x".repeat(51);
-        when(agentRepository.findByIdAndTenantId(agentId, tenantId)).thenReturn(Optional.of(new AgentEntity()));
+        when(promptTemplateRepository.findByIdAndTenantId(promptTemplateId, tenantId))
+                .thenReturn(Optional.of(new PromptTemplateEntity()));
         ChatSessionEntity saved = new ChatSessionEntity();
         saved.setId(UUID.randomUUID());
         when(chatSessionRepository.save(any())).thenReturn(saved);
         when(mapper.toDomain(any())).thenReturn(new ChatSession());
 
-        service.create(agentId, title51, tenantId, userId);
+        service.create(promptTemplateId, title51, tenantId, userId);
 
         ArgumentCaptor<ChatSessionEntity> captor = ArgumentCaptor.forClass(ChatSessionEntity.class);
         verify(chatSessionRepository).save(captor.capture());

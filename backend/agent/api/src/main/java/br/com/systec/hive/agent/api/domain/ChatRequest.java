@@ -8,7 +8,7 @@ public class ChatRequest implements Serializable {
     @Serial
     private static final long serialVersionUID = -4350606251618187866L;
     private UUID sessionId;
-    private Agent agent;
+    private UUID promptTemplateId;
     private String model;
     private String message;
     private boolean stream;
@@ -29,12 +29,12 @@ public class ChatRequest implements Serializable {
         this.model = model;
     }
 
-    public Agent getAgent() {
-        return agent;
+    public UUID getPromptTemplateId() {
+        return promptTemplateId;
     }
 
-    public void setAgent(Agent agent) {
-        this.agent = agent;
+    public void setPromptTemplateId(UUID promptTemplateId) {
+        this.promptTemplateId = promptTemplateId;
     }
 
     public String getMessage() {

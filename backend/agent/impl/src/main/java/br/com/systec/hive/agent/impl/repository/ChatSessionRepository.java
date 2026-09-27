@@ -16,6 +16,8 @@ public interface ChatSessionRepository extends JpaRepository<ChatSessionEntity, 
 
     Optional<ChatSessionEntity> findByIdAndTenantIdAndUserId(UUID id, UUID tenantId, UUID userId);
 
+    boolean existsByPromptTemplateIdAndTenantId(UUID promptTemplateId, UUID tenantId);
+
     Page<ChatSessionEntity> findByTenantIdAndUserId(UUID tenantId, UUID userId, Pageable pageable);
 
     void deleteByIdAndTenantId(UUID id, UUID tenantId);

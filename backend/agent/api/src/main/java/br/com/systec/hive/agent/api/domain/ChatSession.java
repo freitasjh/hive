@@ -13,7 +13,7 @@ public class ChatSession extends AbstractDomain implements Serializable {
     private static final long serialVersionUID = 8758504739293149130L;
 
     private UUID userId;
-    private UUID agentId;
+    private UUID promptTemplateId;
     private String title;
     private String summary;
     private LocalDateTime updateAt;
@@ -21,9 +21,9 @@ public class ChatSession extends AbstractDomain implements Serializable {
     public ChatSession() {
     }
 
-    public ChatSession(UUID userId, UUID agentId, UUID tenantId, String title) {
+    public ChatSession(UUID userId, UUID promptTemplateId, UUID tenantId, String title) {
         this.userId = userId;
-        this.agentId = agentId;
+        this.promptTemplateId = promptTemplateId;
         this.tenantId = tenantId;
         this.title = title;
     }
@@ -36,12 +36,12 @@ public class ChatSession extends AbstractDomain implements Serializable {
         this.userId = userId;
     }
 
-    public UUID getAgentId() {
-        return agentId;
+    public UUID getPromptTemplateId() {
+        return promptTemplateId;
     }
 
-    public void setAgentId(UUID agentId) {
-        this.agentId = agentId;
+    public void setPromptTemplateId(UUID promptTemplateId) {
+        this.promptTemplateId = promptTemplateId;
     }
 
     public String getTitle() {

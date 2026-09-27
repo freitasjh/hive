@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 public record ChatRequestDTO(
-        UUID agentId,
+        UUID promptTemplateId,
         UUID sessionId,
         @NotBlank @Size(max = 4000) String message
 ) {

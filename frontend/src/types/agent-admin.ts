@@ -165,58 +165,26 @@ export function validateKeyPrefix(provider: AiProvider, apiKey: string): boolean
   return apiKey.startsWith(meta.keyPrefix)
 }
 
-export interface AgentDTO {
+/**
+ * O provider e o modelo padrão do TENANT. Um por tenant, sem fallback global e sem criação
+ * automática: enquanto não existir, o chat responde 422 `TENANT_LLM_CONFIG_NOT_FOUND` mandando o
+ * usuário para esta tela.
+ *
+ * `tenantId` volta na resposta (o VO de domínio não o carrega — quem o lei é o controller, a partir
+ * do principal autenticado) e a tela não precisa conferir contra o próprio usuário.
+ */
+export interface TenantLlmConfig {
   id: string
-  name: string
-  avatarUrl?: string | null
-  description?: string | null
-  systemPrompt?: string | null
-  promptTemplateId?: string | null
+  tenantId: string
   provider: AiProvider
   model: string
-  temperature?: number | null
-  topP?: number | null
-  maxTokens?: number | null
-  tools?: string[] | null
-  knowledgeBases?: string[] | null
-  isDefault: boolean
-  active: boolean
   createAt: string
   updateAt: string
 }
 
-export interface AgentCreateDTO {
-  name: string
-  avatarUrl?: string | null
-  description?: string | null
-  systemPrompt?: string | null
-  promptTemplateId?: string | null
+export interface TenantLlmConfigUpsert {
   provider: AiProvider
   model: string
-  temperature?: number | null
-  topP?: number | null
-  maxTokens?: number | null
-  tools?: string[] | null
-  knowledgeBases?: string[] | null
-  isDefault?: boolean | null
-  active?: boolean | null
-}
-
-export interface AgentUpdateDTO {
-  name: string
-  avatarUrl?: string | null
-  description?: string | null
-  systemPrompt?: string | null
-  promptTemplateId?: string | null
-  provider: AiProvider
-  model: string
-  temperature?: number | null
-  topP?: number | null
-  maxTokens?: number | null
-  tools?: string[] | null
-  knowledgeBases?: string[] | null
-  isDefault?: boolean | null
-  active?: boolean | null
 }
 
 export interface CredentialStatus {
@@ -284,8 +252,3 @@ export interface Page<T> {
   number: number
   size: number
 }
-
-/**
- * Result of `PUT /agents/{id}/knowledge-bases`. Names come back so the editor can show the current
- * selection without a second request; ids remain the source of truth because names repeat per tenant.
- */

@@ -28,13 +28,15 @@ import java.util.UUID;
  * <ul>
  *   <li><b>A collection is defaulted</b> — {@code null} and empty are the same fact, and coercing
  *       costs nothing.</li>
- *   <li><b>A value that carries meaning is required.</b> The agent is required: a turn without one has
- *       no system prompt and no generation limits, and saying so at construction beats a prompt that
- *       quietly went out with neither.</li>
+ *   <li><b>A value that carries meaning is required.</b> The prompt template is required: a turn
+ *       without one has no system prompt and no generation limits, and saying so at construction
+ *       beats a prompt that quietly went out with neither.</li>
  * </ul>
  *
  * @param sessionId   session being answered, for the provider's session-scoped client
- * @param agent       the agent, carrying its system prompt, template and generation limits
+ * @param promptTemplate the template chosen for this conversation, carrying its text and its
+ *                       generation limits. Replaces the agent, which carried the same two things
+ *                       plus a name and an avatar nobody in this path ever read.
  * @param provider    effective vendor
  * @param model       effective model name
  * @param apiKey      resolved credential — never rendered, see {@link #toString()}
@@ -42,7 +44,7 @@ import java.util.UUID;
  * @param history     persisted conversation, counted on the trace as {@code historySize}
  * @param conversation the same conversation in the provider's message type, never {@code null}
  */
-public record TurnRequest(UUID sessionId, Agent agent, AiProvider provider, String model,
+public record TurnRequest(UUID sessionId, PromptTemplate promptTemplate, AiProvider provider, String model,
                           String apiKey, String baseUrl,
                           List<br.com.systec.hive.agent.api.domain.ChatMessage> history,
                           List<ChatMessage> conversation) {
@@ -51,7 +53,7 @@ public record TurnRequest(UUID sessionId, Agent agent, AiProvider provider, Stri
         history = history == null ? List.of() : List.copyOf(history);
         conversation = conversation == null ? List.of() : List.copyOf(conversation);
         // Required, not defaulted. See the null policy above.
-        agent = Objects.requireNonNull(agent, "agent");
+        promptTemplate = Objects.requireNonNull(promptTemplate, "promptTemplate");
     }
 
     /**
@@ -64,13 +66,13 @@ public record TurnRequest(UUID sessionId, Agent agent, AiProvider provider, Stri
      * cannot be un-leaked. The conversation is the user's own words, and a failed assertion that prints
      * this record would put them in a build log.
      *
-     * <p>What is left is enough to diagnose a turn: which agent, which vendor, which model, which
+     * <p>What is left is enough to diagnose a turn: which template, which vendor, which model, which
      * session, and how big the two conversations were.
      */
     @Override
     public String toString() {
         return "TurnRequest[sessionId=" + sessionId
-                + ", agentId=" + (agent == null ? null : agent.getId())
+                + ", promptTemplateId=" + (promptTemplate == null ? null : promptTemplate.getId())
                 + ", provider=" + provider
                 + ", model=" + model
                 + ", baseUrl=" + baseUrl

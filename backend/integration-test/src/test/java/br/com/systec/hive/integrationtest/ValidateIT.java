@@ -95,11 +95,10 @@ class ValidateIT extends WebIntegrationTest {
         String token = tokenFor(tenantId, "val-user-" + UUID.randomUUID());
         putCredential(token, "OPENAI", "{\"apiKey\":\"sk-test-fake-key-1234\"}");
 
-        long agentsBefore = count("agent");
         long sessionsBefore = count("chat_session");
         long messagesBefore = count("chat_message");
 
-        mockMvc.perform(post("/v1/agents/validate")
+        mockMvc.perform(post("/v1/providers/validate")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"provider\":\"OPENAI\",\"model\":\"gpt-4o-mini\"}"))
@@ -110,7 +109,6 @@ class ValidateIT extends WebIntegrationTest {
                 .andExpect(jsonPath("$.latencyMs").exists())
                 .andExpect(jsonPath("$.reason").doesNotExist());
 
-        assertThat(count("agent")).isEqualTo(agentsBefore);
         assertThat(count("chat_session")).isEqualTo(sessionsBefore);
         assertThat(count("chat_message")).isEqualTo(messagesBefore);
     }
@@ -124,9 +122,9 @@ class ValidateIT extends WebIntegrationTest {
             throw new RuntimeException("vendor down");
         });
 
-        long agentsBefore = count("agent");
+        long sessionsBefore = count("chat_session");
 
-        mockMvc.perform(post("/v1/agents/validate")
+        mockMvc.perform(post("/v1/providers/validate")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"provider\":\"OPENAI\",\"model\":\"gpt-4o-mini\"}"))
@@ -134,8 +132,7 @@ class ValidateIT extends WebIntegrationTest {
                 .andExpect(jsonPath("$.ok").value(false))
                 .andExpect(jsonPath("$.reason").value("connection_failed"));
 
-        assertThat(count("agent")).isEqualTo(agentsBefore);
-        assertThat(count("chat_session")).isEqualTo(0);
+        assertThat(count("chat_session")).isEqualTo(sessionsBefore);
     }
 
     @Test
@@ -146,14 +143,14 @@ class ValidateIT extends WebIntegrationTest {
 
         String body = "{\"provider\":\"OPENAI\",\"model\":\"gpt-4o-mini\"}";
         for (int i = 0; i < 10; i++) {
-            mockMvc.perform(post("/v1/agents/validate")
+            mockMvc.perform(post("/v1/providers/validate")
                             .header("Authorization", "Bearer " + token)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk());
         }
 
-        mockMvc.perform(post("/v1/agents/validate")
+        mockMvc.perform(post("/v1/providers/validate")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -166,7 +163,7 @@ class ValidateIT extends WebIntegrationTest {
         String token = tokenFor(tenantId, "val-user-" + UUID.randomUUID());
         putCredential(token, "OPENAI", "{\"apiKey\":\"sk-test-fake-key-1234\"}");
 
-        mockMvc.perform(post("/v1/agents/validate")
+        mockMvc.perform(post("/v1/providers/validate")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"provider\":\"OPENAI_COMPATIBLE\",\"model\":\"mimo-v2.5\",\"baseUrl\":\"http://169.254.169.254/\"}"))
@@ -179,7 +176,7 @@ class ValidateIT extends WebIntegrationTest {
         String token = tokenFor(tenantId, "val-user-" + UUID.randomUUID());
         putCredential(token, "OPENAI", "{\"apiKey\":\"sk-test-fake-key-1234\"}");
 
-        mockMvc.perform(post("/v1/agents/validate")
+        mockMvc.perform(post("/v1/providers/validate")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"provider\":\"OPENAI\",\"model\":\"llama3.2\"}"))
@@ -191,7 +188,7 @@ class ValidateIT extends WebIntegrationTest {
         UUID tenantId = UUID.randomUUID();
         String token = tokenFor(tenantId, "val-user-" + UUID.randomUUID());
 
-        mockMvc.perform(post("/v1/agents/validate")
+        mockMvc.perform(post("/v1/providers/validate")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"provider\":\"ANTHROPIC\",\"model\":\"claude-3-5-haiku-latest\"}"))
@@ -200,7 +197,7 @@ class ValidateIT extends WebIntegrationTest {
 
     @Test
     void when_validate_withoutToken_then_returns401() throws Exception {
-        mockMvc.perform(post("/v1/agents/validate")
+        mockMvc.perform(post("/v1/providers/validate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"provider\":\"OPENAI\",\"model\":\"gpt-4o-mini\"}"))
                 .andExpect(status().isUnauthorized());
@@ -213,40 +210,11 @@ class ValidateIT extends WebIntegrationTest {
         seedTenantAndUser(tenantId, username, PASSWORD);
         String limited = jwtTestHelper.generateToken(username, tenantId, List.of("CHAT_SEND"));
 
-        mockMvc.perform(post("/v1/agents/validate")
+        mockMvc.perform(post("/v1/providers/validate")
                         .header("Authorization", "Bearer " + limited)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"provider\":\"OPENAI\",\"model\":\"gpt-4o-mini\"}"))
                 .andExpect(status().isForbidden());
     }
 
-    @Test
-    void when_validateRoute_with_existingAgentId_then_bothRoutesWork() throws Exception {
-        UUID tenantId = UUID.randomUUID();
-        String token = tokenFor(tenantId, "val-user-" + UUID.randomUUID());
-        putCredential(token, "OPENAI", "{\"apiKey\":\"sk-test-fake-key-1234\"}");
-
-        String created = mockMvc.perform(post("/v1/agents")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Assistente\",\"provider\":\"OPENAI\",\"model\":\"gpt-4o-mini\"}"))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-
-        String agentId = new com.fasterxml.jackson.databind.ObjectMapper()
-                .readTree(created).get("id").asText();
-
-        mockMvc.perform(get("/v1/agents/" + agentId)
-                        .header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.provider").value("OPENAI"))
-                .andExpect(jsonPath("$.model").value("gpt-4o-mini"));
-
-        mockMvc.perform(post("/v1/agents/validate")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"provider\":\"OPENAI\",\"model\":\"gpt-4o-mini\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ok").value(true));
-    }
 }

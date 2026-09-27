@@ -44,6 +44,12 @@
             <artifactId>hive-provider-api</artifactId>
             <version>${revision}</version>
         </dependency>
+        <!-- TenantLlmConfigService: o provider/modelo padrão é do tenant. Só a api —
+             a implementação fica em tenant/impl e o chat nunca a vê. -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-tenant-api</artifactId>
+        </dependency>
         <dependency>
             <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-provider-langchain4j</artifactId>

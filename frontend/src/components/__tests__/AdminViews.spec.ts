@@ -16,15 +16,17 @@ vi.mock('../../services/prompt.service', () => ({
 }))
 vi.mock('../../services/agent-admin.service', () => ({
   agentAdminService: {
-    list: vi.fn().mockResolvedValue({ content: [{ id: 'a1', name: 'Bot', provider: 'OPENAI', model: 'gpt-4o-mini', isDefault: true, active: true, createAt: new Date().toISOString(), updateAt: new Date().toISOString() }], totalElements: 1, totalPages: 1, number: 0, size: 20 }),
-    getById: vi.fn().mockResolvedValue({ id: 'a1', name: 'Bot', provider: 'OPENAI', model: 'gpt-4o-mini', promptTemplateId: 'p1', isDefault: false, active: true, createAt: new Date().toISOString(), updateAt: new Date().toISOString() }),
-    create: vi.fn().mockResolvedValue({ id: 'new' }),
-    update: vi.fn().mockResolvedValue({ id: 'a1' }),
-    remove: vi.fn().mockResolvedValue(undefined),
-    setDefault: vi.fn().mockResolvedValue({ id: 'a1', isDefault: true }),
-    getDefault: vi.fn().mockResolvedValue({ id: 'a1', name: 'Bot', isDefault: true }),
     listCredentials: vi.fn().mockResolvedValue([{ provider: 'OPENAI', configured: true, last4: 'abcd' }]),
     validate: vi.fn().mockResolvedValue({ ok: true, provider: 'OPENAI', model: 'gpt-4o-mini', latencyMs: 100 }),
+    getLlmConfig: vi.fn().mockResolvedValue(null),
+    saveLlmConfig: vi.fn().mockResolvedValue({
+      id: 'cfg-1',
+      tenantId: 't1',
+      provider: 'OPENAI',
+      model: 'gpt-4o-mini',
+      createAt: new Date().toISOString(),
+      updateAt: new Date().toISOString(),
+    }),
   }
 }))
 vi.mock('../../services/api', () => ({
@@ -33,8 +35,7 @@ vi.mock('../../services/api', () => ({
 
 import PromptsView from '../../views/admin/PromptsView.vue'
 import PromptEditorView from '../../views/admin/PromptEditorView.vue'
-import AgentsView from '../../views/admin/AgentsView.vue'
-import AgentEditorView from '../../views/admin/AgentEditorView.vue'
+import LlmConfigView from '../../views/admin/LlmConfigView.vue'
 import PlaygroundPanel from '../../components/admin/PlaygroundPanel.vue'
 import TemplateEditor from '../../components/admin/TemplateEditor.vue'
 
@@ -46,9 +47,7 @@ function createTestRouter() {
       { path: '/prompts', component: PromptsView },
       { path: '/prompts/new', component: PromptEditorView },
       { path: '/prompts/:id/edit', component: PromptEditorView },
-      { path: '/agents', component: AgentsView },
-      { path: '/agents/new', component: AgentEditorView },
-      { path: '/agents/:id/edit', component: AgentEditorView },
+      { path: '/settings/llm', component: LlmConfigView },
       { path: '/chat', component: { template: '<div>chat</div>' } },
     ]
   })
@@ -122,54 +121,22 @@ describe('PlaygroundPanel', () => {
   })
 })
 
-describe('AgentsView', () => {
-  it('renders heading', async () => {
-    const w = mountWithPlugins(AgentsView)
+describe('LlmConfigView', () => {
+  it('renders the tenant default heading and the no-config notice', async () => {
+    const w = mountWithPlugins(LlmConfigView, '/settings/llm')
     await w.vm.$nextTick()
-    expect(w.text()).toContain('Agentes')
-  })
-})
-
-describe('AgentEditorView', () => {
-  it('renders form', async () => {
-    const w = mountWithPlugins(AgentEditorView, '/agents/new')
-    await w.vm.$nextTick()
-    expect(w.text()).toContain('Novo Agente')
-  })
-})
-
-describe('AgentEditorView contract', () => {
-  it('provider section renders 4 vendors without legacy framework enums', async () => {
-    const w = mountWithPlugins(AgentEditorView, '/agents/new')
-    await w.vm.$nextTick()
-    await new Promise(r => setTimeout(r, 50))
+    await new Promise(r => setTimeout(r, 30))
     const text = w.text()
-    expect(text).toContain('Provedor de IA')
-    expect(text).toContain('OpenAI')
-    expect(text).toContain('Google Gemini')
-    expect(text).toContain('Anthropic Claude')
-    expect(text).toContain('Ollama')
-    expect(text).not.toContain('Spring AI')
-    expect(text).not.toContain('LangChain4j')
-    expect(text).not.toContain('OLLHAMA')
-    expect(text).not.toContain('OPENCODE')
+    expect(text).toContain('Provedor e modelo do tenant')
+    // Sem config o chat recusa: a tela precisa dizer isso antes de qualquer erro.
+    expect(text).toContain('Nenhum provedor e modelo definidos ainda')
   })
-  it('has no apiKey field — key badge links to /settings/providers', async () => {
-    const w = mountWithPlugins(AgentEditorView, '/agents/new')
+  it('has a single save action and no per-agent default control', async () => {
+    const w = mountWithPlugins(LlmConfigView, '/settings/llm')
     await w.vm.$nextTick()
-    await new Promise(r => setTimeout(r, 50))
-    const html = w.html()
-    expect(html).not.toContain('apiKey')
-    expect(html).toContain('/settings/providers')
-  })
-  it('uses promptTemplateId field (not promptId) in edit mapping', async () => {
-    // verify imported type has promptTemplateId and no promptId — compile-time contract documented via runtime check of mock
-    const { agentAdminService } = await import('../../services/agent-admin.service')
-    const dto = await agentAdminService.getById('a1')
-    expect(dto).toHaveProperty('promptTemplateId', 'p1')
-    expect(dto).not.toHaveProperty('promptId')
-    expect(dto.provider).toBe('OPENAI')
-    expect(dto).not.toHaveProperty('providerType')
+    await new Promise(r => setTimeout(r, 30))
+    expect(w.html()).toContain('llm-save')
+    expect(w.text()).not.toContain('Agentes')
   })
 })
 

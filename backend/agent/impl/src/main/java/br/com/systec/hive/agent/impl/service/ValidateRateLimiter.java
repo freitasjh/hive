@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 /**
- * Sliding-window throttle for POST /v1/agents/validate and GET /v1/providers/{provider}/models:
+ * Sliding-window throttle for POST /v1/providers/validate and GET /v1/providers/{provider}/models:
  * 10 calls/minute per tenant. Windowing algorithm lives in commons
  * {@link SlidingWindowRateLimiter}; only the limit and the exception type are
  * domain-specific. Exposed to the web layer via {@link ValidateRateLimitPolicy}

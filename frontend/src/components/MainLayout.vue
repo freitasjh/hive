@@ -38,12 +38,13 @@ onUnmounted(() => {
 })
 
 // Navigation items for the sidebar
+// Prompts é a tela principal depois do chat: o prompt é o que a conversa escolhe, e o provedor/modelo
+// é uma configuração do tenant, não uma tela de conteúdo.
 const navItems = ref([
   { label: 'Chat', icon: 'pi pi-comments', to: '/chat' },
   { label: 'Prompts', icon: 'pi pi-bolt', to: '/prompts' },
-  { label: 'Agentes', icon: 'pi pi-users', to: '/agents' },
-  { label: 'Bases de Conhecimento', icon: 'pi pi-book', to: '/knowledge' },
-  { label: 'Provedores', icon: 'pi pi-key', to: '/settings/providers' }
+  { label: 'Provedores', icon: 'pi pi-key', to: '/settings/providers' },
+  { label: 'Modelo do tenant', icon: 'pi pi-cog', to: '/settings/llm' }
 ]);
 
 // Breadcrumbs logic based on route meta or path
@@ -61,7 +62,7 @@ const breadcrumbs = computed(() => {
     if (isUuid) {
       if (breadcrumbCustomLabel.value && isLast) {
         label = breadcrumbCustomLabel.value
-      } else if (paths[index + 1] === 'edit' || paths[index - 1] === 'agents') {
+      } else if (paths[index + 1] === 'edit' || paths[index - 1] === 'prompts') {
         label = breadcrumbCustomLabel.value ?? 'Editar'
       } else {
         return
@@ -69,7 +70,7 @@ const breadcrumbs = computed(() => {
     } else if (path === 'edit' && UUID_RE.test(paths[index - 1] ?? '')) {
       return
     } else {
-      const labelMap: Record<string, string> = { agents: 'Agentes', prompts: 'Prompts', chat: 'Chat', new: 'Novo', settings: 'Configurações', providers: 'Provedores', knowledge: 'Bases de Conhecimento' }
+      const labelMap: Record<string, string> = { prompts: 'Prompts', chat: 'Chat', new: 'Novo', settings: 'Configurações', providers: 'Provedores', llm: 'Modelo do tenant' }
       label = labelMap[path] ?? path.charAt(0).toUpperCase() + path.slice(1)
     }
     items.push({

@@ -10,10 +10,10 @@ public class PromptInUseException extends BaseException {
     private static final long serialVersionUID = 1L;
 
     public PromptInUseException(String promptId) {
-        super("Prompt template " + promptId + " em uso por agente, não pode ser removido.", HttpStatus.CONFLICT);
+        super("Prompt template " + promptId + " em uso por uma sessão de chat, não pode ser removido.", HttpStatus.CONFLICT);
     }
 
     public PromptInUseException() {
-        super("Prompt em uso por agente, não pode ser removido.", HttpStatus.CONFLICT);
+        super("Prompt em uso por uma sessão de chat, não pode ser removido.", HttpStatus.CONFLICT);
     }
 }

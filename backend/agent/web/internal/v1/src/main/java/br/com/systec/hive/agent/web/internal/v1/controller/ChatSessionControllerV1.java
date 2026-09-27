@@ -32,7 +32,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping(RestPath.V1 + "/chat/sessions")
-@Tag(name = "Hive Agent - Chat Sessions", description = "CRUD de sessões de chat")
+@Tag(name = "Hive Chat Sessions", description = "CRUD de sessões de chat")
 public class ChatSessionControllerV1 {
 
     private final ChatSessionService chatSessionService;
@@ -56,7 +56,7 @@ public class ChatSessionControllerV1 {
     public ResponseEntity<ChatSessionDTO> create(@RequestBody @Valid CreateSessionDTO payload) {
         UUID tenantId = currentTenantId();
         UUID userId = currentUserId();
-        ChatSession created = chatSessionService.create(payload.agentId(), payload.title(), tenantId, userId);
+        ChatSession created = chatSessionService.create(payload.promptTemplateId(), payload.title(), tenantId, userId);
         ChatSessionDTO dto = sessionMapper.toDto(created);
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }

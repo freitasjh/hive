@@ -48,6 +48,10 @@
     </dependency>
     <dependency>
       <groupId>br.com.systec.hive</groupId>
+      <artifactId>hive-tenant-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>br.com.systec.hive</groupId>
       <artifactId>hive-provider-langchain4j</artifactId>
       <version>1.0.0-SNAPSHOT</version>
     </dependency>

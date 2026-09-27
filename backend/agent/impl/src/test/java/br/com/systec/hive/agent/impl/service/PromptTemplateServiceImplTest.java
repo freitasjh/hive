@@ -9,7 +9,7 @@ import br.com.systec.hive.agent.api.exceptions.PromptInUseException;
 import br.com.systec.hive.agent.api.exceptions.PromptTemplateNotFoundException;
 import br.com.systec.hive.agent.impl.entity.PromptTemplateEntity;
 import br.com.systec.hive.agent.impl.mapper.PromptTemplateDomainMapper;
-import br.com.systec.hive.agent.impl.repository.AgentRepository;
+import br.com.systec.hive.agent.impl.repository.ChatSessionRepository;
 import br.com.systec.hive.agent.impl.repository.PromptTemplateRepository;
 import br.com.systec.hive.commons.impl.security.TenantContext;
 import org.junit.jupiter.api.Test;
@@ -50,7 +50,7 @@ public class PromptTemplateServiceImplTest {
     private PromptTemplateDomainMapper mapper;
 
     @Mock
-    private AgentRepository agentRepository;
+    private ChatSessionRepository chatSessionRepository;
 
     @InjectMocks
     private PromptTemplateServiceImpl service;
@@ -308,7 +308,7 @@ public class PromptTemplateServiceImplTest {
     }
 
     @Test
-    void when_delete_withAgentLinked_then_throwsPromptInUseException() {
+    void when_delete_withSessionLinked_then_throwsPromptInUseException() {
         UUID tenantId = UUID.randomUUID();
         UUID id = UUID.randomUUID();
         PromptTemplateEntity entity = new PromptTemplateEntity();
@@ -322,7 +322,7 @@ public class PromptTemplateServiceImplTest {
         try (MockedStatic<TenantContext> mocked = mockStatic(TenantContext.class)) {
             mocked.when(TenantContext::getCurrentTenant).thenReturn(tenantId);
             when(repository.findByIdAndTenantId(id, tenantId)).thenReturn(Optional.of(entity));
-            when(agentRepository.existsByPromptTemplate_IdAndTenantId(id, tenantId)).thenReturn(true);
+            when(chatSessionRepository.existsByPromptTemplateIdAndTenantId(id, tenantId)).thenReturn(true);
 
             assertThatThrownBy(() -> service.delete(input))
                 .isInstanceOf(PromptInUseException.class);
@@ -330,7 +330,7 @@ public class PromptTemplateServiceImplTest {
     }
 
     @Test
-    void when_deleteById_withAgentLinked_then_throwsPromptInUseException() {
+    void when_deleteById_withSessionLinked_then_throwsPromptInUseException() {
         UUID tenantId = UUID.randomUUID();
         UUID id = UUID.randomUUID();
         PromptTemplateEntity entity = new PromptTemplateEntity();
@@ -341,7 +341,7 @@ public class PromptTemplateServiceImplTest {
         try (MockedStatic<TenantContext> mocked = mockStatic(TenantContext.class)) {
             mocked.when(TenantContext::getCurrentTenant).thenReturn(tenantId);
             when(repository.findByIdAndTenantId(id, tenantId)).thenReturn(Optional.of(entity));
-            when(agentRepository.existsByPromptTemplate_IdAndTenantId(id, tenantId)).thenReturn(true);
+            when(chatSessionRepository.existsByPromptTemplateIdAndTenantId(id, tenantId)).thenReturn(true);
 
             assertThatThrownBy(() -> service.deleteById(id))
                 .isInstanceOf(PromptInUseException.class);

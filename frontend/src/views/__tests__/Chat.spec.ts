@@ -46,12 +46,12 @@ vi.mock('../../services/chat.service', () => ({
   }
 }))
 
-vi.mock('../../services/agent.service', () => ({
-  agentService: {
-    listAgents: vi.fn().mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 })
+vi.mock('../../services/prompt.service', () => ({
+  promptService: {
+    list: vi.fn().mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 100 })
   },
   default: {
-    listAgents: vi.fn().mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 })
+    list: vi.fn().mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 100 })
   }
 }))
 
@@ -59,9 +59,9 @@ import { sessionService } from '../../services/session.service'
 import { chatService } from '../../services/chat.service'
 
 const mockSessionId = '11111111-1111-1111-1111-111111111111'
-const mockAgentId = '22222222-2222-2222-2222-222222222222'
+const mockPromptTemplateId = '22222222-2222-2222-2222-222222222222'
 
-const mockSession = { id: mockSessionId, userId: 'u1', agentId: mockAgentId, title: 'Explique RAG', summary: null, createAt: '2026-08-26T12:00:00Z', updateAt: '2026-08-26T12:00:00Z' }
+const mockSession = { id: mockSessionId, userId: 'u1', promptTemplateId: mockPromptTemplateId, title: 'Explique RAG', summary: null, createAt: '2026-08-26T12:00:00Z', updateAt: '2026-08-26T12:00:00Z' }
 
 const mockMessages = [
   { id: 'm1', sessionId: mockSessionId, role: 'user', content: 'Explique RAG', createAt: '2026-08-26T12:00:00Z' },
@@ -78,8 +78,8 @@ function mountChat() {
           template: '<div data-testid="sidebar"><button data-testid="sidebar-select" @click="$emit(\'select\', \'' + mockSessionId + '\')">select</button><button data-testid="sidebar-new" @click="$emit(\'newChat\')">new</button></div>',
           props: ['modelValue', 'selectedId']
         },
-        AgentSelector: {
-          template: '<div data-testid="agent-selector" />',
+        PromptSelector: {
+          template: '<div data-testid="prompt-selector" />',
           props: ['modelValue', 'disabled']
         },
         ChatMessage: { template: '<div data-testid="msg">{{ content }}</div>', props: ['role', 'content', 'timestamp'] },
@@ -113,11 +113,11 @@ describe('Chat.vue', () => {
   it('sendMessage with null sessionId creates session and stores hive_sessionId', async () => {
     const wrapper = mountChat()
     await flushPromises()
-    ;(wrapper.vm as unknown as { selectedAgentId: string | null }).selectedAgentId = mockAgentId
+    ;(wrapper.vm as unknown as { selectedPromptTemplateId: string | null }).selectedPromptTemplateId = mockPromptTemplateId
     ;(wrapper.vm as unknown as { userInput: string }).userInput = 'Olá'
     await (wrapper.vm as unknown as { sendMessage: () => Promise<void> }).sendMessage()
     await flushPromises()
-    expect(chatService.sendMessage).toHaveBeenCalledWith(mockAgentId, null, 'Olá')
+    expect(chatService.sendMessage).toHaveBeenCalledWith(mockPromptTemplateId, null, 'Olá')
     expect(localStorage.getItem('hive_sessionId')).toBe(mockSessionId)
     expect((wrapper.vm as unknown as { sessionId: string | null }).sessionId).toBe(mockSessionId)
     expect((wrapper.vm as unknown as { messages: unknown[] }).messages.length).toBeGreaterThanOrEqual(2)
@@ -139,10 +139,24 @@ describe('Chat.vue', () => {
     const wrapper = mountChat()
     ;(wrapper.vm as unknown as { sessionId: string | null }).sessionId = mockSessionId
     ;(wrapper.vm as unknown as { messages: unknown[] }).messages = [...mockMessages] as never
+    ;(wrapper.vm as unknown as { selectedPromptTemplateId: string | null }).selectedPromptTemplateId = mockPromptTemplateId
     await (wrapper.vm as unknown as { newChat: () => void }).newChat()
     expect((wrapper.vm as unknown as { sessionId: string | null }).sessionId).toBeNull()
     expect((wrapper.vm as unknown as { messages: unknown[] }).messages.length).toBe(0)
     expect(localStorage.getItem('hive_sessionId')).toBeNull()
+    // A conversa nova precisa de um prompt novo: o da conversa anterior não foi escolhido nesta tela.
+    expect((wrapper.vm as unknown as { selectedPromptTemplateId: string | null }).selectedPromptTemplateId).toBeNull()
+  })
+
+  it('refuses to send without a prompt and creates nothing', async () => {
+    const wrapper = mountChat()
+    await flushPromises()
+    ;(wrapper.vm as unknown as { selectedPromptTemplateId: string | null }).selectedPromptTemplateId = null
+    ;(wrapper.vm as unknown as { userInput: string }).userInput = 'Olá'
+    await (wrapper.vm as unknown as { sendMessage: () => Promise<void> }).sendMessage()
+    await flushPromises()
+    // Não há prompt padrão: uma conversa sem prompt não é criada "para depois".
+    expect(chatService.sendMessage).not.toHaveBeenCalled()
   })
 
   it('reload via localStorage loads history onMounted', async () => {

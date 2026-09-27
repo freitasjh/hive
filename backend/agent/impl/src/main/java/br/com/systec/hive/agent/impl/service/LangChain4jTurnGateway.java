@@ -1,5 +1,6 @@
 package br.com.systec.hive.agent.impl.service;
 
+import br.com.systec.hive.agent.api.domain.InferenceParams;
 import br.com.systec.hive.agent.api.domain.TurnReply;
 import br.com.systec.hive.agent.api.domain.TurnRequest;
 import br.com.systec.hive.agent.api.port.ChatTurnGateway;
@@ -19,7 +20,7 @@ import java.util.regex.Pattern;
  * The LangChain4j-backed {@link ChatTurnGateway}: prompt assembly, the provider call, the retry
  * policy, the empty-reply guard and the model-not-found rule.
  *
- * <p>It knows nothing about sessions, tenants, knowledge bases or telemetry. It is handed a
+ * <p>It knows nothing about sessions, tenants or telemetry. It is handed a
  * {@link TurnRequest} and returns a {@link TurnReply} already measured in the shape the trace
  * needs — which is the whole reason a caller cannot get this wrong by asking for the wrong thing
  * here.
@@ -64,14 +65,17 @@ public class LangChain4jTurnGateway implements ChatTurnGateway {
     public TurnReply execute(TurnRequest request) {
         // Outside the try, exactly as the prompt assembly always was: a defect here is a defect in
         // this class, and it must not be reported as a provider failure.
+        InferenceParams params = request.promptTemplate().getInferenceParams() != null
+                ? request.promptTemplate().getInferenceParams()
+                : new InferenceParams();
         List<dev.langchain4j.data.message.ChatMessage> prompt = buildMessages(request);
         int promptChars = ProviderMessages.totalChars(prompt);
 
         dev.langchain4j.model.chat.response.ChatResponse chatResponse;
         try {
             ChatModel client = llmClientFactory.createClientWithSession(request.provider(), request.model(),
-                    request.agent().getTemperature(), request.agent().getMaxTokens(),
-                    request.agent().getTopP(), request.apiKey(), request.baseUrl(), request.sessionId());
+                    params.getTemperature(), params.getMaxTokens(),
+                    params.getTopP(), request.apiKey(), request.baseUrl(), request.sessionId());
             chatResponse = retryPolicy.call(() -> client.chat(prompt));
         } catch (Exception e) {
             // Returned with the prompt measurements intact, and carrying the provider's exception
@@ -101,27 +105,20 @@ public class LangChain4jTurnGateway implements ChatTurnGateway {
     }
 
     /**
-     * The system prompt this turn runs with: the agent's own, else its template's, else its prompt.
+     * The system prompt this turn runs with: the conversation's own template, verbatim.
      *
-     * <p>Order matters and is the agent's existing precedence; an agent with no system prompt at all
-     * contributes nothing, because an empty {@code SystemMessage} is an instruction to the model to
-     * be brief.
+     * <p>The agent used to sit between the two and pick one of three texts, in an order that had to
+     * be read to be believed. There is now one source, and it is the thing the user picked when they
+     * started the conversation. A template with blank text contributes nothing rather than an empty
+     * {@code SystemMessage}, because an empty system message is an instruction to the model to be
+     * brief.
      */
     private static List<dev.langchain4j.data.message.ChatMessage> buildMessages(TurnRequest request) {
         List<dev.langchain4j.data.message.ChatMessage> messages = new ArrayList<>();
-        String systemPrompt = "";
-        var agent = request.agent();
+        String template = request.promptTemplate().getTemplate();
 
-        if (agent.getSystemPrompt() != null && !agent.getSystemPrompt().isBlank()) {
-            systemPrompt = agent.getSystemPrompt();
-        } else if (agent.getPromptTemplate() != null && agent.getPromptTemplate().getTemplate() != null) {
-            systemPrompt = agent.getPromptTemplate().getTemplate();
-        } else if (agent.getPrompt() != null) {
-            systemPrompt = agent.getPrompt();
-        }
-
-        if (!systemPrompt.isBlank()) {
-            messages.add(new SystemMessage(systemPrompt));
+        if (template != null && !template.isBlank()) {
+            messages.add(new SystemMessage(template));
         }
 
         messages.addAll(request.conversation());

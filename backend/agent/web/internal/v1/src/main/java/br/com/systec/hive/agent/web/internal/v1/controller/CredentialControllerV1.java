@@ -32,7 +32,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping(RestPath.V1 + "/provider-credentials")
-@Tag(name = "Hive Agent - Provider Credentials", description = "Gestão mascarada de credenciais de provider por tenant")
+@Tag(name = "Hive Providers - Credentials", description = "Gestão mascarada de credenciais de provider por tenant")
 public class CredentialControllerV1 {
 
     private final ProviderCredentialService credentialService;

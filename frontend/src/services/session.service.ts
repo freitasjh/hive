@@ -6,8 +6,13 @@ export const sessionService = {
     return api.get('/chat/sessions', { params: { page, size } }).then(r => r.data as Page<ChatSessionDTO>)
   },
 
-  createSession(agentId: string, title?: string): Promise<ChatSessionDTO> {
-    return api.post('/chat/sessions', { agentId, title }).then(r => r.data as ChatSessionDTO)
+  /**
+   * The prompt is chosen HERE, when the conversation is opened — it is a property of the
+   * conversation, and there is no default prompt. After this the session keeps it for its whole life,
+   * which is why the chat header locks the selector.
+   */
+  createSession(promptTemplateId: string, title?: string): Promise<ChatSessionDTO> {
+    return api.post('/chat/sessions', { promptTemplateId, title }).then(r => r.data as ChatSessionDTO)
   },
 
   getSession(id: string): Promise<ChatSessionDTO> {

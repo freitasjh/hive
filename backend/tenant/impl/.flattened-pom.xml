@@ -38,6 +38,11 @@
       <artifactId>hive-commons-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>br.com.systec.hive</groupId>
+      <artifactId>hive-provider-api</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
       <groupId>org.mapstruct</groupId>
       <artifactId>mapstruct</artifactId>
     </dependency>

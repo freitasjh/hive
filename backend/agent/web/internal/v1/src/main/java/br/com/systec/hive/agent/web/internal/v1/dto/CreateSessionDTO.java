@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 public record CreateSessionDTO(
-        @NotNull UUID agentId,
+        @NotNull UUID promptTemplateId,
         @Size(max = 50) String title
 ) {
 }

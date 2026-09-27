@@ -1,6 +1,5 @@
 package br.com.systec.hive.agent.web.internal.v1.controller;
 
-import br.com.systec.hive.agent.api.domain.Agent;
 import br.com.systec.hive.agent.api.domain.ChatRequest;
 import br.com.systec.hive.agent.api.domain.ChatResponse;
 import br.com.systec.hive.agent.api.service.ChatService;
@@ -28,7 +27,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping(RestPath.V1 + "/chat")
-@Tag(name = "Hive Agent - Chat", description = "Interação em tempo real com assistentes de IA")
+@Tag(name = "Hive Chat", description = "Interação em tempo real com o assistente")
 public class ChatControllerV1 {
 
     private final ChatService service;
@@ -47,11 +46,6 @@ public class ChatControllerV1 {
         UUID userId = currentUserId();
 
         ChatRequest chatRequest = mapper.toDomain(payload);
-        if (chatRequest.getAgent() == null && payload.agentId() != null) {
-            Agent agent = new Agent();
-            agent.setId(payload.agentId());
-            chatRequest.setAgent(agent);
-        }
         ChatResponse response = service.chat(chatRequest, tenantId, userId);
         ChatResponseDTO dto = mapper.toResponse(response);
         return RestControllerTool.of().buildSuccessResponse(dto);

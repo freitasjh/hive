@@ -29,7 +29,7 @@ public class ModelReturnedEmptyException extends BaseException {
 
     public ModelReturnedEmptyException(String model) {
         super("O modelo " + model + " não devolveu texto (limite de tokens atingido sem conteúdo). "
-                        + "Aumente o limite de tokens do agente ou encurte a pergunta.",
+                        + "Aumente o limite de tokens do prompt ou encurte a pergunta.",
                 HttpStatus.UNPROCESSABLE_ENTITY);
     }
 }

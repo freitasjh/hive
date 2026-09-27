@@ -16,8 +16,8 @@ public class ChatSessionEntity extends AbstractEntity {
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;
-    @Column(name = "agent_id", nullable = false)
-    private UUID agentId;
+    @Column(name = "prompt_template_id", nullable = false)
+    private UUID promptTemplateId;
     @Column(name = "title", nullable = false, length = 50)
     private String title;
     @Column(name = "summary", columnDefinition = "TEXT")
@@ -31,12 +31,12 @@ public class ChatSessionEntity extends AbstractEntity {
         this.userId = userId;
     }
 
-    public UUID getAgentId() {
-        return agentId;
+    public UUID getPromptTemplateId() {
+        return promptTemplateId;
     }
 
-    public void setAgentId(UUID agentId) {
-        this.agentId = agentId;
+    public void setPromptTemplateId(UUID promptTemplateId) {
+        this.promptTemplateId = promptTemplateId;
     }
 
     public String getTitle() {

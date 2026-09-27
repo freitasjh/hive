@@ -1,6 +1,5 @@
 package br.com.systec.hive.agent.web.internal.v1.dto;
 
-import br.com.systec.hive.provider.api.AiProvider;
 import java.util.List;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -69,56 +68,29 @@ class DtoValidationTest {
     }
 
     @Test
-    void when_createAgent_with_valid_then_noViolations() {
-        AgentCreateDTO dto = new AgentCreateDTO(
-                "Assistente", "https://cdn.example.com/avatar.png", "desc", "systemPrompt", null,
-                "gpt-4o-mini", AiProvider.OPENAI, 0.7, 0.9, 2048, List.of("web_search"), List.of("kb1"), true, true);
+    void when_createSession_with_valid_then_noViolations() {
+        CreateSessionDTO dto = new CreateSessionDTO(java.util.UUID.randomUUID(), "Titulo");
         assertThat(validator.validate(dto)).isEmpty();
     }
 
     @Test
-    void when_createAgent_with_invalidAvatar_then_violation() {
-        AgentCreateDTO dto = new AgentCreateDTO(
-                "Assistente", "not-a-url", "desc", "systemPrompt", null,
-                "gpt-4o-mini", AiProvider.OPENAI, 0.7, 0.9, 2048, null, null, false, true);
+    void when_createSession_with_nullPromptTemplate_then_violation() {
+        // Não há prompt padrão e não há conversa sem prompt: a coluna é NOT NULL e o serviço exige
+        // o template. Um DTO que aceitasse null aqui descreveria uma sessão que o banco rejeita.
+        CreateSessionDTO dto = new CreateSessionDTO(null, "Titulo");
         assertThat(validator.validate(dto)).isNotEmpty();
     }
 
     @Test
-    void when_createAgent_with_tooManyTools_then_violation() {
-        List<String> tools = java.util.stream.IntStream.range(0, 21).mapToObj(i -> "tool" + i).toList();
-        AgentCreateDTO dto = new AgentCreateDTO(
-                "Assistente", null, null, null, null,
-                "gpt-4o-mini", AiProvider.OPENAI, null, null, null, tools, null, false, true);
+    void when_createSession_with_titleTooLong_then_violation() {
+        CreateSessionDTO dto = new CreateSessionDTO(java.util.UUID.randomUUID(), "t".repeat(51));
         assertThat(validator.validate(dto)).isNotEmpty();
     }
 
     @Test
-    void when_createAgent_with_blankName_then_violation() {
-        AgentCreateDTO dto = new AgentCreateDTO(
-                "", null, null, null, null,
-                "gpt-4o-mini", AiProvider.OPENAI, null, null, null, null, null, false, true);
-        assertThat(validator.validate(dto)).isNotEmpty();
-    }
-
-    @Test
-    void when_createAgent_with_blankModel_then_violation() {
-        AgentCreateDTO dto = new AgentCreateDTO(
-                "Assistente", null, null, null, null,
-                "  ", AiProvider.OPENAI, null, null, null, null, null, false, true);
-        assertThat(validator.validate(dto)).isNotEmpty();
-    }
-
-    @Test
-    void when_createAgent_with_nullProvider_then_violation() {
-        AgentCreateDTO dto = new AgentCreateDTO(
-                "Assistente", null, null, null, null,
-                "gpt-4o-mini", null, null, null, null, null, null, false, true);
-        assertThat(validator.validate(dto)).isNotEmpty();
-    }
-
-    @Test
-    void when_chatRequest_with_nullableAgentId_then_valid() {
+    void when_chatRequest_with_nullablePromptTemplateId_then_valid() {
+        // Válido no DTO e recusado no serviço: um turno em sessão existente não manda template, e a
+        // distinção entre "nova conversa" e "continuar" só o serviço consegue fazer.
         ChatRequestDTO dto = new ChatRequestDTO(null, null, "hello");
         assertThat(validator.validate(dto)).isEmpty();
         ChatRequestDTO dto2 = new ChatRequestDTO(java.util.UUID.randomUUID(), null, "hello");
