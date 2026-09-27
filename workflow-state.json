@@ -1,13 +1,13 @@
 {
-  "current_feature": "assistant-mvp",
-  "current_phase": "Validation",
+  "current_feature": "public-api-chat",
+  "current_phase": "Planning",
   "previous_phase": "Execution",
-  "next_phase": "Batch 3 - limpeza de telas/rotas/IA (aguardando)",
+  "next_phase": "Ratificar P1 e P2 do ADR-014 + parecer do security-engineer, entao Batch 1 (extracao de ProviderResolution e TurnOutcomeMapper)",
   "type": "feature",
   "artifacts": {
     "tasks": ".spec/backend/rag-advanced/TASKS.md"
   },
-  "last_update": "2026-09-27T13:00:00-03:00",
+  "last_update": "2026-09-27T20:10:00-03:00",
   "code_review": {
     "last_invoked_at": "2026-09-26T21:30:00-03:00",
     "last_status": "passed",
@@ -368,7 +368,10 @@
     "Modulo 'agent' mantem o nome Though nao tenha mais agente. Renomear toca ~11 diretorios Maven, ~60 arquivos e exigiria decidir sobre flyway_schema_history_agent. Zero valor de produto - divida nomeada.",
     "Migrations agent V15/V16 vao dropar a coluna agent_id_legacy e a tabela agent. A execucao e segura e reversivel AGORA; a remocao fisica do dado e batch proprio, nao decidida.",
     "Banco de dev perdido (container recriado com volume novo, database 'hive' inexistente). Schema recriado por Flyway no proximo boot, mas a credencial cifrada foi com ele - E2E com provider real exige recadastrar.",
-    "E2E com provider real PASSOU (2026-09-27, navegador real). Pendencia: confirmar que a chave OPENCODE_GO antiga foi REVOGADA no provider, e nao apenas contornada pelo cadastro de uma nova."
+    "E2E com provider real PASSOU (2026-09-27, navegador real). Pendencia: confirmar que a chave OPENCODE_GO antiga foi REVOGADA no provider, e nao apenas contornada pelo cadastro de uma nova.",
+    "API publica: parecer do security-engineer e do ux-designer NAO feitos. security-engineer e o que audita superficie HTTP externa, e a decisao de nao pagar RBAC foi do product-manager, nao dele. Deve existir antes do primeiro token.",
+    "API publica: 2 pontos sem decisao - teto de mensagens por requisicao (o ERP chama direto, sem proxy, e LlmRetryPolicy retenta) e onde os metadados de uso persistem (log ou tabela, e a tabela traz LGPD).",
+    "Rotacionar a chave antiga da OPENCODE_GO: foi exposta nesta conversa. O usuario adiou. E o unico risco de seguranca ativo."
   ],
   "h6_status": {
     "suite": "341 unit + 63 IT + 177 FE, 0 falhas",
@@ -510,5 +513,52 @@
     "regra": "Antes de construir a segunda capacidade, exercite a primeira em ambiente real, por um humano, no browser. O PromptSelector com size=100 contra servidor que corta em 50 era 400 em TODA montagem e invisivel a 145 testes mockados.",
     "pendente": "confirmar que a chave OPENCODE_GO antiga foi REVOGADA, e nao so contornada por cadastrar uma nova",
     "nota_brain": "PENDING em .spec/brain/PENDING-brain-store-2026-09-27.md (Brain HTTP 410, 5a vez)"
+  },
+  "public_api_chat": {
+    "status": "PLANNING — 6 fases do dev-planner concluidas, ZERO implementacao",
+    "date": "2026-09-27",
+    "artifacts": ".spec/backend/public-api/{EXPLORATION,CONSTRAINTS,DESIGN-DECISIONS,ARCHITECTURE,PLAN,VALIDATION}.md",
+    "phase": "Validation (dev-planner) — aguardando resposta do usuario as 5 perguntas bloqueantes",
+    "next": "handoff ao developer-engineer pelo PLAN.md (13 batches, 54 tasks, ~32-44h)",
+    "recommendation": "modulo Maven NOVO publicapi (api/impl/dbupdate/web) + SecurityFilterChain separada para /v1/public/** — e o que permite NAO pagar o RBAC de usuario",
+    "gates_sequencing": "batch 1 (extracao D4) ANTES do batch 9; batches 3-5 (P-a/P-b/P-c) ANTES do 8",
+    "contrary_findings": [
+      "ACHADO 1: PINNED por versao NAO congela — PromptTemplateServiceImpl.update() muta a linha in-place e incrementa version; nao existe snapshot. PINNED = tripwire + 4o erro prompt_version_not_found",
+      "ACHADO 2 (gate ausente do briefing): SecurityFilter chama loadUserByUsername INCONDICIONALMENTE -> token client_credentials produz 500, nao 401. Nenhum controller e alcancavel",
+      "ACHADO 3: a API publica e o 2o CHAMADOR de ChatTurnGateway, nao a 2a IMPLEMENTACAO. Gatilho 5 do ADR-012 NAO dispara; 2a impl reimplementaria as 5 decisoes que a porta existe para centralizar"
+    ],
+    "decisions_closed_by_user": 10,
+    "decisions_proposed": 18,
+    "decision_to_task_coverage": "18/18",
+    "pending_approval": "Q1-Q5 em VALIDATION.md §5 (Q1 PINNED tripwire vs snapshot e a unica que trava decisao de design)",
+    "code_review": "N/A — nenhum codigo escrito",
+    "harness_status": "N/A — nenhum codigo escrito",
+    "brain": "arquitetura/projetos/hive/decisoes/api-publica-chat + regras/global/api-m2m-roteiros"
+  },
+  "public_api": {
+    "status": "planejado - aguardando ratificacao",
+    "consumidor": "ERP e B2B da propria organizacao (primeira parte, nao produto vendido). MVP para testes. Evolucao futura: cliente agente.",
+    "adr": "docs/adr/ADR-014-API-Publica-Chat.md",
+    "artefatos": ".spec/backend/public-api/ (EXPLORATION, CONSTRAINTS, DESIGN-DECISIONS, ARCHITECTURE, PLAN, VALIDATION, README)",
+    "decisoes_fechadas": 10,
+    "byok": "DESCARTADO - o ERP nao manda chave, usa tenant_llm_config. Remove armazenamento de segredo de terceiro e um item inteiro de compliance.",
+    "premissas_nao_ratificadas": {
+      "P1": "PINNED e tripwire (detecta drift via prompt_version_not_found), nao snapshot. A premissa original 'fixa a versao' foi REFUTADA: PromptTemplateServiceImpl:82-88 muta a linha in-place e nao existe tabela de historico, entao fixar a versao quebraria a integracao sem nunca devolver o texto antigo. Congelar de verdade exige mudar o editor de prompt = batch separado.",
+      "P2": "modulo Maven novo publicapi (4 poms + 1 config Flyway), para nao criar a aresta agent -> security. Alternativa mais barata: credencial em security + controller em agent/web, ao custo da aresta entre brothers."
+    },
+    "gates_de_seguranca": {
+      "P-d": "ACHADO NO PLANEJAMENTO: SecurityFilter.java:51 chama loadUserByUsername incondicionalmente. Token de client_credentials tem clientId como subject -> excecao cai no catch generico da :66 -> HTTP 500, nao 401. Correcao: SecurityFilterChain separada, que TAMBEM fecha o AGENT_MANAGE por ausencia de rota, permitindo nao pagar a matriz de papeis de usuario (restricao do product-manager honrada por um caminho que ele nao podia prever).",
+      "P-a_b_c": "grant model persistido | tenantId no token (ancora do @Filter) | client_secret com SHA-256 + rotacao + revogacao"
+    },
+    "sequenciamento": [
+      "Batch 1 (extracao de ProviderResolution e TurnOutcomeMapper) ANTES da API - senao fork",
+      "P-a/P-b/P-c ANTES do primeiro token - senao o primeiro token e superusuario",
+      "SecurityFilterChain separada ANTES da API - senao o token alcanca provider-credential"
+    ],
+    "parecer_ausente": "security-engineer e ux-designer NAO foram consultados. Uma superficie HTTP externa e exatamente o que o security-engineer audita, e a decisao de nao pagar RBAC foi do product-manager e nao dele. Registrado como divida do ADR.",
+    "desacordo_do_architect": [
+      "'sem limite de mensagens, teto do proxy' esta errado: o ERP chama o Hive DIRETO, nao ha proxy. E LlmRetryPolicy retenta - payload sem teto + retry e a pior combinacao de custo e erro. Recomendacao: teto generoso no servidor (200 msgs / 32KB) com 413 explicito, NUNCA truncamento silencioso.",
+      "'metadados persistidos' e ambiguo: log (LoggingChatTraceRecorder ja registra, sem texto) ou tabela (4a tabela, escrita no hot path, invalida o 'hot path sem banco', e LGPD aparece no ADR-011 como concern). Nada disso esta decidido."
+    ]
   }
 }
