@@ -1,13 +1,13 @@
 {
-  "current_feature": "rag-advanced",
+  "current_feature": "assistant-mvp",
   "current_phase": "Execution",
   "previous_phase": "Planning",
-  "next_phase": "ADR Passo B (gateway vs AI Services) - aguardando aprovacao do usuario",
+  "next_phase": "Batch 2 - prompt por conversa, morte do conceito Agent (aguardando aprovacao)",
   "type": "feature",
   "artifacts": {
     "tasks": ".spec/backend/rag-advanced/TASKS.md"
   },
-  "last_update": "2026-09-26T21:35:00-03:00",
+  "last_update": "2026-09-27T10:20:00-03:00",
   "code_review": {
     "last_invoked_at": "2026-09-26T21:30:00-03:00",
     "last_status": "passed",
@@ -359,7 +359,11 @@
     },
     "RagContext.toString: record publico em agent/api carregava o texto do chunk injetado. CORRIGIDO. Regra promovida: todo record novo que carregue texto de documento/credencial/payload de excecao precisa de toString() override no mesmo commit - e promocao de escopo (privado->publico no api/) obriga a reavaliar.",
     "agent.knowledge_bases text[] vs tabela agent_kb_link: duas fontes de verdade para o link agente-KB. Nao bug hoje (so a link table e lida).",
-    "KnowledgeBaseContentRetriever mora em agent/impl sendo a contraparte oficial de EmbeddingStoreContentRetriever - e a classe que documenta por que nao usamos a oficial. Candidato a knowledge/impl."
+    "KnowledgeBaseContentRetriever mora em agent/impl sendo a contraparte oficial de EmbeddingStoreContentRetriever - e a classe que documenta por que nao usamos a oficial. Candidato a knowledge/impl.",
+    "Banco de dev PERDIDO: o container de postgres do compose (container_name atlas-ecm-postgres) foi recriado com volume novo e o database 'hive' nao existe mais. Agentes, sessoes, mensagens e a credencial OPENCODE_GO cifrada foram com ele. Codigo intacto. Consequencia: o E2E do Batch 2 vai exigir credencial nova - o que resolve de quebra a rotacao da chave exposta, que era pendencia de seguranca.",
+    "ChatTrace.java:27-37 documenta ragUsed/citationsCount/ragOutcome/ragThreshold nunca populados; elapsedMs justifica exclusao do RAG por um bound de 2s que nao existe mais. Batch 2 - remover os campos do record e quebra de contrato de agent/api, nao limpeza.",
+    "Provider/modelo do Assistant ainda indefinido: (a) default do tenant (b) escolhido junto com o prompt na criacao da conversa (c) escolhido pelo usuario. Nao bloqueia o Batch 2 mas define o contrato da API de criacao de sessao e o modelo de cota do ChatRateLimiter (hoje 10 msg/min por tenant).",
+    "APIs publicas: modelo de autenticacao e cota ainda nao definido. Nao bloqueia a remocao."
   ],
   "h6_status": {
     "suite": "341 unit + 63 IT + 177 FE, 0 falhas",
@@ -436,5 +440,37 @@
     },
     "h5": "brain_store FALHOU (HTTP 410) - 3 notas prontas em .spec/brain/PENDING-brain-store-2026-09-26.md (215 linhas)",
     "commit": false
+  },
+  "scope_decision": {
+    "data": "2026-09-27",
+    "decisao": "REMOVER (nao congelar) Knowledge e conceito Agent. Produto = Assistant: chat simples, sem agente/tools/knowledge, nao-agentico. Prompt escolhido POR CONVERSA na criacao da sessao.",
+    "registro": "Brain arquitetura/projetos/hive/decisoes/scope-assistant-sem-rag",
+    "diagnostico": "RAG estava funcional e era o lugar errado. O loop elementar (prompt template -> provider -> conversa) nunca foi fechado; os 6 bugs de 26/09 estavam nos cantos dele. Construimos o segundo loop antes do primeiro.",
+    "contra_argumento_weighed": "Congelar custaria 1 @ConditionalOnProperty e seria reversivel; apagar custa reconstrucao. O usuario optou por apagar de proposito, para reiniciar a estrutura com mais estudos de LangChain4j e avaliacao de outros bancos vetoriais.",
+    "seguranca": "tag pre-removal-rag-agent mantem tudo recuperavel em minutos"
+  },
+  "batch1_rag_removal": {
+    "status": "completed",
+    "commit": "48f36d6",
+    "objetivo": "modulo agent passa a compilar e funcionar sem o modulo knowledge",
+    "diff": "181 arquivos, +531/-16872 (net -16341). 138 deletados, 41 modificados, 2 novos.",
+    "testes": {
+      "unit": "700 -> 376",
+      "it": "118 -> 66",
+      "frontend": "222 -> 191",
+      "conta": "306 classes deletadas + 24 em 3 classes sobrevividas - 6 novos = -324. 700-324=376=medido."
+    },
+    "code_review": "2 rounds. Round 1 CHANGES_REQUIRED, 0 criticos, 6 amarelos (3 deles comentarios com garantia falsa). 7 must-fix fechados e verificados por MUTACAO. Round 2 APPROVED 0/0.",
+    "realocado_nao_apagado": "RagDiagnostic.causeOf -> FailureClassifier em agent/impl/diagnostics (alimenta o ChatTrace, nao e RAG). 1 branch removida (KbDimensionMismatchException), forcado. 6 testes NOVOS, nao portados.",
+    "knowledge_bases": "@Column(insertable=false,updatable=false) + @Mapping(ignore=true) - ambos load-bearing. API deixa de devolver nomes pendurados. Coluna fisica fica orfa; limpeza e migration do Batch 2.",
+    "deps_mortas": "opennlp-tools e jtokkit removidas de bootstrap e dependencies. Zero consumidor vivo.",
+    "dados": "NENHUMA tabela dropada, nenhum .sql de modulo sobrevivente alterado. Tabelas ficam orfas no banco.",
+    "dividas_aceitas_para_batch_3": [
+      "Telas de KB quebradas (404/405), alcancaveis pelo nav MainLayout.vue:45",
+      "Permissoes KNOWLEDGE_MANAGE/KNOWLEDGE_READ orfas, ainda concedidas em SecurityTokenServiceImpl:175 (fail-closed, sem risco)",
+      "hive-commons-test-support e o modulo INTEIRO orfao (so HardcodedSimilarityCutOffGuard + teste, zero import)",
+      "AgentMapperDomain:34 (toEntity) ainda mapeia knowledgeBases - inofensivo mas le como se fluisse",
+      "Comentarios apontando pra codigo apagado: LangChain4jTurnGatewayTest:357, frontend/src/utils/embeddingConvention.ts:8, types/agent-admin.ts:289"
+    ]
   }
 }
