@@ -34,6 +34,14 @@
         <mockito.version>5.11.0</mockito.version>
         <testcontainers.version>1.20.4</testcontainers.version>
         <langchain4j.version>1.19.0</langchain4j.version>
+        <!--
+          Pinned to 1.19.0-beta29, not to ${langchain4j.version}: the Tika parser family is released
+          on the beta track, and an earlier revision shipped this scope as `provided`, which put a
+          NoClassDefFoundError: ApacheTikaDocumentParser on the async ingestion path at runtime while
+          every unit test passed. Kept as its own property so a beta-track artifact is visibly not the
+          stable line — and so `langchain4j.store.version` is not read as "the store version", which
+          it no longer is: there is no LangChain4j store in this build.
+        -->
         <langchain4j.store.version>1.19.0-beta29</langchain4j.store.version>
         <jtokkit.version>1.1.0</jtokkit.version>
         <opennlp.version>2.5.11</opennlp.version>
@@ -201,11 +209,16 @@
                 <version>${langchain4j.version}</version>
                 <scope>provided</scope>
             </dependency>
-            <dependency>
-                <groupId>dev.langchain4j</groupId>
-                <artifactId>langchain4j-pgvector</artifactId>
-                <version>${langchain4j.store.version}</version>
-            </dependency>
+            <!--
+              `langchain4j-pgvector` used to be managed here and declared by knowledge/impl. Both were
+              removed: nothing in the codebase ever imported `dev.langchain4j.store.pgvector`, and the
+              SPI could not have been adopted anyway — `EmbeddingStore.add` returns `void` in 1.19.0
+              and `String` in 1.20, which makes reconciling `embedding_id` = `chunkId` (the
+              citations depend on it) impossible to write against a stable signature, and
+              `removeAll(Filter)` is a `default` that throws `UnsupportedOperationException`, so a
+              delete by knowledge base would have become a silent no-op. Vector persistence is
+              `KbVectorStore` + `KbEmbeddingStore` (JdbcTemplate), on purpose.
+            -->
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j-document-parser-apache-tika</artifactId>

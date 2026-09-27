@@ -1,19 +1,19 @@
 {
   "current_feature": "rag-advanced",
-  "current_phase": "Planning",
-  "previous_phase": "QualityGate",
-  "next_phase": "RAG-advanced (B2 aprovado pelo usuario, NAO INICIADO)",
+  "current_phase": "Execution",
+  "previous_phase": "Planning",
+  "next_phase": "ADR Passo B (gateway vs AI Services) - aguardando aprovacao do usuario",
   "type": "feature",
   "artifacts": {
     "tasks": ".spec/backend/rag-advanced/TASKS.md"
   },
-  "last_update": "2026-09-26T18:05:00Z",
+  "last_update": "2026-09-26T21:35:00-03:00",
   "code_review": {
-    "last_invoked_at": "2026-09-26T17:15:00Z",
+    "last_invoked_at": "2026-09-26T21:30:00-03:00",
     "last_status": "passed",
     "critical_issues": 0,
     "attention_issues": 0,
-    "reviewer_notes": "8 reviews. Duas CHANGES_REQUIRED (0 criticos) corrigidas. Padrao recorrente que o reviewer enforce: teste que afirma cobertura que nao tem (serializedBody, Javadoc de convencao), e motivo/tecnica fabricada em comentario."
+    "reviewer_notes": "Ciclo do Passo A: 3 iteracoes. Review inicial APPROVED com 4 yellow; todos corrigidos no merits e reconfirmados por MUTACAO (reviewer removeu cada correcao de proposito e o teste certo falhou). 1 yellow novo achado (RagContext.toString vazava o chunk RAG) - mesma classe do anterior, em record que o proprio refactor tornou publico - corrigido. Zero regressoes. Verificou que o requireNonNull de ragContext RESTAURA o comportamento do HEAD em vez de mudar."
   },
   "overrides": [
     {
@@ -356,7 +356,10 @@
       "id": "brain-mcp-410",
       "sev": "P2",
       "desc": "Brain MCP fora (HTTP 410) desde ~11:56. Notas pendentes em .spec/bugs/*/brain-pending/."
-    }
+    },
+    "RagContext.toString: record publico em agent/api carregava o texto do chunk injetado. CORRIGIDO. Regra promovida: todo record novo que carregue texto de documento/credencial/payload de excecao precisa de toString() override no mesmo commit - e promocao de escopo (privado->publico no api/) obriga a reavaliar.",
+    "agent.knowledge_bases text[] vs tabela agent_kb_link: duas fontes de verdade para o link agente-KB. Nao bug hoje (so a link table e lida).",
+    "KnowledgeBaseContentRetriever mora em agent/impl sendo a contraparte oficial de EmbeddingStoreContentRetriever - e a classe que documenta por que nao usamos a oficial. Candidato a knowledge/impl."
   ],
   "h6_status": {
     "suite": "341 unit + 63 IT + 177 FE, 0 falhas",
@@ -409,5 +412,29 @@
       "NAO escolher threshold: 0.60 foi calibrado nos chunks antigos"
     ],
     "diagnosis": "chunks vao truncados no meio da frase; a doc adverte que missing context leva a alucinacao"
+  },
+  "batch1_costuras_rag": {
+    "status": "completed",
+    "gate_H2_2": "verde: 641 unit + 118 IT antes de delegar",
+    "escopo": "RagQuerySettings(threshold como sealed) | RagTurnResolver(397 linhas) | ChatTurnGateway+LangChain4jTurnGateway | TurnRequest/TurnReply/RagContext como tipos publicos | KbVectorStore(4 ops) + rewire de 3 servicos | remocao de langchain4j-pgvector dos 2 poms",
+    "desvios_confirmados_pelo_reviewer": [
+      "A6: property langchain4j.store.version MANTIDA - langchain4j-document-parser-apache-tika tambem a usa (dependencies/pom.xml:222). Eu estava errado.",
+      "A1: RagQuerySettings foi para knowledge/api, nao agent/api - agent/api ja depende de knowledge/api e a porta consumidora e de la, entao em agent/api seria ciclo. Eu estava errado.",
+      "criterio <=8 deps nao atingido: ficou 11. Reviewer e dev concordam que 8 exigiria um TurnCoordinator nao aprovado. 11 honestos > 8 com costura falsa."
+    ],
+    "metricas": {
+      "ChatServiceImpl_linhas": "770 -> 331",
+      "ChatServiceImpl_deps": "15 -> 11",
+      "diff": "18 modificados (+585/-844) + 12 novos",
+      "net_linhas": -259
+    },
+    "zero_mudanca_de_comportamento": "E2E 3 rodadas: systemBlockChars=5028 estavel, threshold=0.6, scores 0.607364/0.601321/0.600860, chunkIds 980c2c95/d8c4d15f/754f88bc. baseline==refactor==correcoes: True",
+    "tests": {
+      "unit": "641 -> 700",
+      "it": 118,
+      "frontend": 222
+    },
+    "h5": "brain_store FALHOU (HTTP 410) - 3 notas prontas em .spec/brain/PENDING-brain-store-2026-09-26.md (215 linhas)",
+    "commit": false
   }
 }

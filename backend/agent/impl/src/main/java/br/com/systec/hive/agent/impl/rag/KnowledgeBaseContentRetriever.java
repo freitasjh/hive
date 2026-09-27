@@ -1,6 +1,7 @@
 package br.com.systec.hive.agent.impl.rag;
 
 import br.com.systec.hive.knowledge.api.domain.KbChunk;
+import br.com.systec.hive.knowledge.api.domain.RagQuerySettings;
 import br.com.systec.hive.knowledge.api.domain.RagRetrievalResult;
 import br.com.systec.hive.knowledge.api.port.KbRetrievalPort;
 import dev.langchain4j.rag.content.Content;
@@ -29,11 +30,11 @@ import java.util.function.Function;
  * to answer "no_link" instead of searching everything), the tenant filter is enforced in SQL and
  * cannot be expressed as a metadata filter over a shared collection, and the similarity cut-off is
  * a property of the <b>base's embedding model</b> — a number the caller cannot know, which is why
- * {@link KbRetrievalPort#MIN_SCORE_FROM_KB_CONVENTION} exists and why a constant in this module was
- * a bug once already.
+ * the caller passes a {@link RagQuerySettings} policy instead of a number, and why a constant in
+ * this module was a bug once already.
  *
  * <p>What this class does keep is the shape the official retriever has: {@code dynamicMaxResults} and
- * {@code dynamicMinScore} resolved <em>per query</em>, at the moment of the search, from functions —
+ * {@code dynamicSettings} resolved <em>per query</em>, at the moment of the search, from functions —
  * never from a constant baked into the class. See {@link #of} for what the defaults resolve to here.
  *
  * <h3>What the retrieval reports is not lost</h3>
@@ -50,22 +51,22 @@ public final class KnowledgeBaseContentRetriever implements ContentRetriever {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeBaseContentRetriever.class);
 
     /**
-     * Cut-off resolution for a turn: returns the score this search should run with.
+     * Cut-off resolution for a turn: returns the policy this search should run with.
      *
-     * <p>Not a constant on purpose. Returning {@link KbRetrievalPort#MIN_SCORE_FROM_KB_CONVENTION}
-     * (or anything {@code <= 0}) is the documented way of saying "you do not get to choose: resolve
-     * it from the base's model", and the knowledge module is the only layer that can read that model.
-     * A number hardcoded here would be a third copy of a cut-off that is already wrong for one of the
-     * model families, in a class that cannot even tell which model it is searching.
+     * <p>Not a constant on purpose. Returning {@link RagQuerySettings#fromKbConvention()} is the
+     * documented way of saying "you do not get to choose: resolve it from the base's model", and the
+     * knowledge module is the only layer that can read that model. A number hardcoded here would be a
+     * third copy of a cut-off that is already wrong for one of the model families, in a class that
+     * cannot even tell which model it is searching.
      *
      * <p>What the hook is for, stated honestly: this is the same shape the official retriever uses, so
      * a cut-off that really does vary per query (by user, by session) is a one-line change here instead
      * of a new retrieval path. <b>It does not vary per query today</b> — the only production caller
-     * passes query-independent values, because the number that matters is a function of the base's
+     * passes a query-independent policy, because the number that matters is a function of the base's
      * embedding model and is resolved inside the knowledge module. Reading "resolved per query" as an
      * existing behaviour would be wrong; it is an extension point, nothing more.
      */
-    private final Function<Query, Double> dynamicMinScore;
+    private final Function<Query, RagQuerySettings> dynamicSettings;
 
     private final Function<Query, Integer> dynamicMaxResults;
     private final KbRetrievalPort retrieval;
@@ -75,13 +76,13 @@ public final class KnowledgeBaseContentRetriever implements ContentRetriever {
 
     private KnowledgeBaseContentRetriever(KbRetrievalPort retrieval, UUID tenantId, List<UUID> kbIds,
                                           Function<Query, Integer> dynamicMaxResults,
-                                          Function<Query, Double> dynamicMinScore,
+                                          Function<Query, RagQuerySettings> dynamicSettings,
                                           Consumer<RagRetrievalResult> sink) {
         this.retrieval = Objects.requireNonNull(retrieval, "retrieval");
         this.tenantId = Objects.requireNonNull(tenantId, "tenantId");
         this.kbIds = List.copyOf(Objects.requireNonNull(kbIds, "kbIds"));
         this.dynamicMaxResults = Objects.requireNonNull(dynamicMaxResults, "dynamicMaxResults");
-        this.dynamicMinScore = Objects.requireNonNull(dynamicMinScore, "dynamicMinScore");
+        this.dynamicSettings = Objects.requireNonNull(dynamicSettings, "dynamicSettings");
         this.sink = Objects.requireNonNull(sink, "sink");
     }
 
@@ -91,23 +92,23 @@ public final class KnowledgeBaseContentRetriever implements ContentRetriever {
      * @param kbIds            bases linked to the agent <b>and already scoped to the tenant</b>; the
      *                         retriever passes them through unchanged and never widens them
      * @param dynamicMaxResults how many chunks this query may take, resolved now
-     * @param dynamicMinScore   how low a score this query accepts, resolved now
-     * @param sink             receives the retrieval's own report, including the empty outcomes
+     * @param dynamicSettings   the cut-off policy this query runs with, resolved now
+     * @param sink              receives the retrieval's own report, including the empty outcomes
      */
     public static KnowledgeBaseContentRetriever of(KbRetrievalPort retrieval, UUID tenantId, List<UUID> kbIds,
                                                    Function<Query, Integer> dynamicMaxResults,
-                                                   Function<Query, Double> dynamicMinScore,
+                                                   Function<Query, RagQuerySettings> dynamicSettings,
                                                    Consumer<RagRetrievalResult> sink) {
         return new KnowledgeBaseContentRetriever(retrieval, tenantId, kbIds, dynamicMaxResults,
-                dynamicMinScore, sink);
+                dynamicSettings, sink);
     }
 
     @Override
     public List<Content> retrieve(Query query) {
         int maxResults = dynamicMaxResults.apply(query);
-        double minScore = dynamicMinScore.apply(query);
+        RagQuerySettings settings = dynamicSettings.apply(query);
         RagRetrievalResult result = retrieval.retrieveWithOutcome(tenantId, kbIds, query.text(),
-                maxResults, minScore);
+                maxResults, settings);
         if (result == null) {
             // Reported as a failure by the turn, not here: a port that returns nothing at all has no
             // outcome to publish, and inventing one here would put a word in the diagnostic's mouth.

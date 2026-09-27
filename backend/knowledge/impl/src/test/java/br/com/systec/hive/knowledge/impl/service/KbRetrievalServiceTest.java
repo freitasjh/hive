@@ -3,9 +3,11 @@ package br.com.systec.hive.knowledge.impl.service;
 import br.com.systec.hive.knowledge.api.domain.KbChunk;
 import br.com.systec.hive.knowledge.api.domain.RagDiagnostic;
 import br.com.systec.hive.knowledge.api.domain.RagOutcome;
+import br.com.systec.hive.knowledge.api.domain.RagQuerySettings;
 import br.com.systec.hive.knowledge.api.domain.RagRetrievalResult;
 import br.com.systec.hive.knowledge.api.exceptions.KbDimensionMismatchException;
 import br.com.systec.hive.knowledge.api.port.KbEmbeddingPort;
+import br.com.systec.hive.knowledge.api.port.KbVectorStore;
 import br.com.systec.hive.knowledge.api.port.RagDiagnosticRecorder;
 import br.com.systec.hive.knowledge.impl.entity.KnowledgeBaseEntity;
 import br.com.systec.hive.knowledge.impl.fake.PrefixAwareEmbeddingModel;
@@ -43,7 +45,7 @@ class KbRetrievalServiceTest {
     private KbDocumentRepository documentRepository;
 
     @Mock
-    private KbEmbeddingStore embeddingStore;
+    private KbVectorStore embeddingStore;
 
     @Mock
     private KbEmbeddingPort embeddingPort;
@@ -86,7 +88,7 @@ class KbRetrievalServiceTest {
     void when_retrieveWithLinkedBaseMissingForTenant_then_reportsKbNotFoundWithTenantAndIds() {
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList())).thenReturn(List.of());
 
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0.7);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.exact(0.7));
 
         assertThat(result.outcome()).isEqualTo(RagOutcome.KB_NOT_FOUND_FOR_TENANT);
         assertThat(result.chunks()).isEmpty();
@@ -98,7 +100,7 @@ class KbRetrievalServiceTest {
 
     @Test
     void when_retrieveWithoutLinkedBases_then_reportsNoLink() {
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(), "q", 5, 0.7);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(), "q", 5, RagQuerySettings.exact(0.7));
 
         assertThat(result.outcome()).isEqualTo(RagOutcome.NO_LINK);
         assertThat(recorder.single().outcome()).isEqualTo(RagOutcome.NO_LINK);
@@ -106,7 +108,7 @@ class KbRetrievalServiceTest {
 
     @Test
     void when_retrieveWithBlankQuery_then_reportsNoLink() {
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "  ", 5, 0.7);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "  ", 5, RagQuerySettings.exact(0.7));
 
         assertThat(result.outcome()).isEqualTo(RagOutcome.NO_LINK);
     }
@@ -118,7 +120,7 @@ class KbRetrievalServiceTest {
         when(embeddingStore.search(eq(tenantId), anyList(), any(), anyInt(), anyInt(), anyDouble()))
                 .thenReturn(List.of());
 
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0.7);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.exact(0.7));
 
         assertThat(result.outcome()).isEqualTo(RagOutcome.NO_CHUNK_ABOVE_THRESHOLD);
         // the number reported is the number that ran, not the number requested
@@ -141,8 +143,8 @@ class KbRetrievalServiceTest {
         when(embeddingStore.search(eq(tenantId), anyList(), any(), anyInt(), anyInt(), anyDouble()))
                 .thenReturn(List.of());
 
-        // 0 means "not specified" — and the base here is nomic, so the resolved value is 0.60
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0);
+        // "not specified" is a policy, not a literal — and the base here is nomic, so 0.60 resolves
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.fromKbConvention());
 
         assertThat(result.threshold()).isEqualTo(0.60);
         assertThat(recorder.single().threshold()).isEqualTo(0.60);
@@ -152,7 +154,7 @@ class KbRetrievalServiceTest {
     void when_retrieveNeverResolvesACutOff_then_noThresholdIsInvented() {
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList())).thenReturn(List.of());
 
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0.7);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.exact(0.7));
 
         assertThat(result.threshold())
                 .as("nothing was searched, so there is no cut-off to report")
@@ -168,28 +170,70 @@ class KbRetrievalServiceTest {
      */
     @Test
     void when_theCutOffIsResolved_then_theModelsRowDecidesAndAnExplicitRequestWins() {
-        assertThat(KbRetrievalService.thresholdFor("nomic-embed-text", 0))
+        assertThat(KbRetrievalService.thresholdFor("nomic-embed-text", RagQuerySettings.fromKbConvention()))
                 .as("measured on a real nomic base: 0.6219 relevant, 0.5972 not")
                 .isEqualTo(0.60);
-        assertThat(KbRetrievalService.thresholdFor("nomic-embed-text:v1.5", 0)).isEqualTo(0.60);
-        assertThat(KbRetrievalService.thresholdFor("text-embedding-3-small", 0))
+        assertThat(KbRetrievalService.thresholdFor("nomic-embed-text:v1.5",
+                RagQuerySettings.fromKbConvention())).isEqualTo(0.60);
+        assertThat(KbRetrievalService.thresholdFor("text-embedding-3-small",
+                RagQuerySettings.fromKbConvention()))
                 .as("behaviour it has always had")
                 .isEqualTo(0.70);
-        assertThat(KbRetrievalService.thresholdFor("mxbai-embed-large", 0))
+        assertThat(KbRetrievalService.thresholdFor("mxbai-embed-large",
+                RagQuerySettings.fromKbConvention()))
                 .as("unmeasured family: the conservative value")
                 .isEqualTo(0.70);
-        assertThat(KbRetrievalService.thresholdFor(null, 0)).isEqualTo(0.70);
+        assertThat(KbRetrievalService.thresholdFor(null, RagQuerySettings.fromKbConvention()))
+                .isEqualTo(0.70);
+        assertThat(KbRetrievalService.thresholdFor("nomic-embed-text", null))
+                .as("a null policy has always meant 'nobody chose'")
+                .isEqualTo(0.60);
 
         // the playground forces a cut-off, and forcing one is allowed
-        assertThat(KbRetrievalService.thresholdFor("nomic-embed-text", 0.55)).isEqualTo(0.55);
-        assertThat(KbRetrievalService.thresholdFor("text-embedding-3-small", 0.55)).isEqualTo(0.55);
-        // a negative score is as unset as a zero: the port promises "anything <= 0" and this is where
-        // that promise is kept. A negative cut-off is not a thing a similarity can take, so treating
-        // it as "resolve from the model" is the only reading that cannot silently return nothing.
-        assertThat(KbRetrievalService.thresholdFor("nomic-embed-text", -1d))
-                .as("the port documents <= 0 as unset")
-                .isEqualTo(0.60);
-        assertThat(KbRetrievalService.thresholdFor("text-embedding-3-small", -0.5d)).isEqualTo(0.70);
+        assertThat(KbRetrievalService.thresholdFor("nomic-embed-text", RagQuerySettings.exact(0.55)))
+                .isEqualTo(0.55);
+        assertThat(KbRetrievalService.thresholdFor("text-embedding-3-small", RagQuerySettings.exact(0.55)))
+                .isEqualTo(0.55);
+    }
+
+    /**
+     * A cut-off outside {@code (0,1]} is refused where it is written, not corrected where it is read.
+     *
+     * <p>The parameter used to be a bare {@code double} in which {@code <= 0} meant "unset", so a
+     * {@code 0} parsed out of a form, or a negative left over from a subtraction, was answered with the
+     * base's calibrated row and nobody was told. Now such a value cannot become an {@code Exact} at
+     * all. Correcting it silently inside {@code thresholdFor} would have reproduced the original
+     * collision one layer down — the caller would get a number it never asked for.
+     */
+    @Test
+    void when_anExplicitCutOffIsNotASimilarity_then_itFailsWhereItIsWritten() {
+        assertThatThrownBy(() -> RagQuerySettings.exact(0d))
+                .as("zero was the old sentinel; it must not survive as a legal value")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cut-off must be a similarity in (0,1]");
+        assertThatThrownBy(() -> RagQuerySettings.exact(-1d))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("-1.0");
+        assertThatThrownBy(() -> RagQuerySettings.exact(1.01d))
+                .as("a similarity cannot exceed 1")
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> RagQuerySettings.exact(Double.NaN))
+                .as("NaN fails every comparison, so it would slip past a < 0 check")
+                .isInstanceOf(IllegalArgumentException.class);
+
+        // The boundary itself is legal: a cut-off of 1 keeps only exact matches.
+        assertThat(RagQuerySettings.exact(1d).exactValue()).isEqualTo(1d);
+    }
+
+    /**
+     * And nothing reaches the resolution step half-built: a policy that carries a real number is the
+     * only kind that gets one back, whatever the base's model says.
+     */
+    @Test
+    void when_anExplicitCutOffIsLegal_then_theBaseModelHasNoSayInIt() {
+        assertThat(KbRetrievalService.thresholdFor("text-embedding-3-small", RagQuerySettings.exact(0.12)))
+                .as("0.12 is below this family's own 0.70 and is still honoured")
+                .isEqualTo(0.12);
     }
 
     @Test
@@ -200,7 +244,7 @@ class KbRetrievalServiceTest {
         when(embeddingStore.search(eq(tenantId), anyList(), any(), anyInt(), anyInt(), anyDouble()))
                 .thenReturn(List.of());
 
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.fromKbConvention());
 
         assertThat(result.threshold()).isEqualTo(0.70);
     }
@@ -212,7 +256,7 @@ class KbRetrievalServiceTest {
         when(embeddingStore.search(eq(tenantId), anyList(), any(), anyInt(), anyInt(), anyDouble()))
                 .thenReturn(List.of());
 
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0.55);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.exact(0.55));
 
         assertThat(result.threshold()).isEqualTo(0.55);
         assertThat(recorder.single().threshold()).isEqualTo(0.55);
@@ -231,7 +275,7 @@ class KbRetrievalServiceTest {
         when(embeddingStore.search(eq(tenantId), anyList(), any(), anyInt(), anyInt(), anyDouble()))
                 .thenReturn(List.of());
 
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.fromKbConvention());
         RagDiagnostic line = recorder.single();
 
         assertThat(result.foundKbs()).isEqualTo(line.foundKbs()).isEqualTo(1);
@@ -246,7 +290,7 @@ class KbRetrievalServiceTest {
         when(embeddingPort.embedQuery(eq(tenantId), any(), anyInt(), any()))
                 .thenThrow(new IllegalStateException("embed failed for query=[PERGUNTA SIGILOSA]"));
 
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.fromKbConvention());
 
         assertThat(result.cause()).isEqualTo("IllegalStateException:unexpected");
         assertThat(String.valueOf(result)).doesNotContain("PERGUNTA SIGILOSA");
@@ -256,7 +300,7 @@ class KbRetrievalServiceTest {
     void when_theBaseIsNotInTheTenant_then_theResultSaysSoInsteadOfLeavingItEmpty() {
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList())).thenReturn(List.of());
 
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.fromKbConvention());
         RagDiagnostic line = recorder.single();
 
         assertThat(result.foundKbs()).isZero().isEqualTo(line.foundKbs());
@@ -273,7 +317,7 @@ class KbRetrievalServiceTest {
         when(embeddingStore.search(eq(tenantId), anyList(), any(), anyInt(), anyInt(), anyDouble()))
                 .thenReturn(List.of());
 
-        service.retrieveWithOutcome(tenantId, List.of(kbId), "como reinicio a busca?", 5, 0.7);
+        service.retrieveWithOutcome(tenantId, List.of(kbId), "como reinicio a busca?", 5, RagQuerySettings.exact(0.7));
 
         assertThat(model.seenTexts())
                 .as("a search is one query, and it is a query")
@@ -289,7 +333,7 @@ class KbRetrievalServiceTest {
         when(embeddingStore.search(eq(tenantId), anyList(), any(), anyInt(), anyInt(), anyDouble()))
                 .thenReturn(List.of());
 
-        service.retrieveWithOutcome(tenantId, List.of(kbId), "como reinicio a busca?", 5, 0.7);
+        service.retrieveWithOutcome(tenantId, List.of(kbId), "como reinicio a busca?", 5, RagQuerySettings.exact(0.7));
 
         assertThat(model.seenTexts()).containsExactly("como reinicio a busca?");
     }
@@ -303,7 +347,7 @@ class KbRetrievalServiceTest {
         when(embeddingStore.search(eq(tenantId), anyList(), any(), anyInt(), anyInt(), anyDouble()))
                 .thenReturn(List.of());
 
-        service.retrieveWithOutcome(tenantId, List.of(kbId), "search_query: como reinicio a busca?", 5, 0.7);
+        service.retrieveWithOutcome(tenantId, List.of(kbId), "search_query: como reinicio a busca?", 5, RagQuerySettings.exact(0.7));
 
         assertThat(model.seenTexts()).containsExactly("search_query: como reinicio a busca?");
     }
@@ -320,16 +364,13 @@ class KbRetrievalServiceTest {
     void when_retrieveSucceeds_then_reportsChunkCountAndLatency() {
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList())).thenReturn(List.of(kb(768)));
         when(embeddingPort.embedQuery(eq(tenantId), any(), anyInt(), any())).thenReturn(new float[]{0.1f, 0.2f});
-        KbEmbeddingStore.ScoredRow row = new KbEmbeddingStore.ScoredRow();
-        row.docId = UUID.randomUUID();
-        row.chunkId = UUID.randomUUID();
-        row.text = "confidential body";
-        row.score = 0.93;
+        KbVectorStore.ScoredRow row = new KbVectorStore.ScoredRow(
+                UUID.randomUUID(), UUID.randomUUID(), 0, "confidential body", 0.93);
         when(embeddingStore.search(eq(tenantId), anyList(), any(), anyInt(), anyInt(), anyDouble()))
                 .thenReturn(List.of(row));
         when(documentRepository.findByTenantIdAndIdIn(eq(tenantId), org.mockito.ArgumentMatchers.<java.util.Collection<UUID>>any())).thenReturn(List.of());
 
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0.7);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.exact(0.7));
 
         assertThat(result.outcome()).isEqualTo(RagOutcome.OK);
         assertThat(result.chunkCount()).isEqualTo(1);
@@ -348,7 +389,7 @@ class KbRetrievalServiceTest {
                 });
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList())).thenReturn(List.of());
 
-        assertThat(service.retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0.7).outcome())
+        assertThat(service.retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.exact(0.7)).outcome())
                 .isEqualTo(RagOutcome.KB_NOT_FOUND_FOR_TENANT);
     }
 
@@ -359,7 +400,7 @@ class KbRetrievalServiceTest {
         Executor never = task -> { /* never runs the task: future.get hits the deadline */ };
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList())).thenReturn(List.of(kb(768)));
 
-        RagRetrievalResult result = service(never).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0.7);
+        RagRetrievalResult result = service(never).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.exact(0.7));
 
         assertThat(result.outcome()).isEqualTo(RagOutcome.TIMEOUT);
         RagDiagnostic diagnostic = recorder.single();
@@ -374,7 +415,7 @@ class KbRetrievalServiceTest {
         when(embeddingPort.embedQuery(eq(tenantId), any(), anyInt(), any()))
                 .thenThrow(new IllegalStateException("pgvector unavailable"));
 
-        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0.7);
+        RagRetrievalResult result = service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.exact(0.7));
 
         assertThat(result.outcome()).isEqualTo(RagOutcome.ERROR);
         assertThat(recorder.single().cause()).contains("IllegalStateException");
@@ -401,7 +442,7 @@ class KbRetrievalServiceTest {
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList()))
                 .thenReturn(List.of(kb(768), other));
 
-        assertThatThrownBy(() -> service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0.7))
+        assertThatThrownBy(() -> service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.exact(0.7)))
                 .isInstanceOf(KbDimensionMismatchException.class);
 
         assertThat(recorder.single().outcome()).isEqualTo(RagOutcome.DIMENSION_MISMATCH);
@@ -412,8 +453,10 @@ class KbRetrievalServiceTest {
     @Test
     void when_retrieve_then_returnsOnlyChunks() {
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList())).thenReturn(List.of());
-        assertThat(service(sameThread).retrieve(tenantId, List.of(kbId), "q", 5, 0.7)).isEmpty();
-        assertThat(service(sameThread).retrieve(tenantId, List.of(), "q", 5, 0.7)).isEmpty();
+        assertThat(service(sameThread).retrieve(tenantId, List.of(kbId), "q", 5,
+                RagQuerySettings.exact(0.7))).isEmpty();
+        assertThat(service(sameThread).retrieve(tenantId, List.of(), "q", 5,
+                RagQuerySettings.exact(0.7))).isEmpty();
     }
 
     @Test
@@ -422,23 +465,20 @@ class KbRetrievalServiceTest {
                 embeddingPort, sameThread, null);
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList())).thenReturn(List.of());
 
-        assertThat(service.retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0.7).chunks()).isEmpty();
+        assertThat(service.retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.exact(0.7)).chunks()).isEmpty();
     }
 
     @Test
     void when_diagnosticLogged_then_neverCarriesQueryTextOrChunkContent() {
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList())).thenReturn(List.of(kb(768)));
         when(embeddingPort.embedQuery(eq(tenantId), any(), anyInt(), any())).thenReturn(new float[]{0.1f});
-        KbEmbeddingStore.ScoredRow row = new KbEmbeddingStore.ScoredRow();
-        row.docId = UUID.randomUUID();
-        row.chunkId = UUID.randomUUID();
-        row.text = "salary of the CEO is 1M";
-        row.score = 0.99;
+        KbVectorStore.ScoredRow row = new KbVectorStore.ScoredRow(
+                UUID.randomUUID(), UUID.randomUUID(), 0, "salary of the CEO is 1M", 0.99);
         when(embeddingStore.search(eq(tenantId), anyList(), any(), anyInt(), anyInt(), anyDouble()))
                 .thenReturn(new ArrayList<>(List.of(row)));
         when(documentRepository.findByTenantIdAndIdIn(eq(tenantId), org.mockito.ArgumentMatchers.<java.util.Collection<UUID>>any())).thenReturn(List.of());
 
-        service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "PERGUNTA SIGILOSA", 5, 0.7);
+        service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "PERGUNTA SIGILOSA", 5, RagQuerySettings.exact(0.7));
 
         String line = LoggingRagDiagnosticRecorder.format(recorder.single());
         assertThat(line).doesNotContain("PERGUNTA SIGILOSA").doesNotContain("salary of the CEO");
@@ -457,7 +497,7 @@ class KbRetrievalServiceTest {
                 "embed failed for query=[PERGUNTA SIGILOSA] using chunk=[salary of the CEO is 1M]"));
 
         RagRetrievalResult result = service(sameThread)
-                .retrieveWithOutcome(tenantId, List.of(kbId), "PERGUNTA SIGILOSA", 5, 0.7);
+                .retrieveWithOutcome(tenantId, List.of(kbId), "PERGUNTA SIGILOSA", 5, RagQuerySettings.exact(0.7));
 
         assertThat(result.outcome()).isEqualTo(RagOutcome.ERROR);
         RagDiagnostic diagnostic = recorder.single();
@@ -542,7 +582,7 @@ class KbRetrievalServiceTest {
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList()))
                 .thenReturn(List.of(kb(768), other));
 
-        assertThatThrownBy(() -> service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, 0.7))
+        assertThatThrownBy(() -> service(sameThread).retrieveWithOutcome(tenantId, List.of(kbId), "q", 5, RagQuerySettings.exact(0.7)))
                 .isInstanceOf(KbDimensionMismatchException.class)
                 .as("the count the line reports must be readable off the exception too")
                 .extracting(e -> ((KbDimensionMismatchException) e).foundKbs())
@@ -583,8 +623,8 @@ class KbRetrievalServiceTest {
         when(knowledgeBaseRepository.findByTenantIdAndIdIn(eq(tenantId), anyList())).thenReturn(List.of());
         KbRetrievalService service = service(sameThread);
 
-        service.retrieveWithOutcome(tenantId, List.of(kbId), "a", 5, 0.7);
-        service.retrieveWithOutcome(tenantId, List.of(), "b", 5, 0.7);
+        service.retrieveWithOutcome(tenantId, List.of(kbId), "a", 5, RagQuerySettings.exact(0.7));
+        service.retrieveWithOutcome(tenantId, List.of(), "b", 5, RagQuerySettings.exact(0.7));
 
         assertThat(recorder.all).extracting(RagDiagnostic::outcome)
                 .containsExactly(RagOutcome.KB_NOT_FOUND_FOR_TENANT, RagOutcome.NO_LINK);

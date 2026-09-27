@@ -1,6 +1,6 @@
 package br.com.systec.hive.knowledge.impl.service;
 
-import br.com.systec.hive.knowledge.api.domain.KbChunk;
+import br.com.systec.hive.knowledge.api.port.KbVectorStore;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -12,8 +12,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+/**
+ * The only {@link KbVectorStore} there is: chunk embeddings in PostgreSQL, one table per dimension.
+ *
+ * <p>Every piece of vendor knowledge in the knowledge module is in this class — the {@code vector}
+ * cast, the {@code <=>} distance operator, the table named after the dimension, the {@code ANY(?)
+ * ::uuid[]} membership test. Nothing else in the codebase writes or reads a vector, and the port
+ * ({@code KbVectorStore}) is what lets that stay true while three services call it by operation
+ * instead of by class.
+ */
 @Repository
-public class KbEmbeddingStore {
+public class KbEmbeddingStore implements KbVectorStore {
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -42,6 +51,7 @@ public class KbEmbeddingStore {
         return sb.append(']').toString();
     }
 
+    @Override
     public void insert(UUID tenantId, UUID kbId, UUID docId, int chunkIndex, String text, float[] vector,
                        int dimension, String convention) {
         String table = tableFor(dimension);
@@ -79,18 +89,21 @@ public class KbEmbeddingStore {
                 + ",\"convention\":\"" + (convention == null ? "" : convention) + "\"}";
     }
 
+    @Override
     public void removeByKb(UUID tenantId, UUID kbId) {
         for (String table : List.of("kb_embeddings_1536", "kb_embeddings_768")) {
             jdbcTemplate.update("DELETE FROM " + table + " WHERE tenant_id = ? AND kb_id = ?", tenantId, kbId);
         }
     }
 
+    @Override
     public void removeByDoc(UUID tenantId, UUID docId) {
         for (String table : List.of("kb_embeddings_1536", "kb_embeddings_768")) {
             jdbcTemplate.update("DELETE FROM " + table + " WHERE tenant_id = ? AND doc_id = ?", tenantId, docId);
         }
     }
 
+    @Override
     public List<ScoredRow> search(UUID tenantId, List<UUID> kbIds, float[] query, int dimension, int maxResults, double minScore) {
         if (kbIds == null || kbIds.isEmpty()) {
             return List.of();
@@ -118,12 +131,12 @@ public class KbEmbeddingStore {
                         if (score < minScore) {
                             continue;
                         }
-                        ScoredRow row = new ScoredRow();
-                        row.chunkId = UUID.fromString(rs.getString("embedding_id"));
-                        row.docId = UUID.fromString(rs.getString("doc_id"));
-                        row.chunkIndex = rs.getInt("chunk_index");
-                        row.text = rs.getString("text");
-                        row.score = score;
+                        ScoredRow row = new ScoredRow(
+                                UUID.fromString(rs.getString("embedding_id")),
+                                UUID.fromString(rs.getString("doc_id")),
+                                rs.getInt("chunk_index"),
+                                rs.getString("text"),
+                                score);
                         rows.add(row);
                     }
                 }
@@ -135,24 +148,6 @@ public class KbEmbeddingStore {
                 }
             }
         });
-    }
-
-    public static class ScoredRow {
-        public UUID chunkId;
-        public UUID docId;
-        public int chunkIndex;
-        public String text;
-        public double score;
-
-        public KbChunk toChunk(String docName) {
-            KbChunk chunk = new KbChunk();
-            chunk.setChunkId(chunkId);
-            chunk.setDocId(docId);
-            chunk.setDocName(docName);
-            chunk.setText(text);
-            chunk.setScore(score);
-            return chunk;
-        }
     }
 
     public static String localeRoot() {

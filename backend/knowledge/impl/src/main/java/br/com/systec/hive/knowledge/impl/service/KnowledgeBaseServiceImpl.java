@@ -9,7 +9,9 @@ import br.com.systec.hive.knowledge.api.domain.KbStatus;
 import br.com.systec.hive.knowledge.api.domain.KnowledgeBase;
 import br.com.systec.hive.knowledge.api.exceptions.KbInUseException;
 import br.com.systec.hive.knowledge.api.exceptions.KnowledgeBaseNotFoundException;
+import br.com.systec.hive.knowledge.api.domain.RagQuerySettings;
 import br.com.systec.hive.knowledge.api.port.KbRetrievalPort;
+import br.com.systec.hive.knowledge.api.port.KbVectorStore;
 import br.com.systec.hive.knowledge.api.service.AgentKbLinkService;
 import br.com.systec.hive.knowledge.api.service.KnowledgeBaseService;
 import br.com.systec.hive.knowledge.impl.entity.KbDocumentEntity;
@@ -42,7 +44,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     private final KnowledgeBaseMapperDomain mapper;
     private final AgentKbLinkService linkService;
     private final KbIngestionService ingestionService;
-    private final KbEmbeddingStore embeddingStore;
+    private final KbVectorStore vectorStore;
     private final KbRetrievalPort retrievalPort;
     private final KbIngestRateLimiter rateLimiter;
 
@@ -51,7 +53,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                                     KnowledgeBaseMapperDomain mapper,
                                     AgentKbLinkService linkService,
                                     KbIngestionService ingestionService,
-                                    KbEmbeddingStore embeddingStore,
+                                    KbVectorStore vectorStore,
                                     KbRetrievalPort retrievalPort,
                                     KbIngestRateLimiter rateLimiter) {
         this.repository = repository;
@@ -59,7 +61,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         this.mapper = mapper;
         this.linkService = linkService;
         this.ingestionService = ingestionService;
-        this.embeddingStore = embeddingStore;
+        this.vectorStore = vectorStore;
         this.retrievalPort = retrievalPort;
         this.rateLimiter = rateLimiter;
     }
@@ -144,7 +146,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         if (!agents.isEmpty()) {
             linkService.unlinkAllFromKb(id, tenantId);
         }
-        embeddingStore.removeByKb(tenantId, id);
+        vectorStore.removeByKb(tenantId, id);
         documentRepository.deleteByKbIdAndTenantId(id, tenantId);
         repository.delete(entity);
         log.info("kb deleted tenantId={} kbId={} force={}", tenantId, id, force);
@@ -172,17 +174,18 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     /**
      * Playground search.
      *
-     * <p>Passes {@link KbRetrievalPort#MIN_SCORE_FROM_KB_CONVENTION} rather than a number: the
-     * cut-off belongs to the base's model, and this method no longer knows which model that is
-     * beyond the id it was given. Hardcoding it here is what made the on-screen search and the chat
-     * disagree about the same base.
+     * <p>States the cut-off as a policy ({@link RagQuerySettings#fromKbConvention()}) rather than as
+     * a number: the cut-off belongs to the base's model, and this method no longer knows which model
+     * that is beyond the id it was given. Hardcoding it here is what made the on-screen search and
+     * the chat disagree about the same base — and stating the policy is what makes the two call
+     * sites agree out loud instead of by both happening to pass the same literal.
      */
     @Override
     public List<KbChunk> search(UUID kbId, UUID tenantId, String query, int topK) {
         repository.findByIdAndTenantId(kbId, tenantId)
                 .orElseThrow(KnowledgeBaseNotFoundException::new);
         return retrievalPort.retrieve(tenantId, List.of(kbId), query, topK,
-                KbRetrievalPort.MIN_SCORE_FROM_KB_CONVENTION);
+                RagQuerySettings.fromKbConvention());
     }
 
     @Override
@@ -191,7 +194,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         rateLimiter.check(tenantId);
         repository.findByIdAndTenantId(kbId, tenantId)
                 .orElseThrow(KnowledgeBaseNotFoundException::new);
-        embeddingStore.removeByKb(tenantId, kbId);
+        vectorStore.removeByKb(tenantId, kbId);
         List<KbDocumentEntity> docs = documentRepository.findByKbIdAndTenantId(kbId, tenantId);
         for (KbDocumentEntity doc : docs) {
             doc.setStatus(KbDocumentStatus.PENDING.name());

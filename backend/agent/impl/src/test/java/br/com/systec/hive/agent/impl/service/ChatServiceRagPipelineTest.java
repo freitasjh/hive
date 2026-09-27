@@ -1,36 +1,35 @@
 package br.com.systec.hive.agent.impl.service;
 
+import br.com.systec.hive.agent.api.diagnostics.ChatTrace;
 import br.com.systec.hive.agent.api.diagnostics.ChatTraceRecorder;
 import br.com.systec.hive.agent.api.domain.Agent;
 import br.com.systec.hive.agent.api.domain.ChatMessage;
 import br.com.systec.hive.agent.api.domain.ChatRequest;
 import br.com.systec.hive.agent.api.domain.ChatResponse;
 import br.com.systec.hive.agent.api.domain.ChatSession;
+import br.com.systec.hive.agent.api.domain.TurnReply;
+import br.com.systec.hive.agent.api.domain.TurnRequest;
+import br.com.systec.hive.agent.api.port.ChatTurnGateway;
 import br.com.systec.hive.agent.api.service.AgentService;
 import br.com.systec.hive.agent.api.service.ChatMessageService;
 import br.com.systec.hive.agent.api.service.ChatSessionService;
 import br.com.systec.hive.agent.api.service.DefaultAgentService;
-import br.com.systec.hive.agent.impl.rag.FollowUpQueryHeuristic;
+import br.com.systec.hive.agent.impl.rag.RagTurnResolver;
 import br.com.systec.hive.commons.testsupport.HardcodedSimilarityCutOffGuard;
 import br.com.systec.hive.knowledge.api.domain.KbChunk;
-import br.com.systec.hive.knowledge.api.domain.RagDiagnostic;
 import br.com.systec.hive.knowledge.api.domain.RagOutcome;
 import br.com.systec.hive.knowledge.api.domain.RagRetrievalResult;
-import br.com.systec.hive.knowledge.api.port.KbAgentLinkPort;
-import br.com.systec.hive.knowledge.api.port.KbRetrievalPort;
-import br.com.systec.hive.knowledge.api.port.RagDiagnosticRecorder;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.ChatRole;
-import br.com.systec.hive.provider.api.LlmClientFactory;
 import br.com.systec.hive.provider.api.OpencodeDiscoveryService;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -42,30 +41,28 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyDouble;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * What the pipeline move changed in a turn, and what it must not have changed.
+ * What the turn hands to the two seams, and what it takes back.
  *
- * <p>The context is now assembled by the official {@code DefaultRetrievalAugmentor} instead of a
- * hand-built string. The tests here hold three lines: the retrieved text still reaches the model
- * inside a {@code SystemMessage}, the facts the client sees ({@code ragUsed}, {@code ragReason},
- * {@code citations}) are unchanged, and the one stage that can spend money — query compression — is
- * off unless an operator names a model for it.
+ * <p>The pipeline behaviour itself — what the retrieved text does to the prompt, which chunk gets
+ * cited, whether the question is duplicated — moved with the code that owns it. Retrieval and
+ * prompt assembly are now {@link RagTurnResolver}'s and {@link ChatTurnGateway}'s, and are tested
+ * there ({@code RagTurnResolverTest}) and in {@code LangChain4jTurnGatewayTest}. What is left to
+ * assert at this level is the wiring: the RAG context the resolver produced reaches the gateway,
+ * the gateway's answer reaches the client, and the trace is written exactly once per turn.
+ *
+ * <p>Both collaborators are real objects rather than mocks, so these tests exercise the actual
+ * hand-off instead of two mocks agreeing on a shape.
  */
 @ExtendWith(MockitoExtension.class)
 class ChatServiceRagPipelineTest {
 
-    @Mock
-    private LlmClientFactory<ChatModel> llmClientFactory;
     @Mock
     private CredentialResolver credentialResolver;
     @Mock
@@ -83,15 +80,14 @@ class ChatServiceRagPipelineTest {
     @Mock
     private OpencodeDiscoveryService discoveryService;
     @Mock
-    private KbRetrievalPort kbRetrieval;
+    private br.com.systec.hive.knowledge.api.port.KbRetrievalPort kbRetrieval;
     @Mock
-    private KbAgentLinkPort kbLinkPort;
+    private br.com.systec.hive.knowledge.api.port.KbAgentLinkPort kbLinkPort;
     @Mock
-    private ChatModel chatModel;
-    @Mock
-    private ChatModel compressionModel;
+    private dev.langchain4j.model.chat.ChatModel chatModel;
 
-    private final List<RagDiagnostic> diagnostics = new ArrayList<>();
+    private final List<ChatTrace> traces = new ArrayList<>();
+    private final List<br.com.systec.hive.knowledge.api.domain.RagDiagnostic> diagnostics = new ArrayList<>();
 
     private UUID tenantId;
     private UUID userId;
@@ -108,11 +104,40 @@ class ChatServiceRagPipelineTest {
         sessionId = UUID.randomUUID();
     }
 
+    /** The real resolver, so a retrieval outcome reaches the turn as an outcome and not as a stub. */
+    private RagTurnResolver resolver(String queryCompressionModel) {
+        return new RagTurnResolver(kbRetrieval, kbLinkPort, diagnostics::add,
+                stubLlmFactory(), queryCompressionModel, 40);
+    }
+
+    /** The real gateway, so prompt assembly and the empty-reply guard are the production ones. */
+    private ChatTurnGateway gateway() {
+        return new LangChain4jTurnGateway(stubLlmFactory());
+    }
+
+    private br.com.systec.hive.provider.api.LlmClientFactory<dev.langchain4j.model.chat.ChatModel>
+    stubLlmFactory() {
+        return new br.com.systec.hive.provider.api.LlmClientFactory<>() {
+            @Override
+            public dev.langchain4j.model.chat.ChatModel createClient(
+                    AiProvider provider, String model, Double temperature, Integer maxTokens,
+                    Double topP, String apiKey, String baseUrl) {
+                return chatModel;
+            }
+
+            @Override
+            public dev.langchain4j.model.chat.ChatModel createClientWithSession(
+                    AiProvider provider, String model, Double temperature, Integer maxTokens,
+                    Double topP, String apiKey, String baseUrl, UUID sessionId) {
+                return chatModel;
+            }
+        };
+    }
+
     private ChatServiceImpl service(String queryCompressionModel) {
-        return new ChatServiceImpl(llmClientFactory, credentialResolver, agentService, chatSessionService,
-                chatMessageService, chatAssistantTxService, defaultAgentService, kbRetrieval, kbLinkPort,
-                chatRateLimiter, discoveryService, ChatTraceRecorder.noop(), diagnostics::add,
-                queryCompressionModel, FollowUpQueryHeuristic.ELLIPTICAL_LIMIT);
+        return new ChatServiceImpl(credentialResolver, agentService, chatSessionService, chatMessageService,
+                chatAssistantTxService, defaultAgentService, chatRateLimiter, discoveryService,
+                trace -> traces.add(trace), resolver(queryCompressionModel), gateway());
     }
 
     private ChatServiceImpl service() {
@@ -132,9 +157,7 @@ class ChatServiceRagPipelineTest {
         when(agentService.findById(agentId)).thenReturn(agent);
         when(credentialResolver.resolve(tenantId, AiProvider.OPENAI))
                 .thenReturn(new CredentialResolver.ResolvedCredential("sk-test", null));
-        when(llmClientFactory.createClientWithSession(any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenReturn(chatModel);
-        when(chatModel.chat(anyList())).thenReturn(
+        when(chatModel.chat(ArgumentMatchers.<List<dev.langchain4j.data.message.ChatMessage>>any())).thenReturn(
                 dev.langchain4j.model.chat.response.ChatResponse.builder()
                         .aiMessage(AiMessage.from("resposta")).build());
         when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
@@ -157,7 +180,7 @@ class ChatServiceRagPipelineTest {
 
     private void stubRetrieval(RagRetrievalResult result) {
         when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of(kbId));
-        when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), anyDouble()))
+        when(kbRetrieval.retrieveWithOutcome(eq(tenantId), any(), any(), any(Integer.class), any()))
                 .thenReturn(result);
     }
 
@@ -209,7 +232,7 @@ class ChatServiceRagPipelineTest {
         return count;
     }
 
-    private RagDiagnostic lastDiagnostic() {
+    private br.com.systec.hive.knowledge.api.domain.RagDiagnostic lastDiagnostic() {
         assertThat(diagnostics).as("every turn emits exactly one RAG line").isNotEmpty();
         return diagnostics.get(diagnostics.size() - 1);
     }
@@ -274,7 +297,7 @@ class ChatServiceRagPipelineTest {
         assertThat(response.isRagUsed()).isFalse();
         assertThat(response.getRagReason()).isEqualTo("no_link");
         assertThat(response.getCitations()).isEmpty();
-        verify(kbRetrieval, never()).retrieveWithOutcome(any(), any(), any(), anyInt(), anyDouble());
+        verify(kbRetrieval, never()).retrieveWithOutcome(any(), any(), any(), any(Integer.class), any());
     }
 
     /**
@@ -298,10 +321,9 @@ class ChatServiceRagPipelineTest {
 
         assertThat(response.isRagUsed()).isFalse();
         assertThat(response.getCitations()).isEmpty();
-        RagDiagnostic diagnostic = lastDiagnostic();
-        assertThat(diagnostic.systemBlockChars())
+        assertThat(lastDiagnostic().systemBlockChars())
                 .as("no block was injected, so the size reported must be the absence of one")
-                .isEqualTo(RagDiagnostic.NO_SYSTEM_BLOCK);
+                .isEqualTo(br.com.systec.hive.knowledge.api.domain.RagDiagnostic.NO_SYSTEM_BLOCK);
         List<dev.langchain4j.data.message.ChatMessage> prompt = capturedPrompt();
         assertThat(systemTextOf(prompt))
                 .as("nothing was retrieved, so no system message may carry the question")
@@ -334,6 +356,47 @@ class ChatServiceRagPipelineTest {
                 .isEqualTo(2);
     }
 
+    // ------------------------------------------------------------------ the seams
+
+    /**
+     * The context the resolver produced has to reach the gateway <b>as the same object</b>. A turn
+     * that re-resolved, re-derived or copied it would be the second opinion this refactor exists to
+     * remove — and a copy is what a field-by-field rebuild looks like from inside the turn.
+     *
+     * <p>Asserted by identity, not equality: {@code RagContext} carries a {@code KbCitation}, which is
+     * a plain bean with identity equality, so two structurally identical contexts are not equal and
+     * only {@code isSameAs} says what this test is about.
+     */
+    @Test
+    void when_theResolverProducesAContext_then_theGatewayIsHandedThatSameObject() {
+        String question = "Qual o prazo do contrato de 2024?";
+        prepareTurn(question);
+        stubRetrieval(RagRetrievalResult.of(RagOutcome.OK, List.of(chunk("prazo de 30 dias")),
+                12L, 0.60, 1, null, null));
+        RagTurnResolver resolver = org.mockito.Mockito.spy(resolver(null));
+        ChatTurnGateway spyGateway = org.mockito.Mockito.spy(gateway());
+        ChatServiceImpl service = new ChatServiceImpl(credentialResolver, agentService, chatSessionService,
+                chatMessageService, chatAssistantTxService, defaultAgentService, chatRateLimiter,
+                discoveryService, trace -> traces.add(trace), resolver, spyGateway);
+
+        service.chat(request(question), tenantId, userId);
+
+        ArgumentCaptor<RagTurnResolver.RagRequest> resolved =
+                ArgumentCaptor.forClass(RagTurnResolver.RagRequest.class);
+        verify(resolver).resolve(resolved.capture());
+        ArgumentCaptor<TurnRequest> handed = ArgumentCaptor.forClass(TurnRequest.class);
+        verify(spyGateway).execute(handed.capture());
+
+        assertThat(handed.getValue().ragContext().used()).isTrue();
+        assertThat(handed.getValue().ragContext().citations()).hasSize(1);
+        assertThat(handed.getValue().ragContext().outcome()).isEqualTo(RagOutcome.OK);
+        assertThat(handed.getValue().ragContext().threshold()).isEqualTo(0.60);
+        assertThat(handed.getValue().ragContext().injectedChars()).isPositive();
+        assertThat(resolved.getValue().question()).isEqualTo(question);
+        assertThat(resolved.getValue().agentId()).isEqualTo(agentId);
+        assertThat(resolved.getValue().tenantId()).isEqualTo(tenantId);
+    }
+
     // ------------------------------------------------------------------ query compression
 
     /**
@@ -348,8 +411,8 @@ class ChatServiceRagPipelineTest {
 
         service().chat(request(question), tenantId, userId);
 
-        verify(llmClientFactory, never()).createClient(any(), any(), any(), any(), any(), any(), any());
-        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(kbId)), eq(question), anyInt(), anyDouble());
+        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(kbId)), eq(question),
+                any(Integer.class), any());
     }
 
     /**
@@ -361,16 +424,13 @@ class ChatServiceRagPipelineTest {
         String question = "E o prazo?";
         prepareTurn(question);
         stubRetrieval(RagRetrievalResult.empty(RagOutcome.OK, 5L, 0.60, 1, null, null));
-        when(compressionModel.chat(anyString())).thenReturn("Qual o prazo do contrato de 2024?");
-        when(llmClientFactory.createClient(eq(AiProvider.OPENAI), eq("gpt-4o"), eq(0.0),
-                eq(ChatServiceImpl.COMPRESSION_MAX_TOKENS), isNull(), eq("sk-test"), isNull()))
-                .thenReturn(compressionModel);
+        when(chatModel.chat(anyString())).thenReturn("Qual o prazo do contrato de 2024?");
 
         service("gpt-4o").chat(request(question), tenantId, userId);
 
-        verify(compressionModel).chat(anyString());
+        verify(chatModel).chat(anyString());
         verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(kbId)),
-                eq("Qual o prazo do contrato de 2024?"), anyInt(), anyDouble());
+                eq("Qual o prazo do contrato de 2024?"), any(Integer.class), any());
     }
 
     /**
@@ -383,14 +443,12 @@ class ChatServiceRagPipelineTest {
         String question = "E o prazo?";
         prepareTurn(question);
         stubRetrieval(RagRetrievalResult.empty(RagOutcome.OK, 5L, 0.60, 1, null, null));
-        when(compressionModel.chat(anyString())).thenReturn("prazo do contrato de 2024");
-        when(llmClientFactory.createClient(any(), any(), any(), any(), any(), any(), any()))
-                .thenReturn(compressionModel);
+        when(chatModel.chat(anyString())).thenReturn("prazo do contrato de 2024");
 
         service("gpt-4o").chat(request(question), tenantId, userId);
 
         ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
-        verify(compressionModel).chat(prompt.capture());
+        verify(chatModel).chat(prompt.capture());
         assertThat(prompt.getValue())
                 .contains("Fale sobre o contrato de 2024")
                 .contains("O contrato de 2024 tem prazo de 30 dias")
@@ -406,8 +464,8 @@ class ChatServiceRagPipelineTest {
 
         service("gpt-4o").chat(request(question), tenantId, userId);
 
-        verify(llmClientFactory, never()).createClient(any(), any(), any(), any(), any(), any(), any());
-        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(kbId)), eq(question), anyInt(), anyDouble());
+        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(kbId)), eq(question),
+                any(Integer.class), any());
     }
 
     /**
@@ -423,8 +481,8 @@ class ChatServiceRagPipelineTest {
 
         service("gpt-4o-mini").chat(request(question), tenantId, userId);
 
-        verify(llmClientFactory, never()).createClient(any(), any(), any(), any(), any(), any(), any());
-        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(kbId)), eq(question), anyInt(), anyDouble());
+        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(kbId)), eq(question),
+                any(Integer.class), any());
     }
 
     @Test
@@ -435,8 +493,8 @@ class ChatServiceRagPipelineTest {
 
         service("mimo-v2.5").chat(request(question), tenantId, userId);
 
-        verify(llmClientFactory, never()).createClient(any(), any(), any(), any(), any(), any(), any());
-        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(kbId)), eq(question), anyInt(), anyDouble());
+        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(kbId)), eq(question),
+                any(Integer.class), any());
     }
 
     /**
@@ -448,14 +506,53 @@ class ChatServiceRagPipelineTest {
         String question = "E o prazo?";
         prepareTurn(question);
         stubRetrieval(RagRetrievalResult.empty(RagOutcome.OK, 5L, 0.60, 1, null, null));
-        when(compressionModel.chat(anyString())).thenThrow(new IllegalStateException("provider down"));
-        when(llmClientFactory.createClient(any(), any(), any(), any(), any(), any(), any()))
-                .thenReturn(compressionModel);
+        when(chatModel.chat(anyString())).thenThrow(new IllegalStateException("provider down"));
 
         ChatResponse response = service("gpt-4o").chat(request(question), tenantId, userId);
 
         assertThat(response.getMessage()).isEqualTo("resposta");
-        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(kbId)), eq(question), anyInt(), anyDouble());
+        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(kbId)), eq(question),
+                any(Integer.class), any());
+    }
+
+    // ------------------------------------------------------------------ one trace per turn
+
+    /** The trace is the turn's own line, and the RAG line is the resolver's. One of each, never two. */
+    @Test
+    void when_aTurnSucceeds_then_exactlyOneTraceAndOneRagLineAreWritten() {
+        String question = "Qual o prazo do contrato de 2024?";
+        prepareTurn(question);
+        stubRetrieval(RagRetrievalResult.of(RagOutcome.OK, List.of(chunk("prazo de 30 dias")),
+                12L, 0.60, 1, null, null));
+
+        service().chat(request(question), tenantId, userId);
+
+        assertThat(traces).as("one telemetry line per turn").hasSize(1);
+        assertThat(diagnostics).as("one RAG line per turn").hasSize(1);
+        assertThat(traces.get(0).ragOutcome()).isEqualTo("ok");
+        assertThat(traces.get(0).ragThreshold()).isEqualTo(0.60);
+        assertThat(traces.get(0).ragUsed()).isTrue();
+        assertThat(traces.get(0).citationsCount()).isEqualTo(1);
+        assertThat(traces.get(0).promptMessages()).isPositive();
+        assertThat(traces.get(0).promptChars()).isPositive();
+        assertThat(traces.get(0).failure()).isNull();
+    }
+
+    /**
+     * The prompt metrics on the trace are the gateway's measurements, not a reconstruction by the
+     * turn. A prompt of N messages is reported as N messages.
+     */
+    @Test
+    void when_theTurnIsTraced_then_thePromptSizeIsTheOneThatWasSent() {
+        String question = "Qual o prazo do contrato de 2024?";
+        prepareTurn(question);
+        stubRetrieval(RagRetrievalResult.of(RagOutcome.OK, List.of(chunk("prazo de 30 dias")),
+                12L, 0.60, 1, null, null));
+
+        service().chat(request(question), tenantId, userId);
+
+        assertThat(traces.get(0).promptMessages()).isEqualTo(capturedPrompt().size());
+        assertThat(traces.get(0).historySize()).isEqualTo(3);
     }
 
     // ------------------------------------------------------------------ the cut-off is still not ours
@@ -463,10 +560,11 @@ class ChatServiceRagPipelineTest {
     @Test
     void when_theRagSourcesAreScanned_then_noSimilarityCutOffIsHardcodedInThem() throws IOException {
         for (String file : List.of(
-                "src/main/java/br/com/systec/hive/agent/impl/service/ChatServiceImpl.java",
+                "src/main/java/br/com/systec/hive/agent/impl/service/LangChain4jTurnGateway.java",
                 "src/main/java/br/com/systec/hive/agent/impl/rag/KnowledgeBaseContentRetriever.java",
                 "src/main/java/br/com/systec/hive/agent/impl/rag/RagAugmentorFactory.java",
-                "src/main/java/br/com/systec/hive/agent/impl/rag/ConditionalCompressingQueryTransformer.java")) {
+                "src/main/java/br/com/systec/hive/agent/impl/rag/ConditionalCompressingQueryTransformer.java",
+                "src/main/java/br/com/systec/hive/agent/impl/rag/RagTurnResolver.java")) {
             HardcodedSimilarityCutOffGuard.assertNoHardcodedCutOff(Path.of(file));
         }
     }

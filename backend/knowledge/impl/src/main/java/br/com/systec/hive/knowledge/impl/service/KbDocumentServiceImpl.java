@@ -6,6 +6,7 @@ import br.com.systec.hive.knowledge.api.domain.KbSourceType;
 import br.com.systec.hive.knowledge.api.exceptions.KbDocumentNotFoundException;
 import br.com.systec.hive.knowledge.api.exceptions.KbDuplicateDocumentException;
 import br.com.systec.hive.knowledge.api.exceptions.KnowledgeBaseNotFoundException;
+import br.com.systec.hive.knowledge.api.port.KbVectorStore;
 import br.com.systec.hive.knowledge.api.service.KbDocumentService;
 import br.com.systec.hive.knowledge.impl.entity.KbDocumentEntity;
 import br.com.systec.hive.knowledge.impl.mapper.KnowledgeBaseMapperDomain;
@@ -30,20 +31,20 @@ public class KbDocumentServiceImpl implements KbDocumentService {
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final KnowledgeBaseMapperDomain mapper;
     private final KbIngestionService ingestionService;
-    private final KbEmbeddingStore embeddingStore;
+    private final KbVectorStore vectorStore;
     private final KbIngestRateLimiter rateLimiter;
 
     public KbDocumentServiceImpl(KbDocumentRepository documentRepository,
                                  KnowledgeBaseRepository knowledgeBaseRepository,
                                  KnowledgeBaseMapperDomain mapper,
                                  KbIngestionService ingestionService,
-                                 KbEmbeddingStore embeddingStore,
+                                 KbVectorStore vectorStore,
                                  KbIngestRateLimiter rateLimiter) {
         this.documentRepository = documentRepository;
         this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.mapper = mapper;
         this.ingestionService = ingestionService;
-        this.embeddingStore = embeddingStore;
+        this.vectorStore = vectorStore;
         this.rateLimiter = rateLimiter;
     }
 
@@ -103,7 +104,7 @@ public class KbDocumentServiceImpl implements KbDocumentService {
     public void delete(UUID docId, UUID tenantId) {
         KbDocumentEntity entity = documentRepository.findByIdAndTenantId(docId, tenantId)
                 .orElseThrow(KbDocumentNotFoundException::new);
-        embeddingStore.removeByDoc(tenantId, docId);
+        vectorStore.removeByDoc(tenantId, docId);
         documentRepository.delete(entity);
         log.info("kb document deleted tenantId={} docId={}", tenantId, docId);
     }

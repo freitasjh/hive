@@ -5,6 +5,7 @@ import br.com.systec.hive.commons.impl.security.TenantContext;
 import br.com.systec.hive.knowledge.api.domain.KbDocumentStatus;
 import br.com.systec.hive.knowledge.api.domain.KbSourceType;
 import br.com.systec.hive.knowledge.api.port.KbEmbeddingPort;
+import br.com.systec.hive.knowledge.api.port.KbVectorStore;
 import br.com.systec.hive.knowledge.impl.entity.KbDocumentEntity;
 import br.com.systec.hive.knowledge.impl.entity.KnowledgeBaseEntity;
 import br.com.systec.hive.knowledge.impl.repository.KbDocumentRepository;
@@ -43,7 +44,7 @@ public class KbIngestionService {
 
     private final KbDocumentRepository documentRepository;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
-    private final KbEmbeddingStore embeddingStore;
+    private final KbVectorStore vectorStore;
     private final KbEmbeddingPort embeddingPort;
     private final Executor parseExecutor;
     private final String storageDir;
@@ -67,13 +68,13 @@ public class KbIngestionService {
 
     public KbIngestionService(KbDocumentRepository documentRepository,
                               KnowledgeBaseRepository knowledgeBaseRepository,
-                              KbEmbeddingStore embeddingStore,
+                              KbVectorStore vectorStore,
                               KbEmbeddingPort embeddingPort,
                               @Qualifier("kbParseExecutor") Executor parseExecutor,
                               @Value("${hive.kb.storage-dir:${java.io.tmpdir}/hive-kb}") String storageDir) {
         this.documentRepository = documentRepository;
         this.knowledgeBaseRepository = knowledgeBaseRepository;
-        this.embeddingStore = embeddingStore;
+        this.vectorStore = vectorStore;
         this.embeddingPort = embeddingPort;
         this.parseExecutor = parseExecutor;
         this.storageDir = storageDir;
@@ -108,7 +109,7 @@ public class KbIngestionService {
             if (text == null || text.isBlank()) {
                 throw new IllegalStateException("no extractable text (scanned-image PDFs unsupported)");
             }
-            embeddingStore.removeByDoc(tenantId, docId);
+            vectorStore.removeByDoc(tenantId, docId);
             // The title is resolved against the truncated text: a cut in the middle of the cover
             // page must not turn into a chunk header that ends mid-word.
             List<String> chunks = chunker.chunk(
@@ -116,11 +117,11 @@ public class KbIngestionService {
             int index = 0;
             int totalTokens = 0;
             // Written on every row: ingestion is async, so a reindex that fails on some documents
-            // leaves a base mixing two conventions with no other trace. See KbEmbeddingStore.
+            // leaves a base mixing two conventions with no other trace. See KbVectorStore.
             String convention = EmbeddingTaskConvention.conventionId(kb.getEmbeddingModel());
             for (String chunk : chunks) {
                 float[] vector = embeddingPort.embedDocument(tenantId, kb.getEmbeddingModel(), kb.getDimension(), chunk);
-                embeddingStore.insert(tenantId, kb.getId(), docId, index, chunk, vector, kb.getDimension(), convention);
+                vectorStore.insert(tenantId, kb.getId(), docId, index, chunk, vector, kb.getDimension(), convention);
                 totalTokens += chunker.estimateTokens(chunk);
                 index++;
             }

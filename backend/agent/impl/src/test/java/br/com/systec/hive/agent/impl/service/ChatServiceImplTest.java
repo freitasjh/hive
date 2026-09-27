@@ -1,13 +1,16 @@
 package br.com.systec.hive.agent.impl.service;
 
 import br.com.systec.hive.agent.api.diagnostics.ChatTrace;
-import br.com.systec.hive.agent.impl.rag.FollowUpQueryHeuristic;
 import br.com.systec.hive.agent.api.diagnostics.ChatTraceRecorder;
+import br.com.systec.hive.agent.api.port.ChatTurnGateway;
+import br.com.systec.hive.agent.impl.rag.FollowUpQueryHeuristic;
+import br.com.systec.hive.agent.impl.rag.RagTurnResolver;
 import br.com.systec.hive.agent.api.domain.Agent;
 import br.com.systec.hive.agent.api.domain.ChatMessage;
 import br.com.systec.hive.agent.api.domain.ChatRequest;
 import br.com.systec.hive.agent.api.domain.ChatResponse;
 import br.com.systec.hive.agent.api.domain.ChatSession;
+import br.com.systec.hive.agent.api.domain.RagContext;
 import br.com.systec.hive.agent.api.exceptions.ChatSessionNotFoundException;
 import br.com.systec.hive.agent.api.exceptions.ConfigMissingException;
 import br.com.systec.hive.agent.api.exceptions.ModelReturnedEmptyException;
@@ -19,6 +22,7 @@ import br.com.systec.hive.commons.testsupport.HardcodedSimilarityCutOffGuard;
 import br.com.systec.hive.knowledge.api.domain.KbChunk;
 import br.com.systec.hive.knowledge.api.domain.RagDiagnostic;
 import br.com.systec.hive.knowledge.api.domain.RagOutcome;
+import br.com.systec.hive.knowledge.api.domain.RagQuerySettings;
 import br.com.systec.hive.knowledge.api.domain.RagRetrievalResult;
 import br.com.systec.hive.knowledge.api.exceptions.KbDimensionMismatchException;
 import br.com.systec.hive.knowledge.api.port.KbRetrievalPort;
@@ -108,6 +112,12 @@ class ChatServiceImplTest {
     @Mock
     private ChatModel chatModel;
 
+    /** The real gateway: prompt assembly, the empty-reply guard and the retry policy are production. */
+    private ChatTurnGateway turnGateway;
+
+    /** The real resolver, so a retrieval outcome reaches the turn as an outcome. */
+    private RagTurnResolver ragTurnResolver;
+
     /**
      * Built by hand rather than by {@code @InjectMocks}: the class takes a primitive configuration
      * value in its constructor and Mockito cannot supply one, so it silently gives up and reports "no
@@ -125,10 +135,19 @@ class ChatServiceImplTest {
         tenantId = UUID.randomUUID();
         userId = UUID.randomUUID();
         agentId = UUID.randomUUID();
-        service = new ChatServiceImpl(llmClientFactory, credentialResolver, agentService, chatSessionService,
-                chatMessageService, chatAssistantTxService, defaultAgentService, kbRetrieval, kbLinkPort,
-                chatRateLimiter, discoveryService, traceRecorder, ragRecorder, null,
-                FollowUpQueryHeuristic.ELLIPTICAL_LIMIT);
+        // The two seams are the production ones. Only the factory they share stays a mock, so every
+        // assertion about which model was asked, with which limits, still reads as a claim about the
+        // real call rather than about a stand-in for the whole gateway.
+        turnGateway = new LangChain4jTurnGateway(llmClientFactory);
+        ragTurnResolver = new RagTurnResolver(kbRetrieval, kbLinkPort, ragRecorder, llmClientFactory,
+                null, FollowUpQueryHeuristic.ELLIPTICAL_LIMIT);
+        service = newService(traceRecorder);
+    }
+
+    private ChatServiceImpl newService(ChatTraceRecorder traces) {
+        return new ChatServiceImpl(credentialResolver, agentService, chatSessionService, chatMessageService,
+                chatAssistantTxService, defaultAgentService, chatRateLimiter, discoveryService,
+                traces, ragTurnResolver, turnGateway);
     }
 
     private Agent openAiAgent() {
@@ -473,39 +492,12 @@ class ChatServiceImplTest {
         verify(chatAssistantTxService, never()).saveAssistantAndTouch(any(), any(), any());
     }
 
-    @Test
-    void when_isModelNotFound_with_providerJson404_then_returnsTrue() {
-        String providerJson = "{\"error\":{\"message\":\"The model `mimo-v2.5` does not exist or you do not have access to it.\","
-                + "\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}";
-
-        assertThat(ChatServiceImpl.isModelNotFound(new dev.langchain4j.exception.HttpException(404, providerJson))).isTrue();
-        assertThat(ChatServiceImpl.isModelNotFound(new dev.langchain4j.exception.ModelNotFoundException("model_not_found: mimo-v2.5"))).isTrue();
-        assertThat(ChatServiceImpl.isModelNotFound(new RuntimeException("model_not_found"))).isTrue();
-    }
-
-    @Test
-    void when_isModelNotFound_with_html404_then_returnsFalse() {
-        // baseUrl sem /v1 -> rota inexistente -> 404 com landing page HTML do opencode.ai.
-        // Isso e erro de configuracao (ProviderException/500), nao "modelo removido" (422).
-        String landingPage = "<!DOCTYPE html><html><head><title>opencode.ai</title></head><body>not found</body></html>";
-
-        assertThat(ChatServiceImpl.isModelNotFound(new dev.langchain4j.exception.HttpException(404, landingPage))).isFalse();
-    }
-
-    @Test
-    void when_isModelNotFound_with_json404WithoutModelMention_then_returnsFalse() {
-        String routeNotFound = "{\"error\":{\"message\":\"Not Found\",\"type\":\"invalid_request_error\"}}";
-
-        assertThat(ChatServiceImpl.isModelNotFound(new dev.langchain4j.exception.HttpException(404, routeNotFound))).isFalse();
-    }
-
-    @Test
-    void when_isModelNotFound_with_non404Http_then_returnsFalse() {
-        assertThat(ChatServiceImpl.isModelNotFound(new dev.langchain4j.exception.HttpException(500, "internal error"))).isFalse();
-        assertThat(ChatServiceImpl.isModelNotFound(new dev.langchain4j.exception.HttpException(401, "invalid api key"))).isFalse();
-        assertThat(ChatServiceImpl.isModelNotFound(new dev.langchain4j.exception.HttpException(403, "forbidden"))).isFalse();
-        assertThat(ChatServiceImpl.isModelNotFound(new RuntimeException("LLM down"))).isFalse();
-    }
+    // `isModelNotFound` used to have four tests here, when the rule was a static method on this class.
+    // It belongs to the generation seam now, and `LangChain4jTurnGatewayTest` covers it more fully —
+    // the same four cases plus a null, a JSON 404 that does not mention the model, and a chain that
+    // wraps the model error twice. What this class has to prove about that rule is not the rule itself
+    // but what the turn does with the verdict, and that is the two tests above and below: a stale
+    // model evicts the vendor list and becomes a 422, and an HTML 404 does not.
 
     @Test
     void when_chat_with_html404Route_then_throwsProviderExceptionAndKeepsCache() {
@@ -608,7 +600,7 @@ class ChatServiceImplTest {
     void when_chatRetrieves_then_itDelegatesTheCutOffToTheBaseModel() {
         prepareChat();
         when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of(linkedKbId));
-        when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), anyDouble()))
+        when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), any()))
                 .thenReturn(RagRetrievalResult.empty(RagOutcome.NO_CHUNK_ABOVE_THRESHOLD, 1L, 0.60, 1, NOTHING_ABOVE_THRESHOLD, null));
         stubClient("reply");
         when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
@@ -616,8 +608,8 @@ class ChatServiceImplTest {
 
         service.chat(newRequest(), tenantId, userId);
 
-        verify(kbRetrieval).retrieveWithOutcome(tenantId, List.of(linkedKbId), "Hello world",
-                ChatServiceImpl.RAG_MAX_RESULTS, KbRetrievalPort.MIN_SCORE_FROM_KB_CONVENTION);
+        verify(kbRetrieval).retrieveWithOutcome(eq(tenantId), eq(List.of(linkedKbId)), eq("Hello world"),
+                eq(RagTurnResolver.RAG_MAX_RESULTS), eq(RagQuerySettings.fromKbConvention()));
     }
 
     private static <T> T last(List<T> values) {
@@ -636,7 +628,7 @@ class ChatServiceImplTest {
     void when_chat_withRetrievalException_then_recordsErrorWithCause() {
         prepareChat();
         when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of(linkedKbId));
-        when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), anyDouble()))
+        when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), any()))
                 .thenThrow(new IllegalStateException("retrieval failed for query=[PERGUNTA SIGILOSA]"));
         stubClient("reply");
         when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
@@ -680,7 +672,7 @@ class ChatServiceImplTest {
     void when_chat_withDimensionMismatchThrown_then_theTurnLineCarriesTheCountFromTheException() {
         prepareChat();
         when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of(linkedKbId));
-        when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), anyDouble()))
+        when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), any()))
                 .thenThrow(new KbDimensionMismatchException(3));
 
         assertThatThrownBy(() -> service.chat(newRequest(), tenantId, userId))
@@ -871,10 +863,11 @@ class ChatServiceImplTest {
         ChatTraceRecorder failingTraces = trace -> {
             throw new IllegalStateException("trace down");
         };
-        ChatServiceImpl service = new ChatServiceImpl(llmClientFactory, credentialResolver, agentService,
-                chatSessionService, chatMessageService, chatAssistantTxService, defaultAgentService,
-                kbRetrieval, kbLinkPort, chatRateLimiter, discoveryService, failingTraces, failingRagRecorder(),
-                null, FollowUpQueryHeuristic.ELLIPTICAL_LIMIT);
+        RagTurnResolver failingResolver = new RagTurnResolver(kbRetrieval, kbLinkPort,
+                failingRagRecorder(), llmClientFactory, null, FollowUpQueryHeuristic.ELLIPTICAL_LIMIT);
+        ChatServiceImpl service = new ChatServiceImpl(credentialResolver, agentService, chatSessionService,
+                chatMessageService, chatAssistantTxService, defaultAgentService, chatRateLimiter,
+                discoveryService, failingTraces, failingResolver, turnGateway);
         when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of());
         stubClient("reply");
         when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
@@ -1167,7 +1160,7 @@ class ChatServiceImplTest {
         prepareChat();
         if (linkOutcome == RagOutcome.OK) {
             when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of(linkedKbId));
-            when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), anyDouble()))
+            when(kbRetrieval.retrieveWithOutcome(eq(tenantId), anyList(), any(), anyInt(), any()))
                     .thenReturn(result);
         } else {
             when(kbLinkPort.linkedKbIds(agentId, tenantId)).thenReturn(List.of());
@@ -1215,5 +1208,7 @@ class ChatServiceImplTest {
     void when_thisClassIsScanned_then_noSimilarityCutOffIsHardcodedInIt() throws IOException {
         HardcodedSimilarityCutOffGuard.assertNoHardcodedCutOff(
                 Path.of("src/main/java/br/com/systec/hive/agent/impl/service/ChatServiceImpl.java"));
+        HardcodedSimilarityCutOffGuard.assertNoHardcodedCutOff(
+                Path.of("src/main/java/br/com/systec/hive/agent/impl/rag/RagTurnResolver.java"));
     }
 }
