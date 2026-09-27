@@ -1,13 +1,13 @@
 {
   "current_feature": "assistant-mvp",
-  "current_phase": "Execution",
+  "current_phase": "Validation",
   "previous_phase": "Execution",
-  "next_phase": "Batch 3 - limpeza de telas/rotas, IA e finish do frontend (aguardando aprovacao)",
+  "next_phase": "Batch 3 - limpeza de telas/rotas/IA (aguardando)",
   "type": "feature",
   "artifacts": {
     "tasks": ".spec/backend/rag-advanced/TASKS.md"
   },
-  "last_update": "2026-09-27T12:10:00-03:00",
+  "last_update": "2026-09-27T13:00:00-03:00",
   "code_review": {
     "last_invoked_at": "2026-09-26T21:30:00-03:00",
     "last_status": "passed",
@@ -367,7 +367,8 @@
     "P1 RBAC registrado em .spec/tech-debts/security-rbac/TASKS.md e NAO corrigido: a concessao de permissao e lista hardcoded em SecurityTokenServiceImpl:175, entao todo usuario autenticado e superusuario e o RBAC e decorativo. DEFAULT_PERMISSIONS e so dado de exibicao. Pre-existente. AGENT_MANAGE derivou para 4 controllers/9 endpoints e o nome mente - renomear e breaking change de dado, nao de codigo, porque a string vive dentro dos tokens ja emitidos. Consequencia pratica: nao existe token real sem as 8 permissoes, entao a negacao nao e demonstravel em browser.",
     "Modulo 'agent' mantem o nome Though nao tenha mais agente. Renomear toca ~11 diretorios Maven, ~60 arquivos e exigiria decidir sobre flyway_schema_history_agent. Zero valor de produto - divida nomeada.",
     "Migrations agent V15/V16 vao dropar a coluna agent_id_legacy e a tabela agent. A execucao e segura e reversivel AGORA; a remocao fisica do dado e batch proprio, nao decidida.",
-    "Banco de dev perdido (container recriado com volume novo, database 'hive' inexistente). Schema recriado por Flyway no proximo boot, mas a credencial cifrada foi com ele - E2E com provider real exige recadastrar."
+    "Banco de dev perdido (container recriado com volume novo, database 'hive' inexistente). Schema recriado por Flyway no proximo boot, mas a credencial cifrada foi com ele - E2E com provider real exige recadastrar.",
+    "E2E com provider real PASSOU (2026-09-27, navegador real). Pendencia: confirmar que a chave OPENCODE_GO antiga foi REVOGADA no provider, e nao apenas contornada pelo cadastro de uma nova."
   ],
   "h6_status": {
     "suite": "341 unit + 63 IT + 177 FE, 0 falhas",
@@ -499,5 +500,15 @@
       "contas": "AgentDeleteCascadeIT(9) e ProviderMigrationIT(4) morreram com a tabela que testavam; entraram ChatSessionPromptTemplateMigrationIT(5) e ChatSessionIT(+1)"
     },
     "limite": "sem E2E com provider real - o banco de dev foi perdido antes deste batch. Geracao coberta por IT com Testcontainers; 502 verificado ao vivo com chave falsa."
+  },
+  "e2e_real_provider": {
+    "status": "PASSED",
+    "data": "2026-09-27",
+    "validado_por": "usuario (navegador real, credencial real)",
+    "fluxo": "credencial -> /settings/llm (default do tenant) -> prompt template -> chat com PromptSelector -> mensagem -> resposta do modelo real",
+    "importancia": "Fecha a divida que a remocao do RAG comprou. Ate aqui a geracao so era coberta por IT com Testcontainers e um 502 com chave falsa.",
+    "regra": "Antes de construir a segunda capacidade, exercite a primeira em ambiente real, por um humano, no browser. O PromptSelector com size=100 contra servidor que corta em 50 era 400 em TODA montagem e invisivel a 145 testes mockados.",
+    "pendente": "confirmar que a chave OPENCODE_GO antiga foi REVOGADA, e nao so contornada por cadastrar uma nova",
+    "nota_brain": "PENDING em .spec/brain/PENDING-brain-store-2026-09-27.md (Brain HTTP 410, 5a vez)"
   }
 }
