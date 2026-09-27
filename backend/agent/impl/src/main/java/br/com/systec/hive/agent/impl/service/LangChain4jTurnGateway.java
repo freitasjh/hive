@@ -68,12 +68,12 @@ public class LangChain4jTurnGateway implements ChatTurnGateway {
         List<dev.langchain4j.data.message.ChatMessage> prompt = buildMessages(request);
         int promptChars = ProviderMessages.totalChars(prompt);
 
-        dev.langchain4j.model.chat.response.ChatResponse full;
+        dev.langchain4j.model.chat.response.ChatResponse chatResponse;
         try {
             ChatModel client = llmClientFactory.createClientWithSession(request.provider(), request.model(),
                     request.agent().getTemperature(), request.agent().getMaxTokens(),
                     request.agent().getTopP(), request.apiKey(), request.baseUrl(), request.sessionId());
-            full = retryPolicy.call(() -> client.chat(prompt));
+            chatResponse = retryPolicy.call(() -> client.chat(prompt));
         } catch (Exception e) {
             // Returned with the prompt measurements intact, and carrying the provider's exception
             // as-is. A wrapper would change the root class name and the status code the caller's
@@ -82,9 +82,9 @@ public class LangChain4jTurnGateway implements ChatTurnGateway {
             return TurnReply.failed(prompt.size(), promptChars, e);
         }
 
-        String reply = ProviderMessages.textOf(full);
-        TokenUsage usage = full == null ? null : full.tokenUsage();
-        String finishReason = full == null || full.finishReason() == null ? null : full.finishReason().name();
+        String reply = ProviderMessages.textOf(chatResponse);
+        TokenUsage usage = chatResponse == null ? null : chatResponse.tokenUsage();
+        String finishReason = chatResponse == null || chatResponse.finishReason() == null ? null : chatResponse.finishReason().name();
         Integer promptTokens = usage == null ? null : usage.inputTokenCount();
         Integer completionTokens = usage == null ? null : usage.outputTokenCount();
         Integer totalTokens = usage == null ? null : usage.totalTokenCount();
@@ -112,6 +112,7 @@ public class LangChain4jTurnGateway implements ChatTurnGateway {
         List<dev.langchain4j.data.message.ChatMessage> messages = new ArrayList<>();
         String systemPrompt = "";
         var agent = request.agent();
+
         if (agent.getSystemPrompt() != null && !agent.getSystemPrompt().isBlank()) {
             systemPrompt = agent.getSystemPrompt();
         } else if (agent.getPromptTemplate() != null && agent.getPromptTemplate().getTemplate() != null) {
@@ -119,9 +120,11 @@ public class LangChain4jTurnGateway implements ChatTurnGateway {
         } else if (agent.getPrompt() != null) {
             systemPrompt = agent.getPrompt();
         }
+
         if (!systemPrompt.isBlank()) {
             messages.add(new SystemMessage(systemPrompt));
         }
+
         RagContext ragContext = request.ragContext();
         if (ragContext.used()) {
             messages.add(ragContext.injected());
