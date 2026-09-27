@@ -1,13 +1,13 @@
 {
   "current_feature": "assistant-mvp",
   "current_phase": "Execution",
-  "previous_phase": "Planning",
-  "next_phase": "Batch 2 - prompt por conversa, morte do conceito Agent (aguardando aprovacao)",
+  "previous_phase": "Execution",
+  "next_phase": "Batch 3 - limpeza de telas/rotas, IA e finish do frontend (aguardando aprovacao)",
   "type": "feature",
   "artifacts": {
     "tasks": ".spec/backend/rag-advanced/TASKS.md"
   },
-  "last_update": "2026-09-27T10:20:00-03:00",
+  "last_update": "2026-09-27T12:10:00-03:00",
   "code_review": {
     "last_invoked_at": "2026-09-26T21:30:00-03:00",
     "last_status": "passed",
@@ -363,7 +363,11 @@
     "Banco de dev PERDIDO: o container de postgres do compose (container_name atlas-ecm-postgres) foi recriado com volume novo e o database 'hive' nao existe mais. Agentes, sessoes, mensagens e a credencial OPENCODE_GO cifrada foram com ele. Codigo intacto. Consequencia: o E2E do Batch 2 vai exigir credencial nova - o que resolve de quebra a rotacao da chave exposta, que era pendencia de seguranca.",
     "ChatTrace.java:27-37 documenta ragUsed/citationsCount/ragOutcome/ragThreshold nunca populados; elapsedMs justifica exclusao do RAG por um bound de 2s que nao existe mais. Batch 2 - remover os campos do record e quebra de contrato de agent/api, nao limpeza.",
     "Provider/modelo do Assistant ainda indefinido: (a) default do tenant (b) escolhido junto com o prompt na criacao da conversa (c) escolhido pelo usuario. Nao bloqueia o Batch 2 mas define o contrato da API de criacao de sessao e o modelo de cota do ChatRateLimiter (hoje 10 msg/min por tenant).",
-    "APIs publicas: modelo de autenticacao e cota ainda nao definido. Nao bloqueia a remocao."
+    "APIs publicas: modelo de autenticacao e cota ainda nao definido. Nao bloqueia a remocao.",
+    "P1 RBAC registrado em .spec/tech-debts/security-rbac/TASKS.md e NAO corrigido: a concessao de permissao e lista hardcoded em SecurityTokenServiceImpl:175, entao todo usuario autenticado e superusuario e o RBAC e decorativo. DEFAULT_PERMISSIONS e so dado de exibicao. Pre-existente. AGENT_MANAGE derivou para 4 controllers/9 endpoints e o nome mente - renomear e breaking change de dado, nao de codigo, porque a string vive dentro dos tokens ja emitidos. Consequencia pratica: nao existe token real sem as 8 permissoes, entao a negacao nao e demonstravel em browser.",
+    "Modulo 'agent' mantem o nome Though nao tenha mais agente. Renomear toca ~11 diretorios Maven, ~60 arquivos e exigiria decidir sobre flyway_schema_history_agent. Zero valor de produto - divida nomeada.",
+    "Migrations agent V15/V16 vao dropar a coluna agent_id_legacy e a tabela agent. A execucao e segura e reversivel AGORA; a remocao fisica do dado e batch proprio, nao decidida.",
+    "Banco de dev perdido (container recriado com volume novo, database 'hive' inexistente). Schema recriado por Flyway no proximo boot, mas a credencial cifrada foi com ele - E2E com provider real exige recadastrar."
   ],
   "h6_status": {
     "suite": "341 unit + 63 IT + 177 FE, 0 falhas",
@@ -472,5 +476,28 @@
       "AgentMapperDomain:34 (toEntity) ainda mapeia knowledgeBases - inofensivo mas le como se fluisse",
       "Comentarios apontando pra codigo apagado: LangChain4jTurnGatewayTest:357, frontend/src/utils/embeddingConvention.ts:8, types/agent-admin.ts:289"
     ]
+  },
+  "batch2_assistant": {
+    "status": "completed",
+    "commit": "6599a0b",
+    "decisao": "prompt escolhido POR CONVERSA na criacao da sessao; provider/modelo = default do tenant em tenant_llm_config (tabela dedicada, option a, com FK NO ACTION para tenant)",
+    "diff": "151 arquivos, +4527/-6673",
+    "modelo_final": "Nao existe entidade Assistant. O aggregate root e a sessao de chat. Nao ha 'assistentes' - ha conversas.",
+    "morreu": "AgentEntity, AgentService(Impl), AgentControllerV1, AgentMapperDomain, DTOs, DefaultAgentService, tabela agent (20 colunas), AgentSelector, AgentsView, AgentEditorView, KnowledgeBaseList/Detail, KbPicker, knowledge.service.ts. POST /v1/agents/validate promovido a /v1/providers/validate.",
+    "nasceu": "tenant_llm_config (1:1, provider por allowlist, NO ACTION na FK) | chat_session.prompt_template_id NOT NULL + FK RESTRICT (409 PROMPT_IN_USE preventivo e reativo) | tela de config do LLM do tenant | PromptSelector | guarda de to.meta.permission no router (fail closed, UX gate nao fronteira)",
+    "agent_id_estrategia": "REVERSIVEL. ADD COLUMN nullable -> backfill idempotente (IS DISTINCT FROM, Flyway do agent roda outOfOrder) -> guard RAISE EXCEPTION (rollback desfaz o passo 1 tambem) -> RENAME para agent_id_legacy (nao apagada) -> NOT NULL + FK. agent.prompt_template_id e NULLABLE desde a V4, entao agente sem template e estado de producao real.",
+    "code_review": "2 rounds. Round 1 CHANGES_REQUIRED 1 critico + 2 amarelos. O critico foi reproduzido pelo reviewer em PG16: o SQL de remediacao rodava sobre coluna que o proprio rollback removeu. Corrigido -> a mensagem virou runbook de 4 passos, com ChatSessionPromptTemplateMigrationIT que RECORTA os comandos da mensagem e os executa. Round 2 APPROVED 0/0, verificado por execucao e mutacao.",
+    "achados_durante_execucao": [
+      "3 erros de PL/pgSQL que so aparecem rodando: RAISE EXCEPTION nao aceita concatenacao no literal; format() espera virgula e nao ||; $$ em comentario quebra o parser do Flyway",
+      "E2E achou o que 145 testes mockados nao viam: PromptSelector pedia size=100, controller 400 para size>50 -> 400 em TODA montagem. Teto do servidor agora preso por IT (50->200, 51->400), nao so por copia no teste do componente",
+      "ChatTrace: agentId era a UNICA identidade de prompt na linha e contradizia os log.* de ChatServiceImpl. Os 4 campos rag* imprimiam ragThreshold=not_resolved em toda linha, afirmando um retrieval inexistente. Ambos corrigidos, com teste de AUSENCIA das 4 chaves."
+    ],
+    "testes": {
+      "unit": "376 -> 376",
+      "it": "66 -> 76",
+      "frontend": "191 -> 145 -> 158",
+      "contas": "AgentDeleteCascadeIT(9) e ProviderMigrationIT(4) morreram com a tabela que testavam; entraram ChatSessionPromptTemplateMigrationIT(5) e ChatSessionIT(+1)"
+    },
+    "limite": "sem E2E com provider real - o banco de dev foi perdido antes deste batch. Geracao coberta por IT com Testcontainers; 502 verificado ao vivo com chave falsa."
   }
 }
