@@ -6,8 +6,9 @@ Accepted — 2026-08-26 (mvp-chat Fase 0)
 > ### ⚠️ Supersedido em 2026-09-27 — decisão `scope-assistant-sem-rag`
 >
 > Este ADR **não foi reescrito**: ele é registro do raciocínio da época, e reescrever seria apagar a
-> lição. O que aconteceu depois está em
-> `arquitetura/projetos/hive/decisoes/scope-assistant-sem-rag` (Brain).
+> lição. A decisão está em **[ADR-013 — Assistant, sem base de conhecimento e sem agente](ADR-013-Assistant-Sem-Rag-Sem-Agente.md)**.
+> O Brain (`arquitetura/projetos/hive/decisoes/scope-assistant-sem-rag`) é registro secundário e
+> complementar, não fonte primária.
 >
 > O produto virou um **Assistant**: chat simples, sem agente, sem tools, sem base de conhecimento.
 > A RN2 "agentId imutável por sessão" foi substituída pela RN-PT2: a sessão guarda

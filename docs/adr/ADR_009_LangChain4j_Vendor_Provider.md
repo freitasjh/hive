@@ -13,7 +13,7 @@
 >   verdade hoje está em `provider/api/.../AiProvider.java`.
 > - **`POST /v1/agents/validate` não existe.** O probe pergunta a um **provedor** se um modelo
 >   responde, então foi para a rota de provedor: **`POST /v1/providers/validate`**. A rota antiga
->   morreu com o conceito de agente (decisão `scope-assistant-sem-rag`).
+>   morreu com o conceito de agente (decisão registrada em **[ADR-013](ADR-013-Assistant-Sem-Rag-Sem-Agente.md)**).
 > - **`AGENT_MANAGE`** guardava o editor de agente e hoje guarda trocar a chave de API e o modelo
 >   padrão do tenant. Ver `.spec/tech-debts/security-rbac/TASKS.md` P1-2.
 >
