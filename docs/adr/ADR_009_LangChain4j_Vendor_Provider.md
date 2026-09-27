@@ -1,6 +1,25 @@
 # ADR-009 — Framework único LangChain4j + provider como vendor real
 
 - **Status:** Aceito (2026-09-25 — EPIC provider-vendor implementado: V9/V10 aplicadas, `provider/spring-ai` removido, `POST /v1/agents/validate` + credenciais por tenant no ar)
+
+> ### ⚠️ Parcialmente superseded em 2026-09-27 — anotações, não reescrita
+>
+> A **decisão** deste ADR (LangChain4j como framework único, provider como vendor real, credencial
+> por tenant) segue **inteira e em vigor**. O que mudou depois são fatos que ele registra como se
+> ainda fossem o estado, e que o código já desmentiu:
+>
+> - **`AiProvider` tem 7 valores, não 5.** `OPENCODE_GO` e `OPENCODE_ZEN` entraram depois (ADR-011,
+>   Aceito 2026-09-25). A lista de 5 deste texto é a allowlist do `tenant_llm_config` ampliada — a
+>   verdade hoje está em `provider/api/.../AiProvider.java`.
+> - **`POST /v1/agents/validate` não existe.** O probe pergunta a um **provedor** se um modelo
+>   responde, então foi para a rota de provedor: **`POST /v1/providers/validate`**. A rota antiga
+>   morreu com o conceito de agente (decisão `scope-assistant-sem-rag`).
+> - **`AGENT_MANAGE`** guardava o editor de agente e hoje guarda trocar a chave de API e o modelo
+>   padrão do tenant. Ver `.spec/tech-debts/security-rbac/TASKS.md` P1-2.
+>
+> O motivo de anotar em vez de reescrever é o de sempre: ADR é registro do raciocínio da época.
+> Reescrever aqui apagaria a lição de que enum e rota mudam por conta de outras decisões.
+
 - **Data:** 2026-09-25
 - **Contexto:** Hive AI (Java 21 + Spring Boot 4.1.0 + LangChain4j 1.19.0 + Vue 3.5 + PrimeVue 4)
 - **Decisores:** usuário + architect + product-manager + ux-designer

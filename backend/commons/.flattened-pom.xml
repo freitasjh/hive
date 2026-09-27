@@ -21,6 +21,5 @@
     <module>impl</module>
     <module>api</module>
     <module>api-tools</module>
-    <module>test-support</module>
   </modules>
 </project>

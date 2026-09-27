@@ -168,9 +168,13 @@ npm run test                     # Executar testes unitários
 - **Blast radius**: breaking change — release único BE+FE; chave é global por tenant (rotação central; override por agente = evolução futura).
 - **OUT de escopo**: cotas/limites de uso por tenant (P2 roadmap); vendors nativos além do MVP (fase 2 via compatible).
 
-## 4.4 Base de Conhecimento / RAG — pgvector, módulo `knowledge/` (ADR-010 — 2026-09-25, Aceito)
+## 4.4 ~~Base de Conhecimento / RAG — pgvector, módulo `knowledge/`~~ (ADR-010 — 2026-09-25, **supersedido** 2026-09-27)
 
-> ### ⚠️ DECISÃO TEMPORÁRIA — 2026-09-27: código removido, dados intactos
+> ### ⚠️ SUPERSEDIDO — registro histórico, não especificação vigente
+>
+> O ADR-010 foi supersedido pela decisão `arquitetura/projetos/hive/decisoes/scope-assistant-sem-rag`
+> (Brain). O texto de RN-KB1..RN-KB7 e dos contratos HTTP abaixo é **o que foi removido**, preservado
+> para não se repetir o raciocínio — não algo para implementar.
 >
 > **Esta seção descreve uma funcionalidade que não existe mais em código.** O módulo `knowledge/`, o
 > pipeline de RAG do `agent/impl` e os endpoints de vínculo agente↔KB foram **removidos** (Batch 1 de
@@ -200,7 +204,7 @@ npm run test                     # Executar testes unitários
 
 - **Bounded context**: módulo `knowledge/` (`api/impl/dbupdate/web/internal/v1`); KBs, documentos, chunks/embeddings, vínculo agente↔KB, playground. `agent/` consome via `knowledge/api` (retrieval no chat).
 - **RN-KB1 (ownership)**: toda KB e documento pertencem a um tenant (`tenant_id NOT NULL`); cross-tenant → 404 uniforme (anti-IDOR).
-- **RN-KB2 (papéis)**: `KNOWLEDGE_MANAGE` (CRUD, upload, URL, reindex, vínculo) e `KNOWLEDGE_READ` (leitura + playground); chat com RAG exige vínculo do agente (só `KNOWLEDGE_READ` não autoriza retrieval arbitrário).
+- **RN-KB2 (papéis)**: `KNOWLEDGE_MANAGE` (CRUD, upload, URL, reindex, vínculo) e `KNOWLEDGE_READ` (leitura + playground); chat com RAG exige vínculo do agente (só `KNOWLEDGE_READ` não autoriza retrieval arbitrário). **⚠️ Ambas removidas em 2026-09-27:** nenhuma era verificada por endpoint desde a queda do `KnowledgeBaseControllerV1`, e `SecurityTokenServiceImpl` continuava concedendo as duas — todo token carregava 2 permissões que não concediam nada, o que engana quem audita as permissões de um usuário. As constantes e as entradas da lista de concessão saíram juntas.
 - **RN-KB3 (limites MVP)**: arquivo máx. 10MB (request 12MB; >10MB → 413); tipos PDF/TXT/MD com magic-bytes (fora → 400); URL máx. 2MB via stream; PDF escaneado (imagem) não suportado; chunking recursive 512 tokens/overlap 50.
 - **RN-KB4 (ciclo de vida)**: documento `PENDING → INDEXING → READY | FAILED` (erro sem stacktrace); reindex idempotente (`removeAll(kb_id)` + reingestão); URL é snapshot único (sem recrawl).
 - **RN-KB5 (N:N max 5)**: junção `agent_knowledge_base`; máx. 5 KBs/agente (6ª → 400); KBs vinculadas exigem mesma dimensão (mix 1536+768 → 400 com mensagem PT-BR no picker).

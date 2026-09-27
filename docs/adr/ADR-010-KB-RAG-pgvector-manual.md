@@ -1,6 +1,19 @@
 # ADR-010 — Base de Conhecimento: RAG manual com pgvector (módulo `knowledge/`)
 
 - **Status:** Aceito (Fase 2 SDD — `knowledge-base`, Batch 2/2 implementado)
+
+> ### ⚠️ Supersedido em 2026-09-27 — decisão `scope-assistant-sem-rag`
+>
+> Este ADR **não foi reescrito**: ele é registro do raciocínio da época, e reescrever seria apagar a
+> lição. O que aconteceu depois está em
+> `arquitetura/projetos/hive/decisoes/scope-assistant-sem-rag` (Brain).
+>
+> O produto virou um **Assistant**: chat simples, sem agente, sem tools, sem base de conhecimento.
+> O módulo `knowledge/` inteiro, o pipeline de RAG e os endpoints de vínculo agente↔KB foram **deletados**.
+Nenhuma migration de drop: as tabelas continuam no banco, órfãs. As permissões `KNOWLEDGE_*` também
+sairam — nenhuma era verificada por endpoint desde a remoção do único controller que as usava, e
+concedê-las colocava no token duas permissões que não destravavam nada.
+
 - **Data:** 2026-09-25
 - **Contexto:** Hive AI (Java 21 + Spring Boot 4.1.0 + LangChain4j 1.19.0 + pgvector/pgvector:pg16)
 - **Decisores:** usuário (módulo separado) + architect + product-manager + ux-designer + security-engineer

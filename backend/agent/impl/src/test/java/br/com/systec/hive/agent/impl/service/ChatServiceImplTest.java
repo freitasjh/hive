@@ -212,7 +212,8 @@ class ChatServiceImplTest {
 
         assertThatThrownBy(() -> service.chat(request, tenantId, userId))
                 .isInstanceOf(TenantLlmConfigNotFoundException.class)
-                .hasMessageContaining("Configurações > Provedores");
+                // O detalhe precisa nomear a tela que corrige (Provedor e modelo), não a de credenciais.
+                .hasMessageContaining("Configurações > Provedor e modelo");
 
         // Nenhum fallback global: sem config não há conversa, e a falha acontece antes da TX1.
         verify(chatMessageService, never()).save(any(), any(), any(), any());

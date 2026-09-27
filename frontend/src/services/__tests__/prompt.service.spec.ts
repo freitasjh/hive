@@ -67,4 +67,42 @@ describe('prompt.service', () => {
     const result = await promptService.list()
     expect(result.content).toHaveLength(1)
   })
+
+  it('lê o totalElements do shape REAL do Spring 3+, onde ele vem aninhado em `page`', async () => {
+    // Body real, medido no H3 com o backend no ar (2026-09-27):
+    //   GET /hive/v1/prompt-templates?page=0&size=50  (56 prompts no tenant)
+    //   → {"content":[...50 itens...],"page":{"size":50,"number":0,"totalElements":56,"totalPages":2}}
+    //
+    // A forma achatada (`totalElements` no topo) é a que os testes de componente usam, e é a que
+    // escondeu o bug: com ela tudo passava e o rodapé "Ver todos os N prompts" nunca aparecia, porque
+    // o `N` caía no comprimento da página. É a mesma classe de erro do filtro que fingia ser busca:
+    // o teste afirmava o invariante do mock, não o do servidor.
+    const body = {
+      content: Array.from({ length: 50 }, (_, i) => ({ id: String(i), name: `P${i}`, code: `p${i}` })),
+      page: { size: 50, number: 0, totalElements: 56, totalPages: 2 }
+    }
+    vi.mocked(api.get).mockResolvedValue({ data: body } as never)
+
+    const result = await promptService.list({ page: 0, size: 50 })
+
+    expect(result.content).toHaveLength(50)
+    // O teto é 50 e existem 56: é exatamente a condição que faz o rodapé existir.
+    expect(result.totalElements).toBe(56)
+    expect(result.totalPages).toBe(2)
+    expect(result.size).toBe(50)
+  })
+
+  it('aceita a forma achatada sem perder o total', async () => {
+    const body = { content: [{ id: '1', name: 'P1', code: 'p1' }], totalElements: 137, totalPages: 14, number: 0, size: 10 }
+    vi.mocked(api.get).mockResolvedValue({ data: body } as never)
+    const result = await promptService.list({ page: 0, size: 10 })
+    expect(result.totalElements).toBe(137)
+  })
+
+  it('cai no comprimento da página quando o servidor não manda metadados', async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { content: [{ id: '1', name: 'P1', code: 'p1' }] } } as never)
+    const result = await promptService.list()
+    expect(result.totalElements).toBe(1)
+    expect(result.size).toBe(20)
+  })
 })

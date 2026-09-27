@@ -13,47 +13,30 @@
         />
       </div>
       <div class="flex gap-2">
-        <Button 
-          icon="pi pi-paperclip" 
-          text 
-          rounded 
-          severity="secondary"
-          class="hover:text-primary transition-colors" 
-          v-tooltip.top="'Anexar arquivo'"
-        />
-        <Button 
-          icon="pi pi-microphone" 
-          text 
-          rounded 
-          severity="secondary"
-          class="hover:text-primary transition-colors"
-          v-tooltip.top="'Comando de voz'"
-        />
-        <Button 
-          :icon="disabled ? 'pi pi-spin pi-spinner' : 'pi pi-send'" 
+        <Button
+          :icon="disabled ? 'pi pi-spin pi-spinner' : 'pi pi-send'"
           class="rounded-xl shadow-md send-button"
-          @click="emit('send')" 
-          :disabled="!modelValue.trim() || disabled" 
+          @click="emit('send')"
+          :disabled="!modelValue.trim() || disabled"
         />
       </div>
-    </div>
-    <div class="flex gap-2 px-1 overflow-x-auto no-scrollbar pb-1">
-      <Tag 
-        v-for="suggest in suggestions" 
-        :key="suggest" 
-        :value="suggest" 
-        class="cursor-pointer bg-surface-100 text-surface-700 hover:bg-primary-100 hover:text-primary transition-all duration-200 border-none rounded-lg px-3 py-2"
-        @click="modelValue = suggest"
-      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+/**
+ * The composer: a text field and a send button, nothing else.
+ *
+ * It used to carry an attach button, a voice button and a row of suggestion tags. All three were
+ * affordances with no handler behind them — attachment and voice are out of the product by decision,
+ * and the suggestions were hardcoded strings that ignored the prompt the user selected, which
+ * contradicted the only rule the product has. A control that looks clickable and does nothing is
+ * worse than a control that does not exist, so they were removed rather than disabled.
+ */
 import { computed } from 'vue'
 import Textarea from 'primevue/textarea'
 import Button from 'primevue/button'
-import Tag from 'primevue/tag'
 
 const props = defineProps<{
   modelValue: string
@@ -66,13 +49,6 @@ const modelValue = computed({
   get: () => props.modelValue,
   set: (val) => emit('update:modelValue', val)
 })
-
-const suggestions = [
-  'Resumir documento',
-  'Analisar código',
-  'Gerar relatório',
-  'Explicar conceito'
-]
 
 const handleEnter = (e: KeyboardEvent) => {
   if (e.shiftKey) return
@@ -115,13 +91,5 @@ const handleEnter = (e: KeyboardEvent) => {
 .send-button:hover {
   background: linear-gradient(135deg, var(--p-primary-500) 0%, var(--p-primary-700) 100%);
   transform: scale(1.05);
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
 }
 </style>

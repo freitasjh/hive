@@ -3,6 +3,19 @@
 ## Status
 Proposto
 
+> ### ⚠️ Supersedido em 2026-09-27 — decisão `scope-assistant-sem-rag`
+>
+> Este ADR **não foi reescrito**: ele é registro do raciocínio da época, e reescrever seria apagar a
+> lição. O que aconteceu depois está em
+> `arquitetura/projetos/hive/decisoes/scope-assistant-sem-rag` (Brain).
+>
+> O produto virou um **Assistant**: chat simples, sem agente, sem tools, sem base de conhecimento.
+> A lista de serviços deste ADR cita `agent.service.ts`, que não existe mais. O que o frontend do
+Assistant usa: `auth.service.ts`, `chat.service.ts`, `session.service.ts`, `prompt.service.ts`,
+`agent-admin.service.ts` (nome histórico: credenciais e catálogo de vendors são coisas de
+*provedor*, não de agente) e o seletor de prompt no lugar do antigo `AgentSelector`.
+
+
 ## Contexto
 O projeto Hive necessita de um frontend moderno e escalável. A escolha da stack recai sobre Vue 3 e PrimeVue devido à produtividade e conformidade com o design system pretendido.
 

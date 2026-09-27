@@ -1,5 +1,9 @@
 version: '3.8'
 
+# Mesmo motivo do `docker-compose-vetor.yml`: sem `name`, o projeto compose chama-se `docker` (nome do
+# diretório) e compartilha namespace com o outro clone do hive, com o taskflow e com o atlas-ecm.
+name: hive
+
 services:
   redis:
     image: redis:7.2-alpine
@@ -30,4 +34,7 @@ networks:
 
 volumes:
   redis_data:
+    # Mesmo motivo do postgres: fixar o nome evita que a troca de nome do projeto crie um volume vazio
+    # e pareça "perda de dado". Ver `docker-compose-vetor.yml`.
+    name: docker_redis_data
     driver: local

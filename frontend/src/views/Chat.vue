@@ -39,14 +39,14 @@
             <i class="pi pi-bolt text-amber-400 text-5xl"></i>
           </div>
           <h2 class="text-900 text-3xl font-bold mb-2 tracking-tight">Bem-vindo ao <span class="text-primary">Hive AI</span></h2>
-          <p class="text-surface-500 max-w-20rem m-auto line-height-3">Sua orquestração inteligente começa aqui. Como posso acelerar seus fluxos de trabalho hoje?</p>
+          <p class="text-surface-500 max-w-20rem m-auto line-height-3">Escolha um prompt acima e escreva sua pergunta. A resposta segue exatamente aquele prompt.</p>
           <p v-if="!selectedPromptTemplateId" class="text-sm text-amber-600 mt-3">Escolha um prompt acima para começar.</p>
         </div>
 
         <ChatMessage
           v-for="msg in messages"
           :key="msg.id"
-          :role="msg.role.toUpperCase() as 'USER' | 'ASSISTANT'"
+          :role="roleOf(msg.role)"
           :content="msg.content"
           :timestamp="msg.createAt"
         />
@@ -114,6 +114,22 @@ const sidebarRef = ref<InstanceType<typeof ChatSidebar> | null>(null)
 const loadSeq = ref(0)
 
 const STORAGE_KEY = 'hive_sessionId'
+
+/**
+ * Maps the stored role to the three the bubble knows. `system` is the app speaking about its own
+ * failure; it is not a speaker, which is why it needs its own rendering and its own label.
+ *
+ * The fallthrough is `SYSTEM`, not `ASSISTANT`, on purpose. Defaulting an unknown role to the model
+ * is exactly the bug this batch removed: the system pushed its own failure as `assistant`, and the
+ * model looked like it had apologised for something it never said. A role nobody recognises is the
+ * app's to explain, not the model's to answer for.
+ */
+function roleOf(role: string): 'USER' | 'ASSISTANT' | 'SYSTEM' {
+  const upper = role.toUpperCase()
+  if (upper === 'USER') return 'USER'
+  if (upper === 'ASSISTANT') return 'ASSISTANT'
+  return 'SYSTEM'
+}
 
 async function scrollToBottom() {
   await nextTick()
@@ -224,11 +240,15 @@ async function sendMessage() {
     } else {
       toast.add({ severity: 'error', summary: 'Erro', detail: problem.detail, life: 4000 })
     }
+    // A falha é do app, então ela não sai como `assistant`: um erro de sistema no papel do
+    // assistente faz o modelo parecer ter pedido desculpas por algo que o modelo não fez
+    // (`DESIGN_SYSTEM.md` §4, regra de mensagem de erro). E o texto não se desculpa — a regra pede
+    // causa, consequência e caminho, que é o que o `detail` do servidor já entrega em pt-BR.
     messages.value.push({
-      id: `error-${Date.now()}`,
+      id: `system-${Date.now()}`,
       sessionId: currentSession ?? '',
-      role: 'assistant',
-      content: 'Desculpe, ocorreu um erro ao processar sua mensagem.',
+      role: 'system',
+      content: problem.detail,
       createAt: new Date().toISOString()
     })
   } finally {

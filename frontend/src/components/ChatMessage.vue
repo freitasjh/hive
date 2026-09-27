@@ -1,15 +1,16 @@
 <template>
   <div :class="['flex w-full mb-4', role === 'USER' ? 'justify-content-end' : 'justify-content-start', 'fade-in-up transition-all duration-300 ease-in-out']">
-    <div :class="['message-bubble p-4 shadow-sm rounded-2xl relative max-w-70 md:max-w-60 lg:max-w-50 border-1', 
-                role === 'USER' ? 'user-msg' : 'assistant-msg']">
+    <div :class="['message-bubble p-4 shadow-sm rounded-2xl relative max-w-70 md:max-w-60 lg:max-w-50 border-1',
+                role === 'USER' ? 'user-msg' : role === 'ASSISTANT' ? 'assistant-msg' : 'system-msg']">
       
       <div class="flex align-items-center gap-2 mb-2">
-        <div v-if="role === 'ASSISTANT'" class="assistant-icon-container w-2rem h-2rem rounded-lg flex align-items-center justify-content-center shadow-sm">
+        <div v-if="role === 'ASSISTANT'" class="assistant-icon-container w-2rem h-2rem rounded-lg flex align-items-center justify-center shadow-sm">
            <i class="pi pi-bolt text-sm"></i>
         </div>
-        <span class="text-xs font-bold uppercase tracking-wider" 
-             :class="role === 'USER' ? 'user-role-label' : 'assistant-role-label'">
-          {{ role === 'USER' ? 'Você' : 'Hive Assistant' }}
+        <i v-else-if="role === 'SYSTEM'" class="pi pi-exclamation-triangle system-icon"></i>
+        <span class="text-xs font-bold uppercase tracking-wider"
+             :class="role === 'USER' ? 'user-role-label' : role === 'ASSISTANT' ? 'assistant-role-label' : 'system-role-label'">
+          {{ label }}
         </span>
       </div>
 
@@ -27,11 +28,23 @@
 import { computed } from 'vue'
 import DOMPurify from 'dompurify'
 
+/**
+ * `SYSTEM` is not a third speaker — it is the absence of one. It renders what the app has to say
+ * about its own failure, in a bubble that cannot be mistaken for the model's: different icon,
+ * different label, warn tint instead of the assistant surface. Pushing a system failure as
+ * `ASSISTANT` made the model look like it had apologised for something it never did.
+ */
 const props = defineProps<{
-  role: 'USER' | 'ASSISTANT'
+  role: 'USER' | 'ASSISTANT' | 'SYSTEM'
   content: string
   timestamp: Date | string
 }>()
+
+const label = computed(() => {
+  if (props.role === 'USER') return 'Você'
+  if (props.role === 'ASSISTANT') return 'Hive Assistant'
+  return 'Sistema'
+})
 
 const sanitizedContent = computed(() => DOMPurify.sanitize(props.content))
 
@@ -63,6 +76,25 @@ const formattedTime = computed(() => {
 .assistant-role-label {
   color: var(--p-primary-color);
   opacity: 0.8;
+}
+
+/* O aviso do sistema se distingue da bolha do assistente por superfície, ícone e rótulo — não por
+   uma cor a mais, e não por um raio que ninguém distingue. Os cues reais: a barra lateral de 3px,
+   a superfície plana contra o gradiente do assistente, o triângulo contra o raio, e o rótulo. */
+.system-msg {
+  background-color: var(--p-surface-50);
+  color: var(--p-text-color);
+  border-color: var(--p-surface-200);
+  border-left: 3px solid var(--p-amber-500);
+}
+
+.system-icon {
+  color: var(--p-amber-600);
+  font-size: 0.9rem;
+}
+
+.system-role-label {
+  color: var(--p-surface-600);
 }
 
 .user-msg {

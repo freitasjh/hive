@@ -1,6 +1,9 @@
 # Débito técnico pré-existente — RBAC decorativo e nome de permissão herdado
 
 **Registrado em:** 2026-09-27, durante a revisão do Batch 2 (Assistant sem RAG).
+**Atualizado em:** 2026-09-27, após o batch de UX do seletor — o P1-1 gained **uma barreira de
+teste** (paridade verificada) e as **2 permissões de conhecimento saíram** das duas listas, então a
+contagem de 8 passou a 6.
 **Status:** 🔴 P1 pré-existente. **NÃO corrigido neste batch**, e a decisão é explícita.
 **Classe:** segurança / autorização.
 
@@ -11,13 +14,26 @@
 **Arquivo:** `backend/security/impl/src/main/java/br/com/systec/hive/security/impl/service/SecurityTokenServiceImpl.java:175`
 
 A concessão de permissões do token usa a **lista hardcoded** do método, não
-`SecurityConstants.DEFAULT_PERMISSIONS`. Consequência: as 8 permissões (`PROMPT_MANAGE`,
-`PROMPT_ADMIN`, `AGENT_MANAGE`, `AGENT_ADMIN`, `CHAT_SEND`, `CHAT_SESSION_MANAGE`,
-`KNOWLEDGE_MANAGE`, `KNOWLEDGE_READ`) são concedidas a **qualquer usuário que se autentique**.
+`SecurityConstants.DEFAULT_PERMISSIONS`. Consequência: as **6** permissões (`PROMPT_MANAGE`,
+`PROMPT_ADMIN`, `AGENT_MANAGE`, `AGENT_ADMIN`, `CHAT_SEND`, `CHAT_SESSION_MANAGE`) são concedidas a
+**qualquer usuário que se autentique**.
+
+> ⚠️ **Contagem corrigida em 2026-09-27.** Este arquivo dizia "8 permissões" e listava
+> `KNOWLEDGE_MANAGE` e `KNOWLEDGE_READ`. As duas **não existem mais**: foram removidas de
+> `SecurityConstants` e da lista de concessão porque nenhum endpoint as verificava desde a queda do
+> `KnowledgeBaseControllerV1`. Quem fosse corrigir este P1 procurando `KNOWLEDGE_MANAGE` não acharia
+> nada. As duas entradas foram também riscadas do histórico deste arquivo.
 
 `SecurityConstants.DEFAULT_PERMISSIONS` é apenas dado de exibição — nada o lê no caminho da
 concessão. Alguém que o mudar achando estar configuring o RBAC não muda nada, e não recebe nenhum
 sinal de que não mudou.
+
+> ✅ **Mitigação adicionada em 2026-09-27 (não é a correção).**
+> `LoginIT.when_login_then_tokenCarriesExactlyTheDeclaredDefaultPermissions` compara o claim
+> `permissions` de um token **real** com `SecurityConstants.DEFAULT_PERMISSIONS` e falha se divergirem
+> em qualquer direção. A duplicação deixa de ser um comentário que mente e passa a ser um invariante
+> testado. O P1 continua aberto: as duas listas podem concordar e ainda assim ambas estarem erradas —
+> quem concede a lista inteira continua sendo o mesmo código.
 
 O gate por permissão **funciona e é testado**: um token sem `CHAT_SEND` leva 403 em
 `/v1/chat` (`ValidateIT.when_validate_withoutPermission_then_returns403`). O que não funciona é a

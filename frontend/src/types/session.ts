@@ -23,10 +23,5 @@ export interface ChatResponseDTO {
   timestamp: string
 }
 
-export interface Page<T> {
-  content: T[]
-  totalElements: number
-  totalPages: number
-  number: number
-  size: number
-}
+/** A interface de página paginada mora em `services/page.ts`, junto do normalizador. */
+export type { Page } from '../services/page'

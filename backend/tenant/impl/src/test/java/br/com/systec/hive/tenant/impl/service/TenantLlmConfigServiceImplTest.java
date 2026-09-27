@@ -63,7 +63,9 @@ class TenantLlmConfigServiceImplTest {
 
         assertThatThrownBy(() -> service.require(tenantId))
                 .isInstanceOf(TenantLlmConfigNotFoundException.class)
-                .hasMessageContaining("Configurações > Provedores");
+                // A tela nomeada é a que corrige: "Provedor e modelo" (/settings/llm). Dizer
+                // "Provedores" mandava o usuário para a tela de credenciais, que é outra condição.
+                .hasMessageContaining("Configurações > Provedor e modelo");
     }
 
     @Test

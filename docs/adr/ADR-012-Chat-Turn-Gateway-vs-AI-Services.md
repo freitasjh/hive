@@ -1,6 +1,18 @@
 # ADR-012 — Porta do turno de chat: `ChatTurnGateway` é a porta; AI Services é implementação alternativa, não pré-requisito
 
 - **Status:** Aceito (revisável — ver "Gatilhos de reavaliação")
+
+> ### ⚠️ Supersedido em 2026-09-27 — decisão `scope-assistant-sem-rag`
+>
+> Este ADR **não foi reescrito**: ele é registro do raciocínio da época, e reescrever seria apagar a
+> lição. O que aconteceu depois está em
+> `arquitetura/projetos/hive/decisoes/scope-assistant-sem-rag` (Brain).
+>
+> O produto virou um **Assistant**: chat simples, sem agente, sem tools, sem base de conhecimento.
+> A **opção D** foi revertida. O que sobrevive — e passou a importar mais — é `ChatTurnGateway` como a
+porta do turno: sem RAG, ela é a costura onde o prompt entra como campo do `TurnRequest`, e é o
+diagnóstico e o trace (o que achou os 6 bugs do loop elementar) que valem mais agora, não menos.
+
 - **Data:** 2026-09-26
 - **Contexto:** Hive AI (Java 21 + Spring Boot 4.1.0 + LangChain4j 1.19.0 + PostgreSQL 16 + pgvector 0.8.2)
 - **Decisores:** architect (parecer de validação) + usuário

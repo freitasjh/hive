@@ -1,7 +1,7 @@
 <template>
   <AuthLayout
     title="Hive AI"
-    subtitle="Junte-se à orquestração inteligente de IA"
+    subtitle="Crie sua conta e comece a conversar"
     icon="pi pi-user-plus"
   >
     <Toast position="top-right" />

@@ -1,18 +1,6 @@
 import api from './api'
-import type { Page, PromptTemplateDTO, PromptTemplateCreateDTO, PromptTemplateUpdateDTO } from '../types/prompt'
-
-function unwrapPage<T>(data: unknown, fallbackSize: number): Page<T> {
-  const d = data as Record<string, unknown>
-  if (d && Array.isArray(d.content)) return d as unknown as Page<T>
-  if (Array.isArray(d)) return { content: d as T[], totalElements: d.length, totalPages: 1, number: 0, size: fallbackSize } as Page<T>
-  // handle Spring success wrapper { success:true, data: Page }
-  if (d && d.data) {
-    const inner = d.data as Record<string, unknown>
-    if (Array.isArray(inner.content)) return inner as unknown as Page<T>
-    if (Array.isArray(d.data)) return { content: d.data as T[], totalElements: (d.data as unknown[]).length, totalPages: 1, number: 0, size: fallbackSize } as Page<T>
-  }
-  return d as unknown as Page<T>
-}
+import type { PromptTemplateDTO, PromptTemplateCreateDTO, PromptTemplateUpdateDTO } from '../types/prompt'
+import { unwrapPage, type Page } from './page'
 
 function unwrapData<T>(data: unknown): T {
   const d = data as Record<string, unknown>
@@ -31,10 +19,16 @@ function handleError(e: unknown): never {
 }
 
 export const promptService = {
-  async list(params: { page?: number; size?: number; q?: string; status?: string } = {}): Promise<Page<PromptTemplateDTO>> {
-    const { page = 0, size = 20, q, status } = params
+  async list(params: { page?: number; size?: number; q?: string; status?: string; timeoutMs?: number } = {}): Promise<Page<PromptTemplateDTO>> {
+    const { page = 0, size = 20, q, status, timeoutMs } = params
     try {
-      const res = await api.get('/prompt-templates', { params: { page, size, q, status } })
+      // `timeoutMs` explícito e opcional: o default do axios é esperar indefinidamente, e uma
+      // listagem pendurada é o tipo de coisa que deixa uma UI em estado de carregamento para
+      // sempre. Quem chama decide (o seletor passa 10s; a tela de prompts usa o default).
+      const res = await api.get('/prompt-templates', {
+        params: { page, size, q, status },
+        ...(timeoutMs ? { timeout: timeoutMs } : {})
+      })
       return unwrapPage<PromptTemplateDTO>(res.data, size)
     } catch (e) { handleError(e); throw e }
   },

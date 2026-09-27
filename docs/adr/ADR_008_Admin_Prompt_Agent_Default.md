@@ -3,6 +3,21 @@
 ## Status
 Accepted — 2026-08-30 (admin-prompt-agent)
 
+> ### ⚠️ Supersedido em 2026-09-27 — decisão `scope-assistant-sem-rag`
+>
+> Este ADR **não foi reescrito**: ele é registro do raciocínio da época, e reescrever seria apagar a
+> lição. O que aconteceu depois está em
+> `arquitetura/projetos/hive/decisoes/scope-assistant-sem-rag` (Brain).
+>
+> O produto virou um **Assistant**: chat simples, sem agente, sem tools, sem base de conhecimento.
+> O conceito de **Agent** morreu por completo: entidade, serviço, controller, mappers, DTOs, tabela
+`agent` (`DROP TABLE`, `agent/V16`) e `chat_session.agent_id`. A sessão aponta para
+`prompt_template_id` (`agent/V15`, que **preserva** o dado antigo em `agent_id_legacy`) e o modelo
+virou `tenant_llm_config`. Não há mais "agente padrão" para resolver: o seletor de prompt do chat é
+o prompt do turno, e uma sessão o mantém imutável. A parte de **versionamento de prompt** deste ADR
+sobrevive.
+
+
 ## Context
 Sistema carecia de interfaces admin para prompts/agentes e de mecanismo fallback quando agentId não informado. Sem padronização, promopt link, exclusividade default e fallback falhavam.
 

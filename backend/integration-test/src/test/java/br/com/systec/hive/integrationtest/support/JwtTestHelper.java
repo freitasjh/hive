@@ -19,7 +19,7 @@ public class JwtTestHelper {
     private static final String TENANT_CLAIM = "tenant-id";
 
     private static final List<String> DEFAULT_PERMISSIONS =
-            List.of("PROMPT_MANAGE", "PROMPT_ADMIN", "AGENT_MANAGE", "AGENT_ADMIN", "CHAT_SEND", "CHAT_SESSION_MANAGE", "KNOWLEDGE_MANAGE", "KNOWLEDGE_READ");
+            List.of("PROMPT_MANAGE", "PROMPT_ADMIN", "AGENT_MANAGE", "AGENT_ADMIN", "CHAT_SEND", "CHAT_SESSION_MANAGE");
 
     @Value("${api.security.token.secret}")
     private String secret;

@@ -190,7 +190,9 @@ class TenantLlmConfigIT extends WebIntegrationTest {
                         .content("{\"promptTemplateId\":\"" + promptTemplateId + "\",\"message\":\"oi\"}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("TENANT_LLM_CONFIG_NOT_FOUND"))
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Configurações > Provedores")))
+                // O detalhe diz a tela que corrige: "Provedor e modelo" (/settings/llm), não a de
+                // credenciais. A substring antiga fixava a mensagem errada, não o comportamento.
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Configurações > Provedor e modelo")))
                 .andReturn().getResponse().getContentAsString();
 
         assertNoSchemaLeak(body);

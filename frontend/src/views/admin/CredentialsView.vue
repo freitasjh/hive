@@ -233,7 +233,7 @@ async function confirmDelete() {
     </Dialog>
 
     <Dialog v-model:visible="showDeleteConfirm" modal header="Remover credencial" :style="{ width: '26rem' }" data-testid="cred-delete-confirm">
-      <p>Remover a chave de <strong>{{ deleteTarget ? VENDOR_CATALOG[deleteTarget].label : '' }}</strong>? Agentes desse provedor falharão com 422 até nova chave.</p>
+      <p>Remover a chave de <strong>{{ deleteTarget ? VENDOR_CATALOG[deleteTarget].label : '' }}</strong>? As conversas que usarem este provedor vão falhar até uma nova chave ser cadastrada.</p>
       <template #footer>
         <Button label="Cancelar" text @click="showDeleteConfirm = false" />
         <Button label="Remover" severity="danger" :loading="deleting" data-testid="cred-delete-confirm-btn" @click="confirmDelete" />

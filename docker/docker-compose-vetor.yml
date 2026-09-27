@@ -1,22 +1,44 @@
-version: '3.9'
+# O nome do projeto compose sai do NOME DO DIRETÓRIO do arquivo, e o diretório se chama `docker`.
+# Sem esta linha, o projeto chama-se `docker` e divide namespace com o outro clone do hive
+# (`/opt/systec/wsProjetos/hive`), com o `taskflow` e com o `atlas-ecm` — e um `up -d` em qualquer
+# um deles reconcilia o namespace inteiro. Foi assim que o postgres de dev deste projeto foi
+# recriado por um compose de outro produto. Ver `.spec/tech-debts/compose-project-name/TASKS.md`.
+name: hive
+
 services:
   postgres:
     image: pgvector/pgvector:pg16 # Use a specific PostgreSQL version tag, e.g., pg17
     container_name: postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: dev_user
-      POSTGRES_PASSWORD: dev_password
-      POSTGRES_DB: embedding_db
+      # ⚠️ O VOLUME É COMPARTILHADO com outros projetos de dev (`hive`, `atlas_admin`, `taskflow`,
+      # `atlas_ecm` convivem no mesmo `postgres_data`). O Postgres só aplica `POSTGRES_USER` e
+      # `POSTGRES_PASSWORD` na **primeira** inicialização de um diretório vazio — depois disso quem
+      # manda é o que já está gravado. Trocar estas linhas não troca a senha: apenas faz um volume
+      # NOVO nascer com outro superusuário e deixa o antigo intacto do lado de dentro. Por isso as
+      # credenciais aqui são `postgres`/`postgres`, e é isso que `application-dev.properties` usa.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      # `hive`, não `embedding_db`: o nome era herança do módulo de conhecimento (pgvector), que foi
+      # deletado em 2026-09-26. `application-dev.properties` aponta para `hive`.
+      POSTGRES_DB: hive
     ports:
-      - "5432:5432" # Maps container port 5432 to host port 5432
+      # 5433, e não 5432: a 5432 do host estava ocupada por um container de OUTRO projeto. Um
+      # `container_name` fixo + porta fixa faz `up -d` falhar ou, pior, criar o schema do Hive no
+      # banco do outro projeto sem dar erro — que foi exatamente o que aconteceu.
+      - "5433:5432" # porta do host 5433 -> 5432 do container
     volumes:
       - postgres_data:/var/lib/postgresql/data # Named volume for data persistence
     healthcheck:
-          test: ["CMD-SHELL", "pg_isready -U postgres"]
+          test: ["CMD-SHELL", "pg_isready -U postgres -d hive"]
           interval: 10s
           timeout: 5s
           retries: 5
 
 volumes:
+  # O nome é FIXADO de propósito. Sem `name:`, o compose deriva o nome do volume do nome do projeto
+  # (`<projeto>_<volume>`), então trocar o projeto de `docker` para `hive` faria o próximo `up -d`
+  # criar um volume NOVO e vazio — e o banco de dev "desapareceria" de novo, que é o incidente que o
+  # `workflow-state.json` já registra duas vezes. Fixando o nome, o volume existente é reutilizado.
   postgres_data:
+    name: docker_postgres_data

@@ -172,7 +172,14 @@ public class SecurityTokenServiceImpl implements SecurityTokenService {
     }
 
     private String generateToken(User user, String jti) {
-        List<String> permissions = List.of("PROMPT_MANAGE", "PROMPT_ADMIN", "AGENT_MANAGE", "AGENT_ADMIN", "CHAT_SEND", "CHAT_SESSION_MANAGE", "KNOWLEDGE_MANAGE", "KNOWLEDGE_READ");
+        // A lista é hardcoded e NÃO é derivada de `SecurityConstants.DEFAULT_PERMISSIONS`: este módulo
+        // não depende de `commons-api-tools`, e vale a dependência entre módulos? A duplicação já
+        // produziu um bug — as duas permissões de conhecimento foram removidas das constantes e
+        // esquecidas aqui, então todo token levou meses concedendo capabilities que não existiam.
+        // A paridade é assegurada por teste em `integration-test` (`LoginIT`), que compara o claim
+        // `permissions` de um token real com a lista de constantes. Ao mexer em qualquer um dos dois
+        // lados, esse teste é o que acusa.
+        List<String> permissions = List.of("PROMPT_MANAGE", "PROMPT_ADMIN", "AGENT_MANAGE", "AGENT_ADMIN", "CHAT_SEND", "CHAT_SESSION_MANAGE");
         return JWT.create()
                 .withIssuer(ISSUE)
                 .withSubject(user.getUsername())

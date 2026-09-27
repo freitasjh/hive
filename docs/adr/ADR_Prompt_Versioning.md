@@ -3,6 +3,18 @@
 ## Status
 Proposed
 
+> ### ⚠️ Não implementada — anotado em 2026-09-27
+>
+> Este ADR está `Proposed` e **nunca foi construído**: não existe versionamento de prompt no código.
+> O que existe é a coluna `version` e a resolução por `code`+`version`
+> (`PromptTemplateRepository.findByTenantIdAndCodeAndVersion`), que é outra coisa e não implementa
+> o modelo descrito aqui (níveis, `draft`/`active` por versão, histórico de transições, rollback).
+>
+> Vale registrar porque o resto da documentação do produto cita "versionamento de prompt" como
+> capacidade existente, e ela não é. **Não está superseded** — está *não implementada*, que é
+> diferente: a decisão continua defensável, só falta construção.
+
+
 ## Context
 O sistema Hive requer um mecanismo robusto de versionamento de prompts para permitir experimentação e rollback sem impacto imediato nos agentes em execução. 
 Foi identificada uma inconsistência entre a `PromptTemplateEntity` e o script de migração `V2__create_agent_tables.sql`, onde campos essenciais como `code`, `params`, `active` e `draft` foram omitidos no banco de dados.

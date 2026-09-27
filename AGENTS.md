@@ -1,6 +1,13 @@
 # Hive AI — Agent Instructions
 
-Multi-agent AI platform. Modular monolith backend + Vue 3 frontend.
+Hive is an **Assistant**: a plain chat surface where the user picks the prompt that answers the
+conversation. No agent, no tools, no knowledge base, no agentic loop. Modular monolith backend +
+Vue 3 frontend. The product decision and the code it removed are recorded in
+`arquitetura/projetos/hive/decisoes/scope-assistant-sem-rag` (Brain) and in
+`docs/product/SYSTEM_SPECIFICATION.md` §4.
+
+> The `agent` **module** is not the agent concept — it is the historical name of the bounded context
+> that now holds chat, sessions and prompt templates. Renaming it is a separate batch.
 
 ## Quick Commands
 
@@ -19,12 +26,35 @@ npm run test                               # vitest run
 
 # Infrastructure (from docker/)
 docker-compose -f docker-compose-redis.yml up -d     # Redis on :6379
-docker-compose -f docker-compose-vetor.yml up -d     # PostgreSQL+pgvector on :5432
+docker-compose -f docker-compose-vetor.yml up -d     # PostgreSQL on :5433 (postgres/postgres, db hive)
 ```
+
+> ### ⚠️ O `docker compose up` falha enquanto os containers do projeto `docker` antigo estiverem no ar
+>
+> O projeto compose chama-se **`hive`** (`name: hive` nos dois arquivos) e `docker compose config`
+> confirma. Mas os containers no ar ainda carregam `project=docker`, e eles têm `container_name`
+> **fixo** — que é um nome **global** no Docker, não namespaced. Então o `up` acima aborta com
+> `Conflict. The container name "/postgres" is already in use`. É a falha **certa**: o Compose se
+> recusa a substituir o banco de dev em silêncio.
+>
+> **A falha é segura.** Os volumes estão fixados (`docker_postgres_data`, `docker_redis_data`), então
+> nada se perde, e o banco **continua no ar** enquanto isso.
+>
+> Comando de uma vez, quando for migrar:
+>
+> ```bash
+> # Sem -v: os volumes estão fixados e saem intactos. Nenhum dado é tocado.
+> docker rm postgres hive-redis hive-redis-insight
+> docker-compose -f docker-compose-vetor.yml up -d
+> docker-compose -f docker-compose-redis.yml up -d
+> ```
+>
+> Decisão do usuário, não automatizada: o ambiente funciona hoje com os containers antigos.
+> Detalhe em `.spec/tech-debts/compose-project-name/TASKS.md`.
 
 ## Architecture
 
-**Backend**: Java 21, Spring Boot 4.1.0, PostgreSQL 16 + pgvector, Redis, RabbitMQ, LangChain4j.
+**Backend**: Java 21, Spring Boot 4.1.0, PostgreSQL 16, Redis, RabbitMQ, LangChain4j.
 **Frontend**: Vue 3.5, TypeScript 5.9, PrimeVue 4, Pinia, Vite 8, Vitest.
 
 ### Backend Module Structure
@@ -103,7 +133,14 @@ src/
 
 ### Dev Environment
 
-- PostgreSQL requires `pgvector` extension (use `pgvector/pgvector:pg16` image)
+- PostgreSQL 16 on **host port 5433**, user `postgres`, database `hive` (ver
+  `docker/docker-compose-vetor.yml` e `application-dev.properties:5` — os dois precisam concordar).
+  A 5432 do host pertence a outro projeto. O volume `postgres_data` é **compartilhado** com outros
+  projetos de dev; as credenciais são as da primeira inicialização dele e não mudam por edição do
+  compose. The dev and Testcontainers images are `pgvector/pgvector:pg16`, but **no vector type
+  is used anywhere** — the extension came in with the knowledge module, which was deleted on
+  2026-09-26. Plain `postgres:16` would work; the image was left alone to avoid a dev/IT change
+  unrelated to the product decision.
 - Redis on default port 6379, no password in dev
 - JWT secret in dev: `api.security.token.secret=123456` (dev only!)
 - Flyway disabled by default (`spring.flyway.enabled=false`) — modules run their own Flyway beans

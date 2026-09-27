@@ -21,6 +21,18 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!--
+          Só para o teste de paridade das permissões. `integration-test` sobe a aplicação inteira, e
+          `commons-api-tools` chega transitivo pelo bootstrap — mas compilar contra dependência
+          transitiva sem declará-la é depender de detalhe de classpath. Declarar deixa a intenção
+          explícita.
+        -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-commons-api-tools</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

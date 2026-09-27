@@ -78,7 +78,7 @@ async function doDelete() {
   } catch (err: unknown) {
     const e = err as { response?: { status?: number; data?: { code?: string; detail?: string } } }
     if (e.response?.status === 409) {
-      toast.add({ severity: 'warn', summary: 'Em uso', detail: e.response.data?.detail ?? 'Prompt em uso por agente', life: 4000 })
+      toast.add({ severity: 'warn', summary: 'Em uso', detail: e.response.data?.detail ?? 'Este prompt está em uso por uma conversa.', life: 4000 })
     } else {
       toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao remover', life: 3000 })
     }
@@ -115,7 +115,7 @@ function severityFor(s: string) {
       v-else-if="items.length === 0"
       icon="pi pi-file"
       title="Nenhum prompt encontrado"
-      description="Crie seu primeiro prompt para começar a orquestrar agentes."
+      description="Crie seu primeiro prompt para começar a conversar."
       ctaLabel="Criar primeiro prompt"
       @cta="router.push('/prompts/new')"
     />

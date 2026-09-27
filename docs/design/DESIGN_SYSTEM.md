@@ -117,3 +117,23 @@ interface TheSidebarProps {
 - **Contrasts**: Always ensure that Amber accents maintain WCAG AA contrast (4.5:1) against surface backgrounds.
 - **Dark Mode**: All components must use CSS variables (`--p-*`) to automatically switch values based on the `.p-dark` selector.
 - **States**: Every interactive element (nav links, profile menu) must define explicit `:hover`, `:active`, and `:focus-visible` states.
+
+## 4. Error Messages
+- **Errors do not apologize.** No "Desculpe", no "Oops", no "Algo deu errado" sem nome. A regra vale
+  para toda mensagem de erro do produto, e vale mais ainda quando a mensagem é apresentada **dentro
+  do fluxo** — ali, o usuário está lendo a conversa, e uma desculpa parece o modelo respondendo.
+- **Toda mensagem de erro tem três partes: causa, consequência e ação.** Falta uma das três e o
+  texto vira toast genérico. `"Não foi possível enviar a mensagem. O modelo não respondeu a tempo.
+  Sua mensagem não foi perdida."` tem as três; `"Erro"` não tem nenhuma.
+- **Message de sistema nunca é `role="assistant"`.** Falha do app é do app. Um erro empurrado no
+  papel do assistente faz o modelo parecer ter dito algo que não disse — foi assim que uma bolha de
+  desculpa nasceu aqui.
+- **Quem fala é identificável.** Mensagem de sistema tem rótulo próprio ("Sistema"), ícone próprio e
+  superfície própria: sem gradiente e sem raio assimétrico da bolha do assistente, para que o olho
+  distinga mensagem do modelo de mensagem do sistema **sem ler**.
+- **Estado de carregamento nunca se confunde com estado vazio.** Uma busca em andamento diz
+  "Buscando…" e esmaece o que já estava à vista; ela **não** diz "nenhum resultado" antes de a
+  resposta chegar. Afirmar ausência antes da resposta é a mesma mentira de um filtro local fingindo
+  ser busca.
+- **Sem beco sem saída e sem saída sem destino.** Onde a busca não acha, as ações são criar ou ver
+  todos. E onde há uma ação, ela navega: botão que não navega é pior que botão que não existe.

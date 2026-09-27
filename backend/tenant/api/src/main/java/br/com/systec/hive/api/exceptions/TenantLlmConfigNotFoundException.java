@@ -15,7 +15,11 @@ import java.io.Serial;
  * LLM", and the chat is the only place that ever notices.
  *
  * <p>The message is the whole point of the class. It names the screen to go to, because a tenant
- * that lands on a bare 422 cannot tell a missing configuration from a rejected one.
+ * that lands on a bare 422 cannot tell a missing configuration from a rejected one. And it names
+ * the screen that actually fixes it: this exception is about the tenant's default provider and
+ * model, which live in {@code Configurações > Provedor e modelo} ({@code /settings/llm}). It used
+ * to say {@code Provedores}, which is the credentials screen — a different condition, on a
+ * different page, where the user arrives with nothing to fix.
  */
 public class TenantLlmConfigNotFoundException extends BaseException {
 
@@ -24,7 +28,7 @@ public class TenantLlmConfigNotFoundException extends BaseException {
 
     public TenantLlmConfigNotFoundException() {
         super("Este tenant ainda não tem provedor e modelo definidos. "
-                + "Configure em Configurações > Provedores antes de iniciar uma conversa.",
+                + "Configure em Configurações > Provedor e modelo antes de iniciar uma conversa.",
                 HttpStatus.UNPROCESSABLE_ENTITY);
     }
 }

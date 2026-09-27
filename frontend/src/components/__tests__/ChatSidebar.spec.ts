@@ -17,8 +17,8 @@ vi.mock('../../services/session.service', () => ({
 import { sessionService } from '../../services/session.service'
 
 const sessions = [
-  { id: 's1', userId: 'u1', agentId: 'a1', title: 'Conversa 1', summary: null, createAt: '2026-08-26T10:00:00Z', updateAt: '2026-08-26T12:00:00Z' },
-  { id: 's2', userId: 'u1', agentId: 'a1', title: 'Conversa 2', summary: null, createAt: '2026-08-26T09:00:00Z', updateAt: '2026-08-26T11:00:00Z' }
+  { id: 's1', userId: 'u1', promptTemplateId: 'p1', title: 'Conversa 1', summary: null, createAt: '2026-08-26T10:00:00Z', updateAt: '2026-08-26T12:00:00Z' },
+  { id: 's2', userId: 'u1', promptTemplateId: 'p2', title: 'Conversa 2', summary: null, createAt: '2026-08-26T09:00:00Z', updateAt: '2026-08-26T11:00:00Z' }
 ]
 
 function mountComponent(props: Record<string, unknown> = {}) {
@@ -107,4 +107,35 @@ describe('ChatSidebar.vue', () => {
     expect(wrapper.find('[data-testid="empty-state"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Nenhuma conversa')
   })
+
+  it('mostra o paginador quando o tenant tem mais conversas que a página', async () => {
+    // Este é o efeito do `unwrapPage`. O `ChatSidebar` só renderiza o paginador com
+    // `totalPages > 1`, e o Spring 3+ aninha o `totalElements`/`totalPages` dentro de `page`. Com o
+    // `res.data as Page<T>` que existia antes, os dois chegavam `undefined`, `undefined > 1` era
+    // falso, e o paginador **nunca aparecia** — sem erro, sem aviso. Num tenant com 58 conversas o
+    // usuário via 20 e não tinha como chegar às outras 38: achar conversa antiga é função principal
+    // de um produto de chat.
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      id: `s${i}`, userId: 'u1', promptTemplateId: 'p1', title: `Conversa ${i}`,
+      summary: null, createAt: '2026-08-26T10:00:00Z', updateAt: '2026-08-26T12:00:00Z'
+    }))
+    vi.mocked(sessionService.listSessions).mockResolvedValue({
+      content: many, totalElements: 58, totalPages: 3, number: 0, size: 20
+    } as never)
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="paginator"]').exists()).toBe(true)
+  })
+
+  it('esconde o paginador quando tudo cabe em uma página', async () => {
+    vi.mocked(sessionService.listSessions).mockResolvedValue({
+      content: sessions, totalElements: 2, totalPages: 1, number: 0, size: 20
+    } as never)
+    const wrapper = mountComponent()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="paginator"]').exists()).toBe(false)
+  })
+
 })
