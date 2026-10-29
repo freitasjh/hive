@@ -53,7 +53,18 @@
 
           <div class="flex flex-column gap-2">
             <label for="llm-model" class="font-semibold text-sm">Modelo</label>
+            <Select
+              v-if="isRemote && !remoteError && remoteModels.length"
+              id="llm-model"
+              v-model="model"
+              :options="remoteModels"
+              placeholder="Escolha um modelo"
+              class="w-full"
+              :disabled="saving || remoteLoading"
+              data-testid="llm-model"
+            />
             <InputText
+              v-else
               id="llm-model"
               v-model="model"
               class="w-full"
@@ -61,7 +72,11 @@
               placeholder="gpt-4o-mini"
               data-testid="llm-model"
             />
-            <small class="text-surface-500">
+            <small v-if="remoteLoading" class="text-surface-500">Carregando modelos do provedor…</small>
+            <Message v-if="remoteError" severity="warn" :closable="false" data-testid="llm-model-error">
+              {{ remoteError }} Usando entrada manual como fallback.
+            </Message>
+            <small v-else class="text-surface-500">
               Catálogo de {{ meta?.label ?? '—' }}:
               <span v-if="catalogModels.length">{{ catalogModels.join(', ') }}</span>
               <span v-else>consulta o provedor</span>
@@ -117,7 +132,7 @@ import Message from 'primevue/message'
 import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import { agentAdminService } from '../../services/agent-admin.service'
-import { VENDOR_CATALOG, VENDOR_ORDER } from '../../types/agent-admin'
+import { VENDOR_CATALOG, VENDOR_ORDER, toApiError } from '../../types/agent-admin'
 import type { AiProvider, TenantLlmConfig, ValidateResponse, VendorMeta } from '../../types/agent-admin'
 
 const router = useRouter()
@@ -132,6 +147,9 @@ const testing = ref(false)
 const loadError = ref<string | null>(null)
 const saveError = ref<string | null>(null)
 const testResult = ref<ValidateResponse | null>(null)
+const remoteModels = ref<string[]>([])
+const remoteLoading = ref(false)
+const remoteError = ref<string | null>(null)
 
 /**
  * A ordem vem de `VENDOR_ORDER` e não da ordem das chaves do objeto: o usuário lê esta lista todo
@@ -144,7 +162,8 @@ const vendorOptions = computed<VendorMeta[]>(() =>
 
 const meta = computed(() => (provider.value ? VENDOR_CATALOG[provider.value] : null))
 const catalogModels = computed(() => meta.value?.models ?? [])
-const canSave = computed(() => !!(provider.value && model.value.trim()) && !saving.value && !loading.value)
+const isRemote = computed(() => isRemoteProvider(provider.value))
+const canSave = computed(() => !!(provider.value && model.value.trim()) && !saving.value && !loading.value && !remoteLoading.value)
 const canTest = computed(() => !!(provider.value && model.value.trim()) && !testing.value)
 
 /**
@@ -152,10 +171,51 @@ const canTest = computed(() => !!(provider.value && model.value.trim()) && !test
  * certainly is not in the new catalog — and `VendorCatalog.validate` on the server would reject it
  * with a message about a model the user never typed here.
  */
+function isRemoteProvider(p: AiProvider | null): boolean {
+  return p === 'OPENCODE_GO' || p === 'OPENCODE_ZEN'
+}
+
+async function fetchRemoteModels(p: AiProvider, refresh = false, resetModel = false) {
+  if (!isRemoteProvider(p)) {
+    remoteModels.value = []
+    remoteError.value = null
+    remoteLoading.value = false
+    return
+  }
+  remoteLoading.value = true
+  remoteError.value = null
+  try {
+    const res = await agentAdminService.listProviderModels(p, refresh)
+    remoteModels.value = res.models ?? []
+    if (resetModel) {
+      model.value = (res.models && res.models.length ? res.models[0] : null) ?? (VENDOR_CATALOG[p].defaultModel ?? '')
+    }
+  } catch (e: unknown) {
+    const apiErr = toApiError(e)
+    remoteError.value = apiErr.detail ?? 'Falha ao carregar modelos remotos.'
+    if (!remoteModels.value.length) {
+      remoteModels.value = [...(VENDOR_CATALOG[p].models ?? [])]
+    }
+    if (resetModel) {
+      model.value = VENDOR_CATALOG[p].defaultModel ?? ''
+    }
+  } finally {
+    remoteLoading.value = false
+  }
+}
+
 function onProviderChanged() {
   const next = provider.value ? VENDOR_CATALOG[provider.value] : null
-  model.value = next?.defaultModel ?? ''
   testResult.value = null
+  if (provider.value && isRemoteProvider(provider.value)) {
+    model.value = next?.defaultModel ?? ''
+    void fetchRemoteModels(provider.value, false, true)
+  } else {
+    model.value = next?.defaultModel ?? ''
+    remoteModels.value = []
+    remoteError.value = null
+    remoteLoading.value = false
+  }
 }
 
 async function load() {
@@ -167,6 +227,9 @@ async function load() {
       configured.value = true
       provider.value = config.provider
       model.value = config.model
+      if (isRemoteProvider(config.provider)) {
+        void fetchRemoteModels(config.provider, false, false)
+      }
     } else {
       configured.value = false
     }

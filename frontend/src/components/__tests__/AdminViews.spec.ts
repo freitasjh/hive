@@ -19,6 +19,7 @@ vi.mock('../../services/agent-admin.service', () => ({
     listCredentials: vi.fn().mockResolvedValue([{ provider: 'OPENAI', configured: true, last4: 'abcd' }]),
     validate: vi.fn().mockResolvedValue({ ok: true, provider: 'OPENAI', model: 'gpt-4o-mini', latencyMs: 100 }),
     getLlmConfig: vi.fn().mockResolvedValue(null),
+    listProviderModels: vi.fn().mockResolvedValue({ models: ['mimo-v2.5', 'claude-sonnet-4-5'], filteredOut: [], cachedAt: '2026-01-01T00:00:00Z' }),
     saveLlmConfig: vi.fn().mockResolvedValue({
       id: 'cfg-1',
       tenantId: 't1',
@@ -33,6 +34,7 @@ vi.mock('../../services/api', () => ({
   default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } } }
 }))
 
+import { agentAdminService } from '../../services/agent-admin.service'
 import PromptsView from '../../views/admin/PromptsView.vue'
 import PromptEditorView from '../../views/admin/PromptEditorView.vue'
 import LlmConfigView from '../../views/admin/LlmConfigView.vue'
@@ -137,6 +139,36 @@ describe('LlmConfigView', () => {
     await new Promise(r => setTimeout(r, 30))
     expect(w.html()).toContain('llm-save')
     expect(w.text()).not.toContain('Agentes')
+  })
+  it('renders a Select with remote models for a remote provider', async () => {
+    (agentAdminService as any).getLlmConfig.mockResolvedValue({
+      id: 'cfg-1', tenantId: 't1', provider: 'OPENCODE_GO', model: 'mimo-v2.5',
+      createAt: new Date().toISOString(), updateAt: new Date().toISOString(),
+    })
+    const w = mountWithPlugins(LlmConfigView, '/settings/llm')
+    await new Promise(r => setTimeout(r, 50))
+    expect(w.html()).toContain('p-select')
+  })
+  it('falls back to InputText when remote models list is empty', async () => {
+    ;(agentAdminService as any).listProviderModels.mockResolvedValueOnce({ models: [], filteredOut: [], cachedAt: '2026-01-01T00:00:00Z' })
+    ;(agentAdminService as any).getLlmConfig.mockResolvedValue({
+      id: 'cfg-1', tenantId: 't1', provider: 'OPENCODE_GO', model: 'mimo-v2.5',
+      createAt: new Date().toISOString(), updateAt: new Date().toISOString(),
+    })
+    const w = mountWithPlugins(LlmConfigView, '/settings/llm')
+    await new Promise(r => setTimeout(r, 50))
+    expect(w.html()).toContain('p-inputtext')
+  })
+  it('shows remote error and falls back to InputText on failure', async () => {
+    ;(agentAdminService as any).listProviderModels.mockRejectedValueOnce(new Error('boom'))
+    ;(agentAdminService as any).getLlmConfig.mockResolvedValue({
+      id: 'cfg-1', tenantId: 't1', provider: 'OPENCODE_GO', model: 'mimo-v2.5',
+      createAt: new Date().toISOString(), updateAt: new Date().toISOString(),
+    })
+    const w = mountWithPlugins(LlmConfigView, '/settings/llm')
+    await new Promise(r => setTimeout(r, 50))
+    expect(w.html()).toContain('llm-model-error')
+    expect(w.html()).toContain('p-inputtext')
   })
 })
 

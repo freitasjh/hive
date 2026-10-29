@@ -13,12 +13,14 @@ vi.mock('../../../services/agent-admin.service', () => ({
   agentAdminService: {
     getLlmConfig: vi.fn(),
     saveLlmConfig: vi.fn(),
-    validate: vi.fn()
+    validate: vi.fn(),
+    listProviderModels: vi.fn()
   },
   default: {
     getLlmConfig: vi.fn(),
     saveLlmConfig: vi.fn(),
-    validate: vi.fn()
+    validate: vi.fn(),
+    listProviderModels: vi.fn()
   }
 }))
 
@@ -46,6 +48,11 @@ describe('LlmConfigView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(agentAdminService.getLlmConfig).mockResolvedValue(null)
+    vi.mocked(agentAdminService.listProviderModels).mockResolvedValue({
+      models: ['mimo-v2.5'],
+      filteredOut: [],
+      cachedAt: new Date().toISOString(),
+    })
   })
 
   it('says the tenant has nothing configured before any error happens', async () => {
