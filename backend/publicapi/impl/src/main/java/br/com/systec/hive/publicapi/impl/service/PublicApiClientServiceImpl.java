@@ -10,6 +10,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,7 @@ public class PublicApiClientServiceImpl implements PublicApiClientService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final PasswordEncoder encoder;
 
+    @Autowired
     public PublicApiClientServiceImpl(PublicApiClientRepository repository, RedisTemplate<String, Object> redisTemplate) {
         this(repository, redisTemplate, new BCryptPasswordEncoder());
     }
