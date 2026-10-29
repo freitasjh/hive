@@ -51,6 +51,10 @@ public class LangChain4jClientFactory implements LlmClientFactory<ChatModel> {
      * Only GO/ZEN clients receive these headers.
      */
     static Map<String, String> opencodeHeaders(UUID sessionId) {
+        // sessionId must not be null: sessionId.toString() is used verbatim as the
+        // x-opencode-session header value. A null would either NPE here or, if coerced,
+        // be sent as the literal "null". Callers in the stateless public flow pass a
+        // synthetic per-request UUID (see createClientWithSession contract).
         return Map.of(
                 SESSION_HEADER, sessionId.toString(),
                 USER_AGENT_HEADER, HIVE_USER_AGENT);
@@ -70,6 +74,13 @@ public class LangChain4jClientFactory implements LlmClientFactory<ChatModel> {
     @Override
     public ChatModel createClientWithSession(AiProvider provider, String model, Double temperature, Integer maxTokens,
             Double topP, String apiKey, String baseUrl, UUID sessionId) {
+        // Contract (Gate R2 of the public-api-chat batch): sessionId is NOT nullable here.
+        //   - opencodeHeaders(UUID) calls sessionId.toString() for the x-opencode-session header,
+        //     so a null would surface as the literal string "null" (or an NPE) in the header.
+        //   - The factory rejects null with IllegalArgumentException rather than silently degrading.
+        //   Therefore, in the stateless public flow, the caller (LangChain4jTurnGateway via
+        //   TurnRequest) must supply a synthetic per-request UUID (the turn id of the response);
+        //   ChatTrace.sessionId stays null on that path. Do not relax this check to tolerate null.
         if (provider == null) {
             throw new IllegalArgumentException("provider must not be null");
         }

@@ -12,7 +12,7 @@ Verificação pós-implementação obrigatória antes do `archive`. Três dimens
 ## Dimensão 2: Correctness (Correção)
 
 - [ ] **Build limpo**: `mvn clean install` (backend) OU `npm run build` (frontend) sem erros.
-- [ ] **Testes passando**: `mvn test` OU `npm run test` — zero falhas.
+- [ ] **Testes passando**: `mvn test` OU `npm run test:run` — zero falhas.
 - [ ] **Cobertura mínima**: Services ≥ 80%, Domain ≥ 90% (backend). Confirmar com relatório.
 - [ ] **Requisitos funcionais**: Cada item de `SPEC.md § Functional Requirements` tem correspondência verificável no código.
 - [ ] **RBAC correto**: Permissões implementadas e testadas (se feature tem RBAC).

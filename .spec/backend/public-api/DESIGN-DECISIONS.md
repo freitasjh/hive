@@ -96,6 +96,9 @@ compor o outro. E é reversível: apagar o módulo inteiro remove a feature sem 
 **Custo honesto:** 4 `pom.xml` novos, 1 `@Configuration` Flyway, 1 `pom` pai. E o bootstrap tem que
 depender de `hive-publicapi-impl` e `hive-publicapi-web`.
 
+✅ **Ratificada pelo usuário (D5 da revisão).** `ux-designer` **não** entra na lista de obrigatórios
+desta feature (D6): superfície headless, sem tela. O gatilho de volta está nomeado no PLAN.
+
 ---
 
 ## 2. 🗡️ Confronto do briefing: "a API pública pode ser a segunda implementação de `ChatTurnGateway`"
@@ -215,7 +218,7 @@ Se alguém inverter, o ADR-013 já avisa o que acontece.
 | # | Decisão | Alternativa rejeitada | Motivo |
 |---|---|---|---|
 | **D1** | Módulo novo `publicapi`, 4 submódulos, histórico Flyway próprio, **sem `repair()`** | (1) `security/dbupdate` + edge `agent→security`; (2) `identity`; (3) `agent` | Bounded context próprio; só arestas de saída; reversível apagando o módulo. Sem `repair()` porque o histórico nasce vazio — e a ausência faz divergência futura **morrer alto**, que é o correto (§`CONSTRAINTS.md §1.2`) |
-| **D2** | **`SecurityFilterChain` separada** para `/v1/public/**`, com `denyAll()` do path público no chain humano | Ramo por claim dentro do `SecurityFilter` | Fecha a lacuna de endpoint **por ausência de rota**, não por lista. O ramo exigiria mexer no `loadUserByUsername` incondicional, que é o caminho de todo usuário |
+| **D2** | **`SecurityFilterChain` separada** para `/v1/public/**`, com `denyAll()` do path público no chain humano | Ramo por claim dentro do `SecurityFilter` | Fecha a lacuna de endpoint **por ausência de rota**, não por lista. ⚠️ **Causa do 500 corrigida na revisão (B2):** não é `loadUserByUsername:51` (inalcançável) — é `validateTokenRevoke:49` → `decodeAndVerify` exigindo `aud=hive.web` → `BaseException` em `:63` → 500. E `SecurityFilter.java:28` é `@Component`: **auto-registrado fora do `FilterChainProxy`**, roda em `/v1/public/**` de qualquer forma (B1). Correção: `FilterRegistrationBean.setEnabled(false)` em `SecurityConfig` (D7) |
 | **D3** | Reusar `LangChain4jTurnGateway`; a API pública é **segundo chamador**, não segunda implementação | `PublicApiTurnGateway` | §2.1/2.2. Preserva a concordância de diagnóstico entre os caminhos |
 | **D4** | Extrair `ProviderResolution` + `TurnOutcomeMapper` de `ChatServiceImpl` **antes** de escrever a rota pública | Escrever a rota pública e deixar `ChatServiceImpl` intacto | Sem a extração, a rota pública **força** a cópia. Com ela, é aditiva. E `ChatServiceImpl` encolhe |
 | **D5** | Cota pública em **Redis** (sliding-window log, `SORTED SET` + Lua atômico), keyed por `clientId`; teto por tenant em chave separada; `ChatRateLimiter` em memória **intocado** | Estender `SlidingWindowRateLimiter` em memória com `clientId` | §`EXPLORATION.md §4.5`. Redis já é produção (`TokenCacheServiceImpl`); `10N/min` sob N instâncias é bug de correção; `ConcurrentHashMap` sem eviction |
@@ -232,10 +235,17 @@ Se alguém inverter, o ADR-013 já avisa o que acontece.
 | **D16** | Ordem de checagem: **401 → 429 → 403 allowlist → 404 → 409 → 400 → 422 → 502** | 404 antes do 403 | `prompt_not_in_allowlist` tem de responder **existindo ou não** o código. Inverter transforma o 403/404 em oráculo de existência **dentro do tenant** — que é o que a decisão 4 quer impedir |
 | **D17** | `access_token` TTL público = **10 min**, sem refresh token | 15 min (do interno) / 30 min | OAuth 2.0: `client_credentials` **não** emite refresh token (RFC 6749 §4.4.3). Janela de exposição de token_commit: 5–15 min é a faixa recomendada para M2M |
 | **D18** | Hot path **sem banco**: assinatura + `jti` blacklist (Redis) + `client` revogado (Redis) + allowlist do claim | Validar `clientId` contra o banco a cada request | Revogação imediata (Redis) sem o custo de um SELECT por request. Precedente do padrão: cache de 60s + invalidação imediata no Redis |
+| **D19** | Default de `pin_mode` = **`FOLLOW_ACTIVE`**; provisionamento **sempre** informa `pin_mode` explicitamente | `PINNED` como default (posição do PM) | **Arbitrado pelo usuário pela própria condição do PM** (*"1 integração, prompt do mesmo time que faz o deploy"*). `PINNED` torna **todo PUT de rotina do prompt um 409** — risco de disponibilidade. `PINNED` segue disponível por credencial/código onde o contrato exigir |
+| **D20** | Política do turno: porta e função pura em `agent/api` (`ProviderMessages` estático, `isModelNotFound`+`ModelNotFound`); adaptador em `agent/impl`; `LangChain4jTurnGateway` **é tocado** | Gateway intacto (regra copiada) ou tudo em `impl` | **Emenda ratificada pelo usuário.** Sem tocar o gateway, ou D3 vira mentira ou a regra é **copiada** — que é o que o ADR-012 existe para evitar. `ProviderResolution` fica no `impl`: `agent/api → agent/impl` é ciclo Maven |
+| **D21** | Teto de payload = **dado da credencial** (3 colunas + claim `plim`); recusa explícita 400/413, **nunca** truncamento | Constante de código; ou "teto do proxy" (não existe proxy no caminho) | Número em código ninguém calibra sem deploy. O ERP chama o Hive **direto**, e `LlmRetryPolicy` **retenta** — payload sem teto × retry é a pior combinação de custo e erro |
+| **D22** | Metadados de uso em **log**; `ChatTrace` ganha `tenantId`+`turnId`+`clientId` no **Batch 1B** | 4ª tabela no hot path | 3 condições (log pesquisável junto ao usuário — **verificada**); zero migration; reversão para tabela + LGPD se a condição cair |
+| **D23** | Provisionamento por **`CommandLineRunner`** (tela 10.1 cortada); `ProvisioningPayloadBuilder` como código; `ux-designer` **não** exigido | Tela de provisionamento | Superfície headless não tem UX. Gatilho para voltar nomeado: 2 credenciais de produção, ou provisionamento por quem não tem acesso ao ambiente |
 
 ## 4. Extrações que precedem a feature (D4) — o recorte
 
-Dois colaboradores novos, ~80 linhas movidas, **zero mudança de comportamento**:
+**Recorte final (D5, revisão de 2026-09-27).** Dois colaboradores em `agent/impl`, uma função pura
+e uma exceção que sobem para `agent/api`, e um método novo no serviço de prompt — **~72 = região
+medida, ~28 = código que muda**, zero mudança de comportamento:
 
 ```
 ProviderResolution            (de ChatServiceImpl:176-186)
@@ -252,10 +262,17 @@ TurnOutcomeMapper             (de ChatServiceImpl:203-246)
   - ANSWERED       → recordTurn(null)
 ```
 
-Efeito: `chat()` deixa de ler ambiente e passa a ter duas chamadas nomeadas no lugar de ~80 linhas
+```
+toProviderMessages  → ESTÁTICO em agent/api/util/ProviderMessages        (D5.3)
+isModelNotFound + ModelNotFound → agent/api                              (D5.4, gateway TOCADO)
+PromptTemplateService.findByCodeAndVersion                                 (D5.4, 1 método)
+```
+
+Efeito: `chat()` deixa de ler ambiente e passa a ter duas chamadas nomeadas no lugar da região
 inline. **A porta, a trace, a classificação e as três classificações de erro ficam byte a byte
 iguais** — a validação do batch é `git diff` das linhas load-bearing, mais a suíte, mais uma rodada
-de E2E com `systemBlockChars` para provar que o prompt montado não mudou.
+de E2E com `systemBlockChars` para provar que o prompt montado não mudou. ⚠️ `findActiveByCode` já
+resolve `FOLLOW_ACTIVE`: **zero query nova**.
 
 ## 5. Riscos desta fase
 

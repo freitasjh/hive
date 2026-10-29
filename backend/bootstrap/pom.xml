@@ -173,6 +173,28 @@
             <scope>compile</scope>
         </dependency>
 
+        <!-- Public API -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-publicapi-api</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-publicapi-impl</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-publicapi-dbupdate</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-publicapi-web-internal-v1</artifactId>
+            <scope>compile</scope>
+        </dependency>
+
         <!-- Provedores de IA -->
         <dependency>
             <groupId>br.com.systec.hive</groupId>

@@ -1,0 +1,667 @@
+{
+  "version": "1.0.0",
+  "date": "2026-10-29T12:20:42.794Z",
+  "source": "harness@1.0.0",
+  "target": "/home/joao/fusionlf/wsProjeto/hive",
+  "installed": [
+    {
+      "path": ".agents/agents/architect/AGENT.md",
+      "kind": "file",
+      "preMergeSha256": "9b572a450691646e674ebc6a791186b111cde64f23c468d0e4f52399b7c75b81"
+    },
+    {
+      "path": ".agents/agents/code-reviewer/PROMPT.md",
+      "kind": "file",
+      "preMergeSha256": "4b5e4383e53d5ae56caeabc597646de10e8fdef6c96080b98fe6dd72341d17e7"
+    },
+    {
+      "path": ".agents/agents/codebase-analyzer/AGENT.md",
+      "kind": "file",
+      "preMergeSha256": "b00dd2804526740811751024ee9530e72d522c1384ebe360dc9e8b861a1511ab"
+    },
+    {
+      "path": ".agents/agents/design-system-specialist/AGENT.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/agents/developer-engineer/AGENT.md",
+      "kind": "file",
+      "preMergeSha256": "1e846998e286768c1687826dd51a4d58a5f7746c7bd59ad58bb0a9a64dd2b5db"
+    },
+    {
+      "path": ".agents/agents/orchestrator/AGENT.md",
+      "kind": "file",
+      "preMergeSha256": "95e18d0050f72b2c80ea0a4dfeddbdfb93b11c6ff13734bbd94a638aa7cdeda0"
+    },
+    {
+      "path": ".agents/agents/product-manager/AGENT.md",
+      "kind": "file",
+      "preMergeSha256": "0ce16c1138924d5c9afe27b36e77db85e6c641ca0052cf051e6492cd8ff24477"
+    },
+    {
+      "path": ".agents/agents/qa-engineer/AGENT.md",
+      "kind": "file",
+      "preMergeSha256": "357228f494a44f9f14720ebf8ddfa3a06dbfd7952ec22e56cdb2f5f47a9dedad"
+    },
+    {
+      "path": ".agents/agents/sdd-orquestrador/AGENT.md",
+      "kind": "file",
+      "preMergeSha256": "bd558c6f72088fa1a6324bd3e5b8993b8a730fe2f476cb8ada7da689054575bf"
+    },
+    {
+      "path": ".agents/agents/security-engineer/AGENT.md",
+      "kind": "file",
+      "preMergeSha256": "40cd20989841ea0afcccd1028999b35271dd22b3d52fd85b4a5805b8c91fc729"
+    },
+    {
+      "path": ".agents/agents/ux-designer/AGENT.md",
+      "kind": "file",
+      "preMergeSha256": "399c78f95f4748033e997e524a4f5107b297f87553cb75d764bf2304731f3b02"
+    },
+    {
+      "path": ".agents/rules/gate-contract.md",
+      "kind": "file",
+      "preMergeSha256": "227493bb929a7429b75597c27d9d4f2d2ee7ba78d88be3bc9f6a316302e64564"
+    },
+    {
+      "path": ".agents/rules/harness-config.md",
+      "kind": "file",
+      "preMergeSha256": "2d391756d8d0ffd7d82974ac8159b8485c898d0166eb8b0ac5b91fa7b871e9eb"
+    },
+    {
+      "path": ".agents/rules/prd-adr-pipeline.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/schemas/harness-report.schema.json",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/LICENSE-dart-lang-skills",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/LICENSE-flutter-skills",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/LICENSE-kadajett-agent-nestjs-skills",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/LICENSE-stitch-skills",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/LICENSE-vercel-agent-skills",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/VENDOR-NOTICE.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/harness-installer/SKILL.md",
+      "kind": "file",
+      "preMergeSha256": "9988e0836e621a8a6b4b23db767e92aeec858d23479f781e710999e9286c7f3c"
+    },
+    {
+      "path": ".agents/skills/nestjs-architecture-specialist/SKILL.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/node-architecture-specialist/SKILL.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/prd-adr-pipeline/checks.mjs",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/prd-adr-pipeline/templates/ADR-INDEX.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/prd-adr-pipeline/templates/ADR.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/prd-adr-pipeline/templates/PRD.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/prd-adr-pipeline/templates/RESEARCH.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/rust-architecture-specialist/SKILL.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/template-best-practices/SKILL.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/template-deepsearch/SKILL.md",
+      "kind": "file"
+    },
+    {
+      "path": ".agents/skills/template-structure/SKILL.md",
+      "kind": "file"
+    },
+    {
+      "path": ".opencode/plugins/gate.js",
+      "kind": "file",
+      "preMergeSha256": "194fdaf6e99232597f07f15f2c5104531f86f66eaec4556941c943c4210c35dd"
+    },
+    {
+      "path": ".opencode/plugins/lib/config.mjs",
+      "kind": "file",
+      "preMergeSha256": "561210ab574238392c6857386fc08308483081cfdd9ed6b00ab355b82527abd0"
+    }
+  ],
+  "merged": [],
+  "flagged": [
+    {
+      "path": ".agents/rules/brain-context.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/rules/frontend-coding-standards.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/rules/sdd-workflow-standard.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/rules/workflow-rules.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/dev-planner/SKILL.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/dev-planner/workflow.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/prompt-optimizer/SKILL.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/prompt-optimizer/references/clarifying-questions.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/sdd-architecture-board/SKILL.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/sdd-architecture-board/templates/ADR_TEMPLATE.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/SKILL.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/asserts/spec-gate.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/asserts/verify-gate.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/references/database.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/references/frontend.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/references/proposal-template.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/sdd-feedback/SKILL.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/security-review/SKILL.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/spec-review/README.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/spec-review/SKILL.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/spec-review/assets/checklist.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/spec-review/assets/output-template.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".agents/skills/spec-review/assets/usage-guide.md",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".opencode/plugins/harness-validator.js",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": ".opencode/plugins/hitl-guardrail.js",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": "opencode.json",
+      "reason": "user-modified (disk != manifest)"
+    },
+    {
+      "path": "harness.config.json",
+      "reason": "user-modified (disk != manifest)"
+    }
+  ],
+  "backupDir": "/home/joao/fusionlf/wsProjeto/.harness-backup-hive-2026-10-29T12-20-41-653Z",
+  "answers": {
+    "project": "hive",
+    "stack": "java+vue",
+    "suiteCommand": "mvn clean install",
+    "pluginsDir": "/home/joao/fusionlf/wsProjeto/hive/.opencode"
+  },
+  "checks": {
+    "passed": false,
+    "failed": [
+      "[ERRO] flagged-open: .agents/rules/brain-context.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/rules/brain-context.md",
+      "[ERRO] flagged-open: .agents/rules/frontend-coding-standards.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/rules/frontend-coding-standards.md",
+      "[ERRO] flagged-open: .agents/rules/sdd-workflow-standard.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/rules/sdd-workflow-standard.md",
+      "[ERRO] flagged-open: .agents/rules/workflow-rules.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/rules/workflow-rules.md",
+      "[ERRO] flagged-open: .agents/skills/dev-planner/SKILL.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/dev-planner/SKILL.md",
+      "[ERRO] flagged-open: .agents/skills/dev-planner/workflow.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/dev-planner/workflow.md",
+      "[ERRO] flagged-open: .agents/skills/prompt-optimizer/SKILL.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/prompt-optimizer/SKILL.md",
+      "[ERRO] flagged-open: .agents/skills/prompt-optimizer/references/clarifying-questions.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/prompt-optimizer/references/clarifying-questions.md",
+      "[ERRO] flagged-open: .agents/skills/sdd-architecture-board/SKILL.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/sdd-architecture-board/SKILL.md",
+      "[ERRO] flagged-open: .agents/skills/sdd-architecture-board/templates/ADR_TEMPLATE.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/sdd-architecture-board/templates/ADR_TEMPLATE.md",
+      "[ERRO] flagged-open: .agents/skills/sdd-compiler/SKILL.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/sdd-compiler/SKILL.md",
+      "[ERRO] flagged-open: .agents/skills/sdd-compiler/asserts/spec-gate.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/sdd-compiler/asserts/spec-gate.md",
+      "[ERRO] flagged-open: .agents/skills/sdd-compiler/asserts/verify-gate.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/sdd-compiler/asserts/verify-gate.md",
+      "[ERRO] flagged-open: .agents/skills/sdd-compiler/references/database.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/sdd-compiler/references/database.md",
+      "[ERRO] flagged-open: .agents/skills/sdd-compiler/references/frontend.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/sdd-compiler/references/frontend.md",
+      "[ERRO] flagged-open: .agents/skills/sdd-compiler/references/proposal-template.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/sdd-compiler/references/proposal-template.md",
+      "[ERRO] flagged-open: .agents/skills/sdd-feedback/SKILL.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/sdd-feedback/SKILL.md",
+      "[ERRO] flagged-open: .agents/skills/security-review/SKILL.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/security-review/SKILL.md",
+      "[ERRO] flagged-open: .agents/skills/spec-review/README.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/spec-review/README.md",
+      "[ERRO] flagged-open: .agents/skills/spec-review/SKILL.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/spec-review/SKILL.md",
+      "[ERRO] flagged-open: .agents/skills/spec-review/assets/checklist.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/spec-review/assets/checklist.md",
+      "[ERRO] flagged-open: .agents/skills/spec-review/assets/output-template.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/spec-review/assets/output-template.md",
+      "[ERRO] flagged-open: .agents/skills/spec-review/assets/usage-guide.md (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.agents/skills/spec-review/assets/usage-guide.md",
+      "[ERRO] flagged-open: .opencode/plugins/harness-validator.js (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.opencode/plugins/harness-validator.js",
+      "[ERRO] flagged-open: .opencode/plugins/hitl-guardrail.js (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/.opencode/plugins/hitl-guardrail.js",
+      "[ERRO] flagged-open: opencode.json (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/opencode.json",
+      "[ERRO] flagged-open: harness.config.json (user-modified (disk != manifest)) — resolucao humana pendente (I6)\n  porquê: flagged-open\n  como corrigir: resolva cada item flagged manualmente e rode doctor/install de novo.\n  onde ver: /home/joao/fusionlf/wsProjeto/hive/harness.config.json"
+    ]
+  },
+  "manifestSchemaVersion": 1,
+  "fileHashes": [
+    {
+      "path": ".agents/agents/architect/AGENT.md",
+      "sha256": "16459c95112f61b981a37f25696c6a652505781ac26e30cd01d16d944b7b9b39",
+      "preMergeSha256": "9b572a450691646e674ebc6a791186b111cde64f23c468d0e4f52399b7c75b81"
+    },
+    {
+      "path": ".agents/agents/code-reviewer/PROMPT.md",
+      "sha256": "d68e7f0fc86614f521a40346d380782fe637cd21ca6c02e12e5cad15fdd5bea6",
+      "preMergeSha256": "4b5e4383e53d5ae56caeabc597646de10e8fdef6c96080b98fe6dd72341d17e7"
+    },
+    {
+      "path": ".agents/agents/codebase-analyzer/AGENT.md",
+      "sha256": "50ac538781bdfed7345e78099d77e07d3e02b191d12426d60c6a85af6f3e39d0",
+      "preMergeSha256": "b00dd2804526740811751024ee9530e72d522c1384ebe360dc9e8b861a1511ab"
+    },
+    {
+      "path": ".agents/agents/design-system-specialist/AGENT.md",
+      "sha256": "738e0750924d7a97c42f8157b9d77e7e4a7a9ec79499e982003a269ede132ef5"
+    },
+    {
+      "path": ".agents/agents/developer-engineer/AGENT.md",
+      "sha256": "608c0d99b252d3f985e27b66cd3f630112be464834cce076564ef4691889974a",
+      "preMergeSha256": "1e846998e286768c1687826dd51a4d58a5f7746c7bd59ad58bb0a9a64dd2b5db"
+    },
+    {
+      "path": ".agents/agents/orchestrator/AGENT.md",
+      "sha256": "2cf1f94038cfbcd6fb512f86cb86fd57943060a6136970da04d76eb5b3b4fda0",
+      "preMergeSha256": "95e18d0050f72b2c80ea0a4dfeddbdfb93b11c6ff13734bbd94a638aa7cdeda0"
+    },
+    {
+      "path": ".agents/agents/product-manager/AGENT.md",
+      "sha256": "4c8bda262ea859311556f02ea42a2b7636e6ae911986e863fcf881db5ecb53ef",
+      "preMergeSha256": "0ce16c1138924d5c9afe27b36e77db85e6c641ca0052cf051e6492cd8ff24477"
+    },
+    {
+      "path": ".agents/agents/qa-engineer/AGENT.md",
+      "sha256": "a41963de7085dfb282319e1664da6a40f9e77c95020efed5c3ba2b32518d5ef2",
+      "preMergeSha256": "357228f494a44f9f14720ebf8ddfa3a06dbfd7952ec22e56cdb2f5f47a9dedad"
+    },
+    {
+      "path": ".agents/agents/sdd-orquestrador/AGENT.md",
+      "sha256": "9928a6f4bab0a82e9dfcb9b3f137e4ea32f62bf1e5fc8d9caa2b675ba6f4bdc6",
+      "preMergeSha256": "bd558c6f72088fa1a6324bd3e5b8993b8a730fe2f476cb8ada7da689054575bf"
+    },
+    {
+      "path": ".agents/agents/security-engineer/AGENT.md",
+      "sha256": "0a2661430045a39fd3f40576a4fe66707cf408660b22f500b24912931238f25e",
+      "preMergeSha256": "40cd20989841ea0afcccd1028999b35271dd22b3d52fd85b4a5805b8c91fc729"
+    },
+    {
+      "path": ".agents/agents/ux-designer/AGENT.md",
+      "sha256": "7bcf5398cb741705da561b5735f1bde4ef29b36ae66a81532a19957ae782832e",
+      "preMergeSha256": "399c78f95f4748033e997e524a4f5107b297f87553cb75d764bf2304731f3b02"
+    },
+    {
+      "path": ".agents/rules/gate-contract.md",
+      "sha256": "288aa54e65729210de5737a931324fff89c517897a2ecd0fc3e9cc46b2963470",
+      "preMergeSha256": "227493bb929a7429b75597c27d9d4f2d2ee7ba78d88be3bc9f6a316302e64564"
+    },
+    {
+      "path": ".agents/rules/harness-config.md",
+      "sha256": "eeeba673f97e05664e538b8cd4928af88e842d97425f67b91a12cf9b6574dea9",
+      "preMergeSha256": "2d391756d8d0ffd7d82974ac8159b8485c898d0166eb8b0ac5b91fa7b871e9eb"
+    },
+    {
+      "path": ".agents/rules/prd-adr-pipeline.md",
+      "sha256": "bcfa217e21c25a0e391bb37d5b5ba2a99749fc13be8bfe2ecc7660f855b75ba5"
+    },
+    {
+      "path": ".agents/schemas/harness-report.schema.json",
+      "sha256": "d587d6b11236d890fb595f117040d2f475aa0da85ae90b9287921f593516458a"
+    },
+    {
+      "path": ".agents/skills/LICENSE-dart-lang-skills",
+      "sha256": "835b0ffef5681b070c8d9c6c7d67cdd018441a7ae65b1ebd772dbdd2bd40f097"
+    },
+    {
+      "path": ".agents/skills/LICENSE-flutter-skills",
+      "sha256": "5b95696b504e162bcf775060ec416005df9969a95cda6f7d4ddb57327dd74d35"
+    },
+    {
+      "path": ".agents/skills/LICENSE-kadajett-agent-nestjs-skills",
+      "sha256": "264e78cc6fa0d0c6067e947522100c11a7b302617c9b719d7d9f4e9def00177e"
+    },
+    {
+      "path": ".agents/skills/LICENSE-stitch-skills",
+      "sha256": "b4133a55232c0996713349891dc55469d46a16ec027c033c9e4108b2149abb42"
+    },
+    {
+      "path": ".agents/skills/LICENSE-vercel-agent-skills",
+      "sha256": "1cc9611d4fffbd0201696a5a81cc0b1d82743db847654ff4fa57d92ba7669387"
+    },
+    {
+      "path": ".agents/skills/VENDOR-NOTICE.md",
+      "sha256": "f0b7fbc1065dbe1067540278965efbf8af8b9530414748b903a266d97ab4f639"
+    },
+    {
+      "path": ".agents/skills/harness-installer/SKILL.md",
+      "sha256": "186b56d41a9c3453f9a95eaaf4f0d56f18b52d9222b568e4286f870e03b10fa6",
+      "preMergeSha256": "9988e0836e621a8a6b4b23db767e92aeec858d23479f781e710999e9286c7f3c"
+    },
+    {
+      "path": ".agents/skills/nestjs-architecture-specialist/SKILL.md",
+      "sha256": "90fefbb6691014cef362fb9fd369ec027a92944340f823b633699427ffbaa788"
+    },
+    {
+      "path": ".agents/skills/node-architecture-specialist/SKILL.md",
+      "sha256": "a41e117015e38784172a849e96fdc541b0a290094e88d4efa41e0ec5b79a97d8"
+    },
+    {
+      "path": ".agents/skills/prd-adr-pipeline/checks.mjs",
+      "sha256": "3ae81147618732e572ab77a4e70244733261d7653b9499b60a9b317d6837cafa"
+    },
+    {
+      "path": ".agents/skills/prd-adr-pipeline/templates/ADR-INDEX.md",
+      "sha256": "1b747601bf1e59955b8b66fa861755ce3504d5a3f6d21a74f429eccf88a2574d"
+    },
+    {
+      "path": ".agents/skills/prd-adr-pipeline/templates/ADR.md",
+      "sha256": "150b5229a9e397d5dbc1407803f387bf4934d82d12716c48c1d8c7753a7ab250"
+    },
+    {
+      "path": ".agents/skills/prd-adr-pipeline/templates/PRD.md",
+      "sha256": "df2d61eb5c3e775841a44fe3e6e59e2cea6dc435eb4b1efb74b9fa0adf97c8fe"
+    },
+    {
+      "path": ".agents/skills/prd-adr-pipeline/templates/RESEARCH.md",
+      "sha256": "c09d31662b4ad3a761a5b636fa5e10250d775c8af9df4b06f80939380d89f028"
+    },
+    {
+      "path": ".agents/skills/rust-architecture-specialist/SKILL.md",
+      "sha256": "7b459980cdc4a265ba477fcfa600dec0bef5bb161674349d7e56c567ac9b680d"
+    },
+    {
+      "path": ".agents/skills/template-best-practices/SKILL.md",
+      "sha256": "e95eab41bc8eb13e42fb705b306217c845b33a44dc52b7257a320d1c22645907"
+    },
+    {
+      "path": ".agents/skills/template-deepsearch/SKILL.md",
+      "sha256": "e6fc53d0948bc78ad3643e78909a78aa905af0bb5c688bdfc80f414608533fd6"
+    },
+    {
+      "path": ".agents/skills/template-structure/SKILL.md",
+      "sha256": "bcd5f533374729b5a679fd97636682a3260070cd0897842d2bf7eb1f88adfaac"
+    },
+    {
+      "path": ".opencode/plugins/gate.js",
+      "sha256": "b08b6393598eb222729f39afc340222c9db247a5846cde32e847101663f2263e",
+      "preMergeSha256": "194fdaf6e99232597f07f15f2c5104531f86f66eaec4556941c943c4210c35dd"
+    },
+    {
+      "path": ".opencode/plugins/lib/config.mjs",
+      "sha256": "3147ec936c570efa9fbfc169b21537b2b6a8e8cd32f3068b218f4bb380f679fa",
+      "preMergeSha256": "561210ab574238392c6857386fc08308483081cfdd9ed6b00ab355b82527abd0"
+    }
+  ],
+  "flaggedResolution": [
+    {
+      "path": ".agents/rules/brain-context.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/rules/frontend-coding-standards.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/rules/sdd-workflow-standard.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/rules/workflow-rules.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/dev-planner/SKILL.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/dev-planner/workflow.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/prompt-optimizer/SKILL.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/prompt-optimizer/references/clarifying-questions.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/sdd-architecture-board/SKILL.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/sdd-architecture-board/templates/ADR_TEMPLATE.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/SKILL.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/asserts/spec-gate.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/asserts/verify-gate.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/references/database.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/references/frontend.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/sdd-compiler/references/proposal-template.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/sdd-feedback/SKILL.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/security-review/SKILL.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/spec-review/README.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/spec-review/SKILL.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/spec-review/assets/checklist.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/spec-review/assets/output-template.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".agents/skills/spec-review/assets/usage-guide.md",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".opencode/plugins/harness-validator.js",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": ".opencode/plugins/hitl-guardrail.js",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": "opencode.json",
+      "status": "open",
+      "how": ""
+    },
+    {
+      "path": "harness.config.json",
+      "status": "open",
+      "how": ""
+    }
+  ],
+  "validationMarks": [
+    {
+      "item": "project",
+      "status": "validated"
+    },
+    {
+      "item": "stack",
+      "status": "validated"
+    },
+    {
+      "item": "suiteCommand",
+      "status": "validated"
+    },
+    {
+      "item": "pluginsDir",
+      "status": "validated"
+    }
+  ],
+  "upgradedFrom": "harness@1.0.0",
+  "removed": [
+    ".opencode/plugins/__tests__/config-loader.spec.mjs",
+    ".opencode/plugins/__tests__/dogfood.spec.mjs",
+    ".opencode/plugins/__tests__/gate.spec.mjs",
+    ".opencode/plugins/__tests__/report-schema.spec.mjs",
+    ".opencode/plugins/__tests__/sdd-checks.spec.mjs",
+    ".opencode/plugins/__tests__/seal.spec.mjs"
+  ],
+  "collisions": [
+    ".agents/rules/brain-context.md",
+    ".agents/rules/frontend-coding-standards.md",
+    ".agents/rules/sdd-workflow-standard.md",
+    ".agents/rules/workflow-rules.md",
+    ".agents/skills/dev-planner/SKILL.md",
+    ".agents/skills/dev-planner/workflow.md",
+    ".agents/skills/prompt-optimizer/SKILL.md",
+    ".agents/skills/prompt-optimizer/references/clarifying-questions.md",
+    ".agents/skills/sdd-architecture-board/SKILL.md",
+    ".agents/skills/sdd-architecture-board/templates/ADR_TEMPLATE.md",
+    ".agents/skills/sdd-compiler/SKILL.md",
+    ".agents/skills/sdd-compiler/asserts/spec-gate.md",
+    ".agents/skills/sdd-compiler/asserts/verify-gate.md",
+    ".agents/skills/sdd-compiler/references/database.md",
+    ".agents/skills/sdd-compiler/references/frontend.md",
+    ".agents/skills/sdd-compiler/references/proposal-template.md",
+    ".agents/skills/sdd-feedback/SKILL.md",
+    ".agents/skills/security-review/SKILL.md",
+    ".agents/skills/spec-review/README.md",
+    ".agents/skills/spec-review/SKILL.md",
+    ".agents/skills/spec-review/assets/checklist.md",
+    ".agents/skills/spec-review/assets/output-template.md",
+    ".agents/skills/spec-review/assets/usage-guide.md",
+    ".opencode/plugins/harness-validator.js",
+    ".opencode/plugins/hitl-guardrail.js",
+    "opencode.json",
+    "harness.config.json"
+  ],
+  "doctorPre": {
+    "verdict": "QUEBRADO"
+  }
+}

@@ -30,7 +30,7 @@ Entender profundamente O QUE o usuário precisa resolver, diferenciando sintoma 
 
 ### Entradas
 - Descrição inicial do usuário (pode ser vaga)
-- Contexto do projeto (ler `AGENTS.md`, `backend/README.md`)
+- Contexto do projeto (ler `AGENTS.md`, `.doc/ARCHITECTURE.md`)
 
 ### Processo
 
@@ -98,7 +98,7 @@ Mapear todas as limitações técnicas, dependências e requisitos não-funciona
 
 ### Entradas
 - EXPLORATION.md aprovado
-- Contexto do projeto (`backend/README.md`, `AGENTS.md`)
+- Contexto do projeto (`.doc/ARCHITECTURE.md`, `.doc/STACK.md`)
 
 ### Processo
 
@@ -345,7 +345,7 @@ Decompor em tarefas, estimar esforço, identificar dependências e riscos.
 #### 4.1 — Decompor em Tarefas
 Para cada componente, crie tarefas seguindo TDD:
 ```
-1. Tarefa de Migration (Flyway)
+1. Tarefa de Migration (Liquibase)
 2. Tarefa de Entity (JPA)
 3. Tarefa de DAO
 4. Tarefa de Service

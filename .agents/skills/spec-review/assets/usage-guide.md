@@ -1,6 +1,6 @@
-# Guia de Uso — Skill Spec Review (Hive AI)
+# Guia de Uso — Skill Spec Review (TaskFlow)
 
-Este guia descreve como usar a skill `spec-review` para revisar specifications do **Hive AI** (Spring Boot 4.1 + Java 21 + Vue 3.5 + PrimeVue 4).
+Este guia descreve como usar a skill `spec-review` para revisar specifications do **TaskFlow** (Spring Boot 3.5 + Vue 3).
 
 ---
 
@@ -9,14 +9,14 @@ Este guia descreve como usar a skill `spec-review` para revisar specifications d
 ### 1 Invocar a Skill
 
 ```
-Analise a specification em .spec/backend/agent/ seguindo as regras do projeto.
+Analise a specification em .spec/backend/task/ seguindo as regras do projeto.
 ```
 
 Ou para uma análise completa com plano de ação:
 
 ```
-Revise a specification em .spec/backend/agent/SPEC.md:
-- Verifique conformidade com DDD Modular e boas práticas Hive AI
+Revise a specification em .spec/backend/project/SPEC.md:
+- Verifique conformidade com DDD Modular e boas práticas TaskFlow
 - Identifique gaps por severidade
 - Gere um plano de ação detalhado
 ```
@@ -25,7 +25,7 @@ Revise a specification em .spec/backend/agent/SPEC.md:
 
 Ler a specification
 Executar checklist (50+ itens)
-Cruzar com regras canônicas do Hive AI
+Cruzar com regras canônicas do TaskFlow
 Gerar relatório com gaps
 Priorizar ações por severidade
 
@@ -45,7 +45,7 @@ Identifique o tipo de sua specification:
 
 ### Backend — Módulo de Domínio
 
-**Quando:** api/impl/dbupdate/web em agent, identity, tenant, security, provider, commons
+**Quando:** api/impl/public em user, employee, project, team, task, workflow, kanban
 **Regras aplicáveis:**
 - `backend-coding-standards.md` — DDD modular, performance
 - `backend-unit-tests.md` — Testes unitários
@@ -57,15 +57,15 @@ Identifique o tipo de sua specification:
 - Falta de interface na camada api
 - Falta de `@HasPermission("PERMISSION_NAME")` no controller
 
-### Flyway Migration
+### Liquibase Migration
 
 **Quando:** dbupdate em qualquer domínio
 **Regras aplicáveis:**
-- `db-migration-flyway.md` — Versionamento, naming V{N}__, history table por módulo
+- `db-migration-liquibase.md` — Versionamento, unicidade, estrutura XML
 
 **Exemplo de gaps comuns:**
-- Migration sem history table própria do módulo
-- Migration alterada após execução em produção
+- Changeset sem include no master-changelog.xml
+- Changeset alterado após execução em produção
 
 ### Frontend — Vue 3
 
@@ -75,8 +75,8 @@ Identifique o tipo de sua specification:
 
 **Exemplo de gaps comuns:**
 - Store monolítica (não separada por domínio)
-- Service fora do padrão `src/services/*.service.ts`
-- Ícone não-PrimeIcons (usar `pi pi-*`)
+- Service sem padrão class-based
+- Ícone mdi- usado (apenas ri- permitido)
 - CSS não-scoped no style global
 
 ### Mista (Backend + Frontend)
@@ -90,9 +90,9 @@ Identifique o tipo de sua specification:
 ### Resumo Executivo
 
 ```
-Arquivo:        .spec/backend/agent/SPEC.md
-Tipo:           Backend (agent/impl + agent/web)
-Dominio:        Agent
+Arquivo:        .spec/backend/task/SPEC.md
+Tipo:           Backend (task/impl + task/public)
+Dominio:        Task
 Status:         Com ressalvas
 Conformidade:   78%
 ```
@@ -106,7 +106,7 @@ Tabela com conformidade por categoria:
 | Estrutura | 85% | |
 | Requisitos | 70% | |
 | DDD Modular | 90% | |
-| Flyway | 100% | |
+| Liquibase | 100% | |
 | Testes | 60% | |
 
 ### Gaps Críticos
@@ -127,7 +127,7 @@ Seção — Riscos de segurança, quebra de padrão:
 ```
 [#ALTA-001] Falta de @HasPermission no controller
    Categoria: Seguranca
-   Recomendacao: Adicionar @HasPermission("CHAT_SEND") nos metodos
+   Recomendacao: Adicionar @HasPermission("TASK_WRITE") nos metodos
 ```
 
 ---
@@ -162,11 +162,11 @@ Seção — Riscos de segurança, quebra de padrão:
 
 ## Exemplos Práticos
 
-### Exemplo 1: Spec Backend Agent
+### Exemplo 1: Spec Backend Task
 
 **Input:**
 ```
-Revise: .spec/backend/agent/ (CRUD de agentes e prompt templates - modulo agent)
+Revise: .spec/backend/task/ (CRUD de tarefas - modulo task)
 ```
 
 **Output esperado:**
@@ -178,20 +178,20 @@ Criticos:
 
 Altos:
 - Testes de integracao nao especificados
-- Edge cases de versionamento de prompt nao documentados
+- Edge cases de transicao de status nao documentados
 
 Medios:
-- Falta diagrama de fluxo de versoes
+- Falta diagrama de fluxo de estados
 
 Acao imediata: 0 itens
 Prazo: Pronto para coding com ressalvas
 ```
 
-### Exemplo 2: Spec Frontend Agent
+### Exemplo 2: Spec Frontend Project
 
 **Input:**
 ```
-Revise a specification de agentes em .spec/frontend/agent/
+Revise a specification de projetos em .spec/frontend/project/
 ```
 
 **Output esperado:**
@@ -244,7 +244,7 @@ Prazo: Corrigir critico antes de coding
    Codigo + testes unitarios + integracao
        |
        v
-5. CODE REVIEW (fullstack-code-reviewer subagent)
+5. CODE REVIEW (code-reviewer subagent)
    Verifica codigo contra spec e regras
 ```
 
@@ -255,7 +255,7 @@ Prazo: Corrigir critico antes de coding
 ### P: E se minha spec for mista (Backend + Frontend)?
 
 R: A skill reconhecerá e aplicará regras de ambos os domínios:
-- Verificará DDD Modular + Flyway (Backend)
+- Verificará DDD Modular + Liquibase (Backend)
 - Verificará Pinia stores + componentes Vue 3 (Frontend)
 - Scorecard mostrará conformidade por categoria
 
@@ -277,7 +277,7 @@ R: **Sem gaps críticos** = Pode ser aprovada com ressalvas
 
 R: Ambos:
 - **Forma:** Checklist estrutural (título, seções, dependências)
-- **Conteúdo:** Conformidade com regras (DDD, Flyway, segurança)
+- **Conteúdo:** Conformidade com regras (DDD, Liquibase, segurança)
 
 ---
 
@@ -292,7 +292,7 @@ R: Ambos:
 
 ### Não use quando:
 
-- Quer revisar código (use subagent `fullstack-code-reviewer`)
+- Quer revisar código (use subagent `code-reviewer`)
 - Quer validar testes (use subagent `qa-engineer`)
 - Quer análise de segurança profunda (use subagent `security-engineer`)
 
@@ -306,4 +306,4 @@ R: Ambos:
 
 ---
 
-_Baseado no template spec-review.v2.1, adaptado para Hive AI_
+_Baseado no template spec-review.v2.1, adaptado para TaskFlow_

@@ -1,4 +1,4 @@
-# Checklist de Revisão de Specification — Hive AI
+# Checklist de Revisão de Specification — TaskFlow
 
 Use este checklist ao revisar specifications (SPEC.md). Para cada item, marque:
 - Conforme / Presente
@@ -15,8 +15,8 @@ Use este checklist ao revisar specifications (SPEC.md). Para cada item, marque:
 | **Título claro e descritivo** | [ ] | Descreve o objetivo da feature |
 | **Visão geral (Overview)** | [ ] | Contextualiza o problema a resolver |
 | **Escopo definido (Incluso/Excluído)** | [ ] | Deixa claro o que faz e não faz parte |
-| **Domínio afetado identificado** | [ ] | agent / identity / tenant / security / provider / commons |
-| **Camada afetada identificada** | [ ] | api / impl / dbupdate / web / frontend |
+| **Domínio afetado identificado** | [ ] | user / employee / project / team / task / workflow / board/kanban / security |
+| **Camada afetada identificada** | [ ] | api / impl / public / dbupdate / frontend |
 | **Dependências entre módulos** | [ ] | Quais módulos `api` são necessários |
 | **Requisitos não-funcionais** | [ ] | Performance, segurança |
 | **Riscos identificados** | [ ] | Riscos técnicos e mitigações planejadas |
@@ -43,14 +43,14 @@ Use este checklist ao revisar specifications (SPEC.md). Para cada item, marque:
 
 | Item | Status | Comentário |
 |------|--------|-----------|
-| **Módulos seguem estrutura api/impl/dbupdate/web** | [ ] | api (interfaces/model), impl (services/repos), web (controllers/DTOs) |
+| **Módulos seguem estrutura api/impl/public** | [ ] | api (interfaces/model), impl (services/repos), public (controllers/DTOs) |
 | **impl NÃO depende de impl de outro módulo** | [ ] | Só via api (interfaces) |
-| **Camada web usa DTOs, nunca entidades JPA** | [ ] | Controllers recebem/devolvem DTOs |
-| **Repository Pattern** | [ ] | Estende `JpaRepository<Entity, UUID>` diretamente |
+| **Camada public usa DTOs, nunca entidades JPA** | [ ] | Controllers recebem/devolvem DTOs |
+| **Repository Pattern** | [ ] | AbstractRepository (EntityManager) ou JpaRepository + JpaSpecificationExecutor |
 | **Service Layer** | [ ] | Interfaces na `api`, implementações na `impl` |
-| **VOs de domínio (não entidades) no service** | [ ] | Mappers convertem domain ↔ entity |
+| **Uso de securityService.getCurrentEmployeeId()** | [ ] | Para obter usuário logado |
 | **@HasPermission("PERMISSION_NAME")** | [ ] | Controle de acesso por permissão |
-| **Controllers usam RestControllerTool** | [ ] | `RestControllerTool.of().buildSuccessResponse()` |
+| **Controllers extendem AbstractController** | [ ] | Helpers: buildSuccessResponse, buildSuccessResponseNoContent, etc. |
 | **Pré-dimensionamento de coleções** | [ ] | `new ArrayList<>(size)` |
 | **Sem Streams em caminhos críticos** | [ ] | Segurança, filtros HTTP |
 
@@ -59,23 +59,24 @@ Use este checklist ao revisar specifications (SPEC.md). Para cada item, marque:
 | Item | Status | Comentário |
 |------|--------|-----------|
 | **Coleções pré-dimensionadas** | [ ] | Tamanho inicial definido |
-| **Mapeamento via MapStruct** | [ ] | `@Mapper(componentModel = "spring")`, sem reflection manual |
+| **Mapeamento manual (Converter com of())** | [ ] | Sem MapStruct, sem reflection |
 | **Sem Streams em segurança/filtros** | [ ] | Usar loops for-each ou indexados |
 
 ---
 
-## 4. Flyway Migrations
+## 4. Liquibase Migrations
 
 | Item | Status | Comentário |
 |------|--------|-----------|
-| **SQL em {module}/dbupdate/.../db/migration/{module}/** | [ ] | Caminho padrão do módulo dbupdate |
-| **Naming V{N}__{description}.sql** | [ ] | Começa em V2; history table própria por módulo |
-| **NUNCA alterar migrations já executadas** | [ ] | Criar nova migration sempre |
-| **Flyway bean + history table por módulo** | [ ] | `flyway_schema_history_{module}` |
+| **XML changelogs em dbupdate/.../changelog/changes/** | [ ] | Caminho padrão do módulo dbupdate |
+| **Changeset id {timestamp}-{descricao}** | [ ] | Formato obrigatório |
+| **Versão ÚNICA entre todos os módulos** | [ ] | Timestamps não conflitam |
+| **Include adicionado ao master-changelog.xml** | [ ] | Na ordem correta de dependências |
+| **NUNCA alterar changesets já executados** | [ ] | Criar novo changeset sempre |
 
 ---
 
-## 5. Frontend (Vue 3 + PrimeVue 4)
+## 5. Frontend (Vue 3 + Vuetify 3)
 
 ### 5.1 Estrutura e Estilo
 
@@ -83,26 +84,27 @@ Use este checklist ao revisar specifications (SPEC.md). Para cada item, marque:
 |------|--------|-----------|
 | **Composition API com `<script setup lang="ts">`** | [ ] | Formato obrigatório |
 | **Componentes com CSS scoped** | [ ] | style.css só para variáveis globais |
-| **Path aliases conforme vite.config.ts** | [ ] | Não inventar aliases |
-| **API baseURL `/hive/v1`** | [ ] | Proxy Vite `/hive` → localhost:8080/hive |
+| **Path aliases corretos** | [ ] | @, @core, @layouts, @images, @styles |
+| **Prefix API `/api/v1/{resource}`** | [ ] | Proxy Vite para localhost:8080/taskflow |
 
 ### 5.2 Estado e Dados
 
 | Item | Status | Comentário |
 |------|--------|-----------|
-| **Stores Pinia (setup function)** | [ ] | Getters/actions, estado local no componente |
-| **Services em src/services/*.service.ts** | [ ] | Wrappers da instância Axios `api.ts` |
-| **Interceptor Axios** | [ ] | Bearer token do localStorage, redirect em 401 |
-| **Tipos TS em src/types/** | [ ] | Interfaces/tipos do domínio |
-| **Ícones PrimeIcons (`pi pi-*`)** | [ ] | Não usar mdi-* / ri-* |
-| **Theming PrimeVue Aura** | [ ] | Deep Indigo + Amber, dark mode `.p-dark` |
+| **Stores Pinia (Options API)** | [ ] | state/getters/actions, resetState() |
+| **Services class-based com http (Axios)** | [ ] | save() verifica id===null para create vs update |
+| **Interceptores Axios** | [ ] | Bearer token do localStorage, refresh em 401 |
+| **Models: TS class com construtor** | [ ] | Defaults definidos no construtor |
+| **Ícones Remix (`ri-*`)** | [ ] | Proibido `mdi-*` |
+| **Auto-imports** | [ ] | vue, vue-router, @vueuse/core, pinia — sem import explícito |
+| **SweetAlert2 para feedback** | [ ] | useHandlerMessage() para toasts/modals/errors |
 
 ### 5.3 Testes Frontend
 
 | Item | Status | Comentário |
 |------|--------|-----------|
-| **Vitest + jsdom** | [ ] | Configurado em vite.config.ts |
-| **Stores/componentes testados** | [ ] | Actions, getters e renderização |
+| **Vitest + happy-dom** | [ ] | Sem jsdom |
+| **Stores testadas** | [ ] | Actions e getters |
 | **Cobertura mínima 70%** | [ ] | Nas novas funções/componentes |
 
 ---
@@ -113,12 +115,12 @@ Use este checklist ao revisar specifications (SPEC.md). Para cada item, marque:
 |------|--------|-----------|
 | **Estratégia: unitários + integração** | [ ] | Ambos obrigatórios |
 | **Unitários: JUnit 5 + Mockito** | [ ] | @ExtendWith(MockitoExtension.class) |
-| **Naming: when_{action}_with_{scenario}_then_{result}()** | [ ] | snake_case descritivo |
-| **Fakes em src/test/java/.../fake/** | [ ] | Dados de teste isolados |
+| **Naming: when{Action}_then{Expected}** | [ ] | camelCase |
+| **Fakes em src/test/java/.../fake/** | [ ] | Métodos fake() e fakeVO() |
 | **Integração: *IT.java no module integration-test** | [ ] | PostgreSQL 16 via Testcontainers |
-| **MockMvc (NÃO RestAssured)** | [ ] | @AutoConfigureMockMvc (spring-boot-webmvc-test) |
-| **DatabaseCleaner.reset() para limpeza** | [ ] | TRUNCATE ... CASCADE entre testes |
-| **JwtTestHelper para autenticação** | [ ] | Sem segredo hardcoded |
+| **MockMvc (NÃO RestAssured)** | [ ] | @AutoConfigureMockMvc |
+| **IntegrationTestUtil para estado compartilhado** | [ ] | Static holders para token e entidades |
+| **Testes ordenados com @Order** | [ ] | Login sempre primeiro (@Order(1)) |
 | **Cobertura 80% service, 90% domain** | [ ] | Mínima obrigatória |
 
 ---
@@ -131,7 +133,7 @@ Use este checklist ao revisar specifications (SPEC.md). Para cada item, marque:
 | **@HasPermission("PERMISSION_NAME")** | [ ] | Em cada método de controller |
 | **Validação de entrada em todas as camadas** | [ ] | @Valid, Bean Validation |
 | **Sem dados sensíveis em logs** | [ ] | Senhas, tokens, PII |
-| **Erros RFC 7807 (application/problem+json)** | [ ] | ControllerExceptionHandler global |
+| **BaseException com httpStatus customizado** | [ ] | ControllerExceptionHandler global |
 | **SQL Injection prevenido** | [ ] | JPA PreparedStatement |
 
 ---
@@ -142,7 +144,7 @@ Use este checklist ao revisar specifications (SPEC.md). Para cada item, marque:
 |------|--------|-----------|
 | **Pré-dimensionamento de coleções** | [ ] | ArrayList, HashSet com tamanho inicial |
 | **Sem Streams em caminhos críticos** | [ ] | Segurança, autenticação, filtros |
-| **Mapeamento via MapStruct** | [ ] | `@Mapper(componentModel = "spring")` |
+| **Mapeamento manual (Converter com of())** | [ ] | Sem MapStruct, sem reflection |
 
 ---
 
@@ -153,7 +155,7 @@ Use este checklist ao revisar specifications (SPEC.md). Para cada item, marque:
 | **Nomes de classes em inglês** | [ ] | Service, Repository, Controller |
 | **Mensagens UI em PT-BR** | [ ] | Labels, alerts, toasts |
 | **Zero comentários no código** | [ ] | Código auto-documentado |
-| **Nomenclatura consistente** | [ ] | *ServiceImpl, *Mapper, *ControllerV1, *DTO |
+| **Nomenclatura consistente** | [ ] | *ServiceImpl, *Converter, *Controller, *Mapper |
 | **Testes: *Test.java (unit) / *IT.java (integration)** | [ ] | Padrão de nomenclatura |
 | **Lombok NÃO usado** | [ ] | Proibido no projeto |
 | **Injeção por construtor (nunca @Autowired campo)** | [ ] | Spring recomenda |
@@ -178,7 +180,7 @@ N/A (Não aplicável):   [ ] / [ ]
 Regras canônicas verificadas durante a análise:
 - [ ] `.agents/rules/backend-coding-standards.md`
 - [ ] `.agents/rules/frontend-coding-standards.md`
-- [ ] `.agents/rules/db-migration-flyway.md`
+- [ ] `.agents/rules/db-migration-liquibase.md`
 - [ ] `.agents/rules/backend-unit-tests.md`
 - [ ] `.agents/rules/backend-integration-tests.md`
 - [ ] `.agents/rules/workflow-rules.md`

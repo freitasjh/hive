@@ -1,25 +1,33 @@
 {
   "current_feature": "public-api-chat",
-  "current_phase": "Planning",
-  "previous_phase": "Execution",
-  "next_phase": "Ratificar P1 e P2 do ADR-014 + parecer do security-engineer, entao Batch 1 (extracao de ProviderResolution e TurnOutcomeMapper)",
+  "current_phase": "Completed",
+  "previous_phase": "Testing",
+  "next_phase": "Archive/commit — aguardando aprovacao do usuario (P6).",
   "type": "feature",
   "artifacts": {
-    "tasks": ".spec/backend/rag-advanced/TASKS.md"
+    "adr": "docs/adr/ADR-014-API-Publica-Chat.md",
+    "planning": ".spec/backend/public-api/",
+    "runbook": ".spec/backend/public-api/RUNBOOK-prompt-edition.md",
+    "review": "3 pareceres + 3 registros de decisao (security-engineer, product-manager, architect) — chat + Brain, 2026-09-27; decisoes D1-D8 aplicadas nos 6 artefatos + ADR-014"
   },
-  "last_update": "2026-09-27T20:10:00-03:00",
+  "last_update": "2026-10-29T14:27:13.311679-03:00",
   "code_review": {
-    "last_invoked_at": "2026-09-26T21:30:00-03:00",
+    "last_invoked_at": "2026-10-29T14:27:13.311842-03:00",
     "last_status": "passed",
     "critical_issues": 0,
     "attention_issues": 0,
-    "reviewer_notes": "Ciclo do Passo A: 3 iteracoes. Review inicial APPROVED com 4 yellow; todos corrigidos no merits e reconfirmados por MUTACAO (reviewer removeu cada correcao de proposito e o teste certo falhou). 1 yellow novo achado (RagContext.toString vazava o chunk RAG) - mesma classe do anterior, em record que o proprio refactor tornou publico - corrigido. Zero regressoes. Verificou que o requireNonNull de ragContext RESTAURA o comportamento do HEAD em vez de mudar."
+    "reviewer_notes": "Batch 12 H6 final: APPROVED 0 criticos."
   },
   "overrides": [
     {
       "portao": "P4->P5",
       "motivo": "Backend DOWN por infra ${revision} flatten ausente (pre-existente). Frontend UP, 41 BE + 37 FE tests passam. Aprovado.",
       "data": "2026-08-26T17:56:40.497002Z"
+    },
+    {
+      "portao": "P0->P1",
+      "motivo": "Revisao documental da API publica executada sem consultar o usuario antes: o pedido foi explicito (\"chame o security-engineer, product-manager e architect para fazer uma revisao completa e dar o parecer\"). Portao registrado para rastreabilidade, nao comoOverride de um parecer ausente.",
+      "data": "2026-09-27T21:40:00-03:00"
     }
   ],
   "archived_path": ".spec/archive/20260925-knowledge-base",
@@ -263,13 +271,6 @@
     "console": "0 errors/warnings",
     "debts": "nenhum novo; CA-Zen pendente chave"
   },
-  "bug": {
-    "id": "agent-delete-cascade",
-    "root_cause": "chat_session.agent_id FK sem ON DELETE -> NO ACTION; todo agente com historico e inde deletavel (409)",
-    "extra": "agent_knowledge_base.agent_id SEM FK para agent -> links orfaos apos o cascade",
-    "decision": "usuario aprovou A1 (CASCADE) - destrutivo e irreversivel, mitigado por mensagem explicita",
-    "status": "B1 approved, B2 a delegar"
-  },
   "e2e_ca_go": {
     "status": "PASSED",
     "key": "configured last4=CcgG (ciphertext 108B, nunca em claro)",
@@ -327,21 +328,7 @@
     "ca_zen": "PENDENTE — sem credencial real. bugs 4 (dropdown) e 5 (timeout) afetam tambem Zen, nao validados em E2E."
   },
   "open_debts": [
-    {
-      "id": "re-medir-threshold",
-      "sev": "P2",
-      "desc": "0.60 calibrado em base de 5 chunks (margem ~0.02). Re-medir com base maior/diversa; definir gatilho objetivo (ex.: >N chunks)."
-    },
-    {
-      "id": "versionar-convencao",
-      "sev": "P2",
-      "desc": "Misturar embeddings de convencoes diferentes = score indefinido. Hoje detectado por GROUP BY metadata->>convention. Versionar por KB evitaria reindex manual."
-    },
-    {
-      "id": "min-score-por-kb",
-      "sev": "P3",
-      "desc": "Coluna min_score por KB permitiria calibrar sem tocar em codigo."
-    },
+    "RAG: 3 dividas (re-medir-threshold, versionar-convencao, min-score-por-kb) MORRAS com a remocao do modulo knowledge (2026-09-27) - nao sao mais trabalho",
     {
       "id": "ca-zen",
       "sev": "P1",
@@ -515,11 +502,11 @@
     "nota_brain": "PENDING em .spec/brain/PENDING-brain-store-2026-09-27.md (Brain HTTP 410, 5a vez)"
   },
   "public_api_chat": {
-    "status": "PLANNING — 6 fases do dev-planner concluidas, ZERO implementacao",
+    "status": "PLANNING — 6 fases do dev-planner + revisao de 3 pareceres; 9 blocos de correcao documental APLICADOS nos 6 artefatos + ADR-014. ZERO implementacao.",
     "date": "2026-09-27",
     "artifacts": ".spec/backend/public-api/{EXPLORATION,CONSTRAINTS,DESIGN-DECISIONS,ARCHITECTURE,PLAN,VALIDATION}.md",
-    "phase": "Validation (dev-planner) — aguardando resposta do usuario as 5 perguntas bloqueantes",
-    "next": "handoff ao developer-engineer pelo PLAN.md (13 batches, 54 tasks, ~32-44h)",
+    "phase": "Validation + Revisao aplicada — aguardando aprovacao do usuario (portao P2→P3)",
+    "next": "handoff ao developer-engineer pelo PLAN.md (14 batches, ~75 tasks, ~52-66h)",
     "recommendation": "modulo Maven NOVO publicapi (api/impl/dbupdate/web) + SecurityFilterChain separada para /v1/public/** — e o que permite NAO pagar o RBAC de usuario",
     "gates_sequencing": "batch 1 (extracao D4) ANTES do batch 9; batches 3-5 (P-a/P-b/P-c) ANTES do 8",
     "contrary_findings": [
@@ -530,10 +517,39 @@
     "decisions_closed_by_user": 10,
     "decisions_proposed": 18,
     "decision_to_task_coverage": "18/18",
-    "pending_approval": "Q1-Q5 em VALIDATION.md §5 (Q1 PINNED tripwire vs snapshot e a unica que trava decisao de design)",
+    "pending_approval": "RESOLVIDO: 6 perguntas respondidas pelo usuario (tripwire; FOLLOW_ACTIVE; log pesquisavel; gateway tocado; SecurityFilter.java inalterado; re-medir baseline). Resta SEC-02.",
     "code_review": "N/A — nenhum codigo escrito",
     "harness_status": "N/A — nenhum codigo escrito",
-    "brain": "arquitetura/projetos/hive/decisoes/api-publica-chat + regras/global/api-m2m-roteiros"
+    "brain": "arquitetura/projetos/hive/decisoes/api-publica-chat + regras/global/api-m2m-roteiros",
+    "review_applied": {
+      "data": "2026-09-27",
+      "blocos": 9,
+      "decisoes_fechadas": [
+        "D1 pin_mode default FOLLOW_ACTIVE",
+        "D2 teto = dados da credencial (plim)",
+        "D3 system -> 400 + IT falsificavel",
+        "D4 metadados em log + ChatTrace Batch 1B",
+        "D5 politica do turno em agent/api + gateway TOCADO",
+        "D6 provisionamento CommandLineRunner (tela cortada; ux-designer OFF)",
+        "D7 FilterRegistrationBean; SecurityFilter.java com 0 linhas",
+        "D8 excecoes de seguranca registradas + 4 correcoes baratas",
+        "P6 baseline re-medido (SUITE-BASELINE.md + sha)"
+      ],
+      "respostas_do_usuario": {
+        "P1": "tripwire ratificado",
+        "P2": "FOLLOW_ACTIVE (condicao do PM: 1 integracao, mesmo time do deploy)",
+        "P3": "log do ambiente pesquisavel -> D4 fica log",
+        "P4": "aceita tocar LangChain4jTurnGateway (isModelNotFound sai)",
+        "P5": "aceita 'SecurityFilter.java inalterado'",
+        "P6": "re-medir baseline no Batch 0"
+      },
+      "arquivos_alterados": [
+        ".spec/backend/public-api/{EXPLORATION,CONSTRAINTS,DESIGN-DECISIONS,ARCHITECTURE,PLAN,VALIDATION,README}.md",
+        ".spec/backend/public-api/RUNBOOK-prompt-edition.md (novo)",
+        "docs/adr/ADR-014-API-Publica-Chat.md"
+      ],
+      "divergencia_em_aberto": "SEC-02: 401 na chain humana. security propoe fix no SecurityFilter (arquivo que a Conformidade promete nao tocar); PLAN 6.3 diz nao mexer em SecurityTokenServiceImpl; architect nao se pronunciou. Perguntar ao usuario antes do Batch 6."
+    }
   },
   "public_api": {
     "status": "planejado - aguardando ratificacao",
@@ -560,5 +576,243 @@
       "'sem limite de mensagens, teto do proxy' esta errado: o ERP chama o Hive DIRETO, nao ha proxy. E LlmRetryPolicy retenta - payload sem teto + retry e a pior combinacao de custo e erro. Recomendacao: teto generoso no servidor (200 msgs / 32KB) com 413 explicito, NUNCA truncamento silencioso.",
       "'metadados persistidos' e ambiguo: log (LoggingChatTraceRecorder ja registra, sem texto) ou tabela (4a tabela, escrita no hot path, invalida o 'hot path sem banco', e LGPD aparece no ADR-011 como concern). Nada disso esta decidido."
     ]
-  }
+  },
+  "public_api_chat_review": {
+    "date": "2026-09-27",
+    "scope": "revisao documental ADR-014 + .spec/backend/public-api/ (2708 linhas, zero codigo)",
+    "reviewers": [
+      "security-engineer",
+      "product-manager",
+      "architect"
+    ],
+    "verdicts": {
+      "security-engineer": "APROVADO COM CONDICOES",
+      "product-manager": "APROVADO COM CONDICOES",
+      "architect": "APROVADO COM CONDICOES"
+    },
+    "blockers_before_first_token": 10,
+    "blockers": [
+      "B1 SecurityFilter.java:28 e @Component -> auto-registrado no container para /*, fora do FilterChainProxy; continua rodando em /v1/public/** e produz 500 em toda request publica. O ADR afirma o contrario e o checklist exige filter inalterado",
+      "B2 Causa do P-d apontada errada: loadUserByUsername:51 e inalcancavel; a falha real e validateTokenRevoke:49 -> decodeAndVerify:167-171 exigindo aud=hive.web -> BaseException relancada em :63 -> 500",
+      "B3 VALIDATION.md 4.2 passo 10 so trata 403/200 como falha -> o gate de aceitacao do achado P-d passa o proprio defeito (500)",
+      "B4 IT de superficie (PLAN 6.4) espera 401 e recebe 500; denyAll do 6.1 vive no AuthorizationFilter, nunca consultado nesse caminho",
+      "B5 O desenho cria publicapi/impl -> agent/impl (impl-to-impl), pior que a aresta agent->security que P2 existe para evitar. Nenhum artefato declara essa aresta",
+      "B6 ChatTrace nao tem clientId nem tenantId -> trace da rota publica nao e atribuivel; invalida a finalidade declarada de P-a e a escolha log-em-vez-de-tabela",
+      "B7 DoS real: clamp de max_tokens ausente (LangChain4jTurnGateway:76-78 monta o client, logo o teto E nosso), teto de corpo, teto de concorrencia e teto por IP ausentes. Cota-por-minuta limita taxa, nao ocupacao. Retry 2 = 3 chamadas de provider por request",
+      "B8 Limiter de /auth/token com chave {clientId}: o forjador rotaciona client_id e ganha bucket novo por tentativa",
+      "B9 EVAL de Lua com RedisTemplate<String,Object> serializa args como JSON -> tonumber = nil -> ZADD com score invalido. Precisa StringRedisTemplate",
+      "B10 Envelope de 401/403 da chain publica nunca desenhado (authenticationEntryPoint existente responde 3o envelope) + handler local sem catch-all obrigatorio deixa HttpMessageNotReadable/MethodArgumentNotValid/405/DataIntegrityViolation vazarem application/problem+json e BaseException.getDetailMessage() expoe a causa"
+    ],
+    "contradicoes_documentais": [
+      "system: ADR = aceito e declarado em metadata.hive{} | ARCHITECTURE 4.1 + D10 + PLAN 9.1 = 400 system_role_not_allowed",
+      "teto de mensagens: ADR = sem limite (teto do proxy) | ARCHITECTURE = 1..20 msgs / 1..8000 chars | architect = 200 msgs / 32 KB",
+      "linhas movidas: ADR = ~110 | DESIGN-DECISIONS = ~80 | medido = 72. ChatServiceImpl encolhe para ~280 (ADR diz ~265)",
+      "ordem de execucao: D16 = 401>429>403>404>409>400>422>502 | ARCHITECTURE 4.4 = 400 antes de 429, unknown_model antes de 403, 422 antes de 404",
+      "permissoes: ADR diz \"as mesmas 6 de RoleControllerV1\" | real = 4 (ADMIN) + 2 (USER) | CONSTRAINTS 4.2 esta correto",
+      "D18 \"hot path sem banco\" e falso: passo 8 le tenant_llm_config; passo 10 le de novo + provider_credential e decifra AES",
+      "ARCHITECTURE 4.1 diz content 8000 \"espelha o limite de 4000\" - nao espelha",
+      "baseline da suite: 376/76/158 (PLAN) vs 505/118/222 (testes) vs 341/63/177 (h6_status) - tres numeros, H2.2 sem baseline inequivoco"
+    ],
+    "divergencias_entre_pareceres": [
+      "default de pin_mode: product-manager quer PINNED como padrao; security-engineer quer FOLLOW_ACTIVE como padrao e PINNED so onde o contrato exige. DECISAO DO USUARIO",
+      "esforco: PLAN 32-44h | architect 46-58h (+40%) | product-manager 32-44 honesto no nucleo mas mal enderecado (26-30 cortando 10.1; 32-36 com acréscimos)",
+      "P2: product-manager ratifica como decisao de esforco (1-2h); architect diz que e decisao de ARQUITETURA - o que decide e onde mora a politica de turno, e essa pergunta esta sem resposta"
+    ],
+    "omissoes_que_quebram_o_desenho": [
+      "finish_reason hardcoded \"stop\" no contrato publico enquanto TurnReply.finishReason traz LENGTH",
+      "prompt_fingerprint = \"sha256 dos primeiros N bytes\", N indefinido - truncar o comeco e o pior lado; e o PLAN classifica como cortavel, sendo a unica identidade que sobrevive a promocao de ambiente",
+      "prompt_code sem teto por credencial -> JWT acima de maxHttpHeaderSize -> 400 do container, fora do contrato",
+      "typ ausente (RFC 8725 3.2), kid e rotacao de chave ausentes; aud e separacao por claim e nao por chave (mesmo segredo HMAC assina token humano e de maquina)",
+      "jti em blacklist sem escritor: client_credentials nao tem refresh -> passo 2 do 4.4 e codigo morto por construcao",
+      "@HasPermission roda depois da resolucao de argumentos -> a ordem \"permissao 5 -> validacao 6\" do 4.4 nao e implementavel",
+      "baselineOnMigrate(true) no modulo novo: com historico vazio + schema nao vazio, baselineia em V1 e pula a V1 em silencio",
+      "ScopedValue (TenantContext) nao propaga para thread pool, e PublicChatService e onde alguem vai querer @Async -> leitura cross-tenant sem erro",
+      "PublicApiSecurityFilter nao limpa SecurityContextHolder em finally (SecurityFilter:71 faz)",
+      "last_used_at e coluna morta: D18 diz hot path sem banco e nenhuma task escreve",
+      "JwtTestHelper so minta aud=hive.web -> as ITs nao cortaveis 6.4/6.5 nao sao executaveis como escritas",
+      "comparacao em tempo constante listada como gate de IT - nao e testavel por IT",
+      "npm audit e OWASP Dependency-Check fora de todo gate H1, exigido pelo security-standard.md",
+      "TLS afirmado em CONSTRAINTS 4.1 e nenhum perfil define server.ssl.*; spring.profiles.active=dev e o default com segredo de 6 bytes",
+      "provisionamento por SQL permite client_secret digitado por humano -> SHA-256 de baixa entropia quebravel offline de um dump",
+      "Authorization: Basic no header: a justificativa vale para o access log default do Tomcat, nao para nginx/ALB com $http_authorization",
+      "/actuator/** e /v3/** em permitAll sem guarda de perfil - e /v3/** agora publica o contrato da superficie nova"
+    ],
+    "scorecard": {
+      "security-standard.md": "3 PASS / 1 n-a-PASS / 6 FAIL / 2 n-a",
+      "db-migration-flyway.md": "11 de 12 OK (fail: baselineOnMigrate(true))",
+      "backend-coding-standards.md": "OK com 2 ressalvas",
+      "sdd-workflow-standard.md": "1 fail (artifacts.tasks apontava para spec arquivada) + 1 ressalva (SPEC.md/TASKS.md nao existem com esses nomes)",
+      "harness-continuous.md": "H1/H2.2 OK com baseline ambigua; H3 supera o esperado"
+    },
+    "it_nao_cortaveis_acrescentadas": [
+      "IT-MAXTOKENS-CLAMP",
+      "IT-BODY-CAP (413, verifyNoInteractions no gateway)",
+      "IT-QUOTA-ANTES-ALLOWLIST",
+      "IT-TRACE-ATRIBUICAO",
+      "IT-ENVELOPE-CATCHALL",
+      "IT-SECRET-ROTAÇÃO",
+      "IT-TOKEN-NO-CACHE (200+401+400)",
+      "IT-SECRET-NO-LOG",
+      "IT-CONSTANTE (falha se usar String.equals no segredo)",
+      "IT-CROSS-TENANT",
+      "IT-ACESSO-NEGADO-LOGADO",
+      "IT-CROSS-TENANT no /auth/token (filtro OFF)"
+    ],
+    "decisoes_pendentes_do_usuario": [
+      "D1 default de pin_mode (PINNED vs FOLLOW_ACTIVE) - divergencia real entre os 3 pareceres",
+      "D2 valor do teto de mensagens (precisa do caso do ERP) + teto no payload de provisionamento, porque discovery foi recusado",
+      "D3 system: rejeitar com 400 (ambos convergem) e corrigir a linha do ADR",
+      "D4 metadados: log + ChatTrace ganhar clientId/tenantId, ou 4a tabela com retencao e LGPD",
+      "D5 ratificar P2 e decidir onde mora a politica de turno (agent/api vs agent/impl) - e o que decide a aresta real",
+      "D6 cortar 10.1 (tela de provisionamento)? Se cortar, o ux-designer sai da lista de obrigatorios",
+      "D7 como o SecurityFilter sai do path publico: FilterRegistrationBean desabilitado ou shouldNotFilter",
+      "D8 aceitar formalmente ou corrigir as 4 excecoes ao security-standard.md nao registradas: HMAC256 sem rotacao, ausencia de TLS no servidor, segredos de dev versionados, actuator/v3 em permitAll"
+    ],
+    "read_only": true,
+    "arquivos_alterados_por_esta_revisao": "nenhum (pareceres foram read-only; 3 notas gravadas no Brain)",
+    "decisoes_fechadas": {
+      "D1_pin_mode": {
+        "fechado_por": "product-manager",
+        "decisao": "PINNED como default do PROVISIONAMENTO (nao DEFAULT no DDL — o CHECK impede o INSERT que omite o par). Tripwire compara pinned_fingerprint, nao pinned_version: versao nao sobrevive a promocao entre ambientes.",
+        "divergencia_aberta": "security-engineer NAO mudou de posicao: quer FOLLOW_ACTIVE como default e PINNED so onde o contrato exige (PINNED torna cada PUT de rotina um 409 = risco de disponibilidade). SEM ARBITRAGEM.",
+        "condicao_do_pm": "Se a resposta for \"1 integracao e o prompt e do mesmo time que faz o deploy\" → o default vira FOLLOW_ACTIVE sem discussao.",
+        "tarefas": "3.3, 3.7, 9.4, 9.13, 9.16, 10.6, runbook novo RUNBOOK-prompt-edition.md"
+      },
+      "D2_teto_mensagens": {
+        "fechado_por": "product-manager (forma) + architect (forma tecnica)",
+        "decisao": "Recusa explicita, NUNCA truncamento. 400 nos dois casos (too_many_messages / request_too_large); 413 SO para bytes, decidido no filtro por Content-Length antes do Jackson. Teto vira DADO DA CREDENCIAL (3 colunas: max_messages 200, max_message_chars 32000, max_total_chars 256000) lido no claim plim.",
+        "desvio_do_pm": "1o veredito era 200/32KB em constante de codigo. Alterou: limite em codigo e numero que ninguem calibra sem deploy. Q4 de BLOQUEANTE virou PARAMETRO — o gate mede.",
+        "tarefas": "3.3, 3.7, 3.10, 9.1, 9.8, 9.14, 9.15, 10.6"
+      },
+      "D3_system": {
+        "fechado_por": "product-manager + architect + security-engineer (3 de 3)",
+        "decisao": "400 system_role_not_allowed. O ADR era o unico dissentente (3 linhas). buildMessages:121-124 põe SystemMessage primeiro — aceitar-e-sobrescrever deixaria o system do ERP chegar por ultimo. Por ser rejeicao, NAO ha override a declarar: a IT passa a afirmar que metadata.hive esta AUSENTE (a ausencia e a prova; a IT anterior era in-falsificavel).",
+        "taxonomia": "9 rejeitados por nome (response_format, tools, tool_choice, functions, function_call, n, logprobs, top_logprobs, parallel_tool_calls) + 11 aceitos-e-ignorados (inclui max_completion_tokens) + 3 especiais + unknown_field",
+        "novo": "docs/product/PUBLIC_API_CHAT_INTEGRATION.md (guia) — 3-4h, hoje sem orcamento",
+        "tarefas": "9.1, 9.8, 9.12 nova (IT falsificavel), 9.17, 10.6, 11"
+      },
+      "D4_metadados": {
+        "fechado_por": "product-manager",
+        "decisao": "LOG, nao tabela. MAS: ChatTrace ganha tenantId + turnId + clientId NO ESCOPO desta feature (novo BATCH 1B), ~15 linhas, zero migration, nenhum teste existente quebrado. Retencao 14 dias declarada como PREMISSA (rotacao do ambiente, nada no codigo impoe).",
+        "desvio_do_pm": "Alterei posicao: log so vale se a linha for pesquisavel na janela de incidente, e hoje ChatTrace nao tem clientId/tenantId/turnId — o turn_id que o ERP recebe nao casa com linha nenhuma. 3 condicoes, nao 2.",
+        "discordo_registrado": "o PM NAO adota a conclusao do security de que isso derruba P-a. P-a e o grant model PERSISTIDO (o que revogar / o que testar em 403); a trace responde o que foi usado, por quem, quando. Complementares.",
+        "condicao_de_reversao": "Se o log do ambiente alvo nao for coletado/pesquisavel, OU auditoria de uso virar requisito → vira TABELA com retencao e LGPD (+1 migration).",
+        "tarefas": "BATCH 1B: 1B.1-1B.5 + 9.9, 9.18; SEC-04 (security) — nao cortavel"
+      },
+      "D5_politica_do_turno": {
+        "fechado_por": "architect",
+        "decisao": "Porta e funcao pura em agent/api; adaptador em agent/impl; toProviderMessages como estatico em agent/api/util/ProviderMessages; isModelNotFound + ModelNotFound MOVE para agent/api; PromptTemplateService ganha 1 metodo (findByCodeAndVersion) e findActiveByCode ja resolve FOLLOW_ACTIVE → ZERO query nova, ZERO aresta impl-to-impl. P2 ratificada.",
+        "autocritica_do_arquiteto": "\"agent/api e gratis\" e falso (as 3 opcoes pagam). \"ProviderResolution vai para agent/api\" e IMPOSSIVEL: CredentialResolver esta em agent/impl e agent/api -> agent/impl e ciclo Maven. \"o metodo controla transacao\" e falso. \"~110/~80 linhas\" — 72 e a REGIAO, ~28 e o codigo que muda; essa confusao e a origem mecanica da divergencia entre os 3 arquivos. \"3a opcao e mais barata\" e falsa: security nao tem dbupdate.",
+        "P2_veredito": "publicapi (1 aresta, 5 poms, 0 mudanca de @ComponentScan, apagar reverte tudo) > security/web ja existe (1 aresta mas poe PublicChatService dentro de security/impl) > agent/web (2 arestas + hazard vivo de precedencia de handler)",
+        "emenda_pendente_usuario": "Aceita que LangChain4jTurnGateway seja TOCADO (a regra isModelNotFound sai do arquivo)? Sem isso, ou o gateway fica intacto e D3 vira mentira, ou a regra e copiada. Custo: 1 checkbox de Conformidade.",
+        "tarefas": "1.1, 1.3, 1.4, 1.5, 1.7 nova, 1.8 nova, 9.4"
+      },
+      "D6_cortar_10_1": {
+        "fechado_por": "product-manager",
+        "decisao": "CORTAR. Provisionamento vira CommandLineRunner que chama PublicApiClientService.provisionar() e imprime o payload 1 vez. O segredo e SEMPRE gerado por maquina (proibido campo de segredo). ProvisioningPayloadBuilder como CODIGO (unico produtor de base_url + prompt_codes + limits).",
+        "ganho": "ux_designer_required = FALSE nesta feature (API headless nao tem UX). Gatilho nomeado para voltar: 2 credenciais de producao, ou alguem sem acesso ao ambiente precisar provisionar — e ai o parecer de UX e GATE do batch, nao revisao posterior.",
+        "tarefas": "10.5 (runner), 10.6 (guia), 10.7 (IT: o secret impresso autentica no /auth/token)"
+      },
+      "D7_security_filter": {
+        "fechado_por": "architect (forma) + security-engineer (prova)",
+        "decisao": "FilterRegistrationBean<SecurityFilter> com setEnabled(false) em SecurityConfig. SecurityFilter.java INALTERADO, nenhuma linha. shouldNotFilter rejeitado (criaria um 2o lugar com a lista de paths, divergindo em silencio).",
+        "forma_do_tenant": "PublicApiSecurityFilter, na forma exata de SecurityFilter:56-59 — TenantContext.runWithTenant(tenantId do CLAIM, filterChain::doFilter) como Callable. ScopedValue so liga na extensao dinamica do Callable e NAO propaga pra thread pool: um CompletableFuture = leitura cross-tenant SEM ERRO.",
+        "divergencia_reconciliada": "o sentinel em log.warn (architect) foi REJEITADO pelo security: instrumentacao em codigo de producao e cheiro que o proximo copia. Fica a IT de sentinel (400 do contrato em body que falha no MVC) + um TESTE ESTATICO que varre backend/ e afirma que nenhuma classe @Component implementa jakarta.servlet.Filter.",
+        "emenda_pendente_usuario": "\"SecurityFilter inalterado\" → \"SecurityFilter.java inalterado; o duplo registro e corrigido em SecurityConfig por 1 @Bean\".",
+        "tarefas": "6.1 reescrita, 6.6 nova (IT sentinel), 6.7 nova (clearContext no finally + IT de 2 requests), 6.4 reescrita (nunca 200), 6.4.1 nova (IT de caracterizacao do 500), SEC-01"
+      },
+      "D8_execucoes_seguranca": {
+        "fechado_por": "security-engineer",
+        "veredito": "Das 4 exceoes ao security-standard.md, NENHUMA sai com risco aceito sem mitigacao, e 2 NAO sao excecao (esticar a norma seria scope-stretch):",
+        "excecoes": [
+          "HMAC256 (algoritmo) = EXCECAO ACEITA, registrada. Risco: com assinatura simetrica, iss/aud/exp sao campos que o ATACANTE escreve. Gatilho: 2o cliente externo, ou kid/rotacao.",
+          "Chave unica para 2 dominios = CORRECAO BARATA (~10 linhas), NAO excecao. Sem isso, aud separa so o token HONESTO, nao o forjado — e a propriedade que o ADR reivindica para D7 e condicional. api.security.public.token.secret + decodeAndVerify por parametro + JUnit dos dois sentidos.",
+          "Sem TLS no servidor = NAO e violacao como escrita (a norma fala em dados em transito, nao em o processo Java terminar TLS) e INCOMPROVAVEL no repo (grep server.ssl = 0). Correcao: falhar o boot em prod sem HIVE_TLS_MODE explicito. Prova e do edge = divida com owner de ops.",
+          "perfil dev como default = CORRECAO BARATA (~10 linhas). prod JA e fail-fast (${JWT_TOKEN} sem valor). O furo e o caminho que ninguem escolhe: sem SPRING_PROFILES_ACTIVE, o boot SUCEDE com chave de 6 bytes. Segredos de dev versionados NAO sao excecao (sao placeholders documentados) — mover para .env seria falso conserto.",
+          "/actuator/** e /v3/** em permitAll = CORRECAO BARATA, e o caso e PIOR do que o parecer anterior: springdoc-openapi-starter-webmvc-scalar e dependencia COMPILE de bootstrap/pom.xml:53-57, entao /v3/api-docs esta no jar de prod e publica o schema de TODOS os endpoints internos, incluindo POST /hive/v1/provider-credential. Correcao: springdoc.api-docs.enabled=false em prod + management.endpoints.web.exposure.include explicito + IT. O enquadramento do ADR (\"adjacente, nao afetado\") e CORRETO para /actuator/** e FALSO para /v3/**."
+        ],
+        "autocritica_do_security": "\"DataIntegrityViolationException ecoa dado interno\" estava ERRADO: mapeia constraint para literal escrito a mao e manda a mensagem do driver so para o log; o que volta e instance = o path que o cliente chamou. O teto de corpo NAO e 160 KB: JSON escapa non-ASCII como \\uXXXX = 6 bytes, logo 20x8000x6 = 960 KB; teto = 1 MiB, senao o filtro rejeita o que o contrato de D2 declara valido. \"HMAC e um risco\" sao DOIS. O sentinel em log.warn foi rejeitado em favor da IT.",
+        "tarefas": "SEC-01 a SEC-24 (IDs estaveis, nao colidem com o N.M do PLAN) + 4 dividas nomeadas"
+      }
+    },
+    "alteracoes_de_posicao": [
+      "SECURITY: \"DataIntegrityViolation ecoa dado interno\" → ERRADO, corrigido para instance=path do cliente",
+      "SECURITY: \"teto de corpo 160 KB\" → 1 MiB (escape \\uXXXX = 6 bytes/char)",
+      "SECURITY: \"/actuator nao afetado\" → meio verdade: correto p/ actuator, FALSO p/ /v3 (springdoc e compile de bootstrap)",
+      "SECURITY: \"HMAC e um risco\" → sao dois (algoritmo = excecao aceita; chave unica = correcao de 10 linhas)",
+      "SECURITY: rejeitou o sentinel em log.warn do architect (instrumentacao em prod) → IT de sentinel + teste estatico",
+      "SECURITY: rejeitou o \"500-e-nunca-200\" do architect para o passo 10 — um gate que aprova o bug e gate que nao e gate",
+      "ARCHITECT: \"agent/api e gratis\" → falso, as 3 opcoes pagam",
+      "ARCHITECT: \"ProviderResolution vai para agent/api\" → IMPOSSIVEL (agent/api -> agent/impl e ciclo Maven)",
+      "ARCHITECT: \"o metodo tambem controla transacao\" → falso (TX1 e TX2 sao REQUIRED, abertas pelas chamadas)",
+      "ARCHITECT: \"~110/~80 linhas\" → 72 e a REGIAO, ~28 o codigo; a confusao causou a divergencia entre os 3 arquivos",
+      "ARCHITECT: \"a 3a opcao e mais barata em contagem de arquivos\" → falsa, security nao tem dbupdate",
+      "ARCHITECT: \"@HasPermission roda antes da validacao\" → invertida e nao implementavel (@Around roda depois da resolucao de argumentos)",
+      "ARCHITECT: \"unknown_model antes do 403 de allowlist\" → quebrava a regra load-bearing (exigia 1 SELECT antes do 1o SELECT)",
+      "ARCHITECT: \"@Order e necessario no advice\" → NAO, handler local vence; o motivo declarado estava errado",
+      "PM: teto em constante de codigo → DADO DA CREDENCIAL (3 colunas + claim plim)",
+      "PM: 413 para ambos → 400 para contagem, 413 SO para bytes no filtro (413 morre no middleware antes do handler)",
+      "PM: \"log, com 2 condicoes\" → 3 condicoes, e ChatTrace entra no escopo",
+      "PM: prompt_fingerprint era recomendacao → coluna gravada e comparada",
+      "PM: rejeitou a conclusao do security de que ChatTrace sem clientId derruba P-a (grant persistido e trace sao complementares)",
+      "PM: rejeitou o 401-e-nunca-200 do architect pelo mesmo motivo que o security"
+    ],
+    "esforco_reestimado": "52-66 h (architect, apos as correcoes). PLAN dizia 32-44. Entra: correcoes documentais +2, ModelNotFound movido +2-3, FilterRegistrationBean + 3 ITs de cadeia +2, IT de cota-vs-allowlist + claim rlm +2. Sai: TurnContext -1 (nao existe).",
+    "divergencias_sem_arbitragem": [
+      "D1 default de pin_mode: PM = PINNED | security = FOLLOW_ACTIVE. NENHUM cedeu. Pergunta de 5 min ao time do ERP decide.",
+      "SEC-02 (401 na chain humana) vs PLAN 6.3 (\"default e nao mexer em SecurityTokenServiceImpl\"): security propoe o fix no SecurityFilter (arquivo que a Conformidade promete nao tocar); architect nao se pronunciou porque rodou em paralelo. Tie-break pendente.",
+      "D3 coluna pin_mode: PM gravou sem DEFAULT no DDL; o texto novo de D1 fala em \"PINNED sem ambos e recusado pelo banco\" — os dois textos precisam conviver com o CHECK do trio."
+    ],
+    "deve_ir_para_o_usuario": [
+      "1. Ratifica P1 como tripwire? (se snapshot, D1 e substituido e o ADR-014 reabre)",
+      "2. Default de pin_mode: PINNED (PM) ou FOLLOW_ACTIVE (security)? — ou responda \"1 integracao, mesmo time do deploy\" e o PM muda sozinho",
+      "3. Retencao de log do ambiente alvo: o log e coletado e pesquisavel por clientId/turnId depois de 1 dia? (se nao → D4 vira tabela, +1 migration + LGPD)",
+      "4. Aceita a emenda: LangChain4jTurnGateway e TOCADO (isModelNotFound sai do arquivo)?",
+      "5. Aceita a emenda: \"SecurityFilter inalterado\" → \"SecurityFilter.java inalterado\"?",
+      "6. Baseline 376 unit / 76 IT / 158 FE aceito, ou re-medido no Batch 0? (recomendado: re-medir e gravar em SUITE-BASELINE.md com sha do commit)"
+    ],
+    "brain_embedding": "⚠️ QUEUED/OFFLINE: brain_store retornou embedded=0, queued=N nas 3 rodadas (2026-09-27). Notas estao no vault e legiveis por brain_read, mas NAO sao buscaveis por brain_search. Divida pre-existente, registrada em workflow-state.json:425-433 e PENDING-brain-store-2026-09-26.md.",
+    "aplicado_nos_artefatos": true,
+    "data_aplicacao": "2026-09-27",
+    "estaleira": "SEC-02: 401 na chain humana. security propoe fix no SecurityFilter (arquivo que a Conformidade promete nao tocar); PLAN 6.3 diz nao mexer em SecurityTokenServiceImpl; architect nao se pronunciou. Perguntar ao usuario antes do Batch 6."
+  },
+  "batch0_baseline": {
+    "status": "completed",
+    "data": "2026-10-09",
+    "sha_medido": "e6d289e033efbeeb0fd1dbcd2fe6b9ffc4aabad8",
+    "counts": {
+      "unit": 371,
+      "it": 75,
+      "frontend": 189
+    },
+    "falhas": 0,
+    "artefato": ".spec/backend/public-api/SUITE-BASELINE.md",
+    "nota": "3 numeros dos artefatos (376/76/158, 505/118/222, 341/63/177) estavam TODOS errados; baseline medido 371/75/189 e a fonte da verdade",
+    "suite_nao_depende_do_compose": "WebIntegrationTest usa Testcontainers; container de dev so para spring-boot:run e H3",
+    "achado_1_compose": "up do redis falha com Conflict (container_name global do projeto docker). Pre-existente, nao corrigido - migracao de namespace e decisao do usuario (.spec/tech-debts/compose-project-name)",
+    "achado_2_dev_properties": "application-dev.properties SUJO na arvore (pre-existente, de outro agente): datasource trocado de localhost:5433/hive (postgres/postgres) para localhost:5432/hive (dev_user/dev_password). NAO afeta baseline (ITs usam profile test + Testcontainers). VAI quebrar mvn spring-boot:run no dev e o H3 do Batch 11. Aguardando decisao do usuario: reverter ou manter."
+  },
+  "batch1_extraction": {
+    "status": "completed",
+    "data": "2026-10-09",
+    "objetivo": "extrair ProviderResolution + TurnOutcomeMapper + toProviderMessages (estatico em agent/api/util/ProviderMessages) + mover isModelNotFound/ModelNotFound para agent/api + PromptTemplateService.findByCodeAndVersion",
+    "gate_1_6": "PROVADO — igualdade byte a byte do corpo ao provider (sha256 793153e1... antes/depois), proxy node:http em :11500, Ollama local, backend real em :8080. Evidencia versionada em .spec/backend/public-api/gate-1.6.md",
+    "mudanca_systemBlockChars": "campo morreu com o RAG; sucessor medido = promptChars (93 antes/depois)",
+    "testes": {
+      "unit": "371 -> 386 (+15)",
+      "modulo_agent_impl": "211 pos-correcoes",
+      "it": 75,
+      "frontend": 189,
+      "falhas": 0
+    },
+    "code_review": "2 rounds. Round 1 CHANGES_REQUIRED 0 critico / 3 amarelo (4 must-fix, todos doc/teste). Round 2 APPROVED 0/0, contraprovado com mvn test -pl agent/impl (211, 0 falhas)",
+    "arquivos": {
+      "novos": 5,
+      "modificados": 7,
+      "commit": false
+    },
+    "achado_batch9": "caminho publico precisa rodar DENTRO do runWithTenant do passo 4 — findByCodeAndVersion le TenantContext e o @Filter e ligado por TenantContext, nao por parametro. Registrado em PLAN.md 9.4/9.5 e ChatServiceImpl:69-85",
+    "brain": "PENDENTE 4 em .spec/brain/PENDING-brain-store-2026-09-27.md (MCP 410)"
+  },
+  "harness_status": "passed"
 }

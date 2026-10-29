@@ -6,8 +6,8 @@ import java.util.concurrent.CancellationException;
 /**
  * Turns a failed call into a log-safe label: {@code RootSimpleName:code}.
  *
- * <p>It lives in {@code impl} because the chat turn is its only caller: {@code ChatServiceImpl} hands
- * a provider failure to {@link #causeOf} to label the {@code failure} field of the turn's trace, and
+ * <p>It lives in {@code impl} because the chat turn is its only caller: {@code TurnOutcomeMapper}
+ * hands a provider failure to {@link #causeOf} to label the {@code failure} field of the turn's trace, and
  * nothing else in the product asks this question. It was born as a method on a knowledge-base
  * diagnostic record, because that was the only caller that needed to say "why did this retrieval
  * stop"; the chat turn's own trace needs the same sentence about a completely different failure. It

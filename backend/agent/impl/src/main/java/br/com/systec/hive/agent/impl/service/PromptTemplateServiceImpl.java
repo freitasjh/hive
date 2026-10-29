@@ -151,6 +151,15 @@ public class PromptTemplateServiceImpl implements PromptTemplateService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public PromptTemplate findByCodeAndVersion(String code, Integer version) {
+        UUID tenantId = TenantContext.getCurrentTenant();
+        return repository.findByTenantIdAndCodeAndVersion(tenantId, code, version)
+                .map(mapper::toDomain)
+                .orElseThrow(PromptTemplateNotFoundException::new);
+    }
+
+    @Override
     @Transactional
     public PromptTemplate delete(PromptTemplate obj) {
         UUID tenantId = TenantContext.getCurrentTenant();

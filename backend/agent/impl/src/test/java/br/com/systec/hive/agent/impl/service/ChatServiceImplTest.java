@@ -31,6 +31,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -79,6 +81,12 @@ class ChatServiceImplTest {
     /** The real gateway: prompt assembly, the empty-reply guard and the retry policy are production. */
     private ChatTurnGateway turnGateway;
 
+    /** The real extraction: which provider/model the tenant configured, and with which credential. */
+    private ProviderResolution providerResolution;
+
+    /** The real extraction: what each outcome means, and what it costs the operator. */
+    private TurnOutcomeMapper turnOutcomeMapper;
+
     /**
      * Built by hand rather than by {@code @InjectMocks}: the class takes a primitive configuration
      * value in its constructor and Mockito cannot supply one, so it silently gives up and reports "no
@@ -107,13 +115,17 @@ class ChatServiceImplTest {
         // assertion about which model was asked, with which limits, still reads as a claim about the
         // real call rather than about a stand-in for the whole gateway.
         turnGateway = new LangChain4jTurnGateway(llmClientFactory);
+        // The two extracted collaborators are the production ones too: their own tests cover the rules,
+        // and stubbing them here would hide a real change of behaviour behind a fake.
+        providerResolution = new ProviderResolution(tenantLlmConfigService, credentialResolver);
+        turnOutcomeMapper = new TurnOutcomeMapper(traceRecorder, discoveryService);
         service = newService(traceRecorder);
     }
 
     private ChatServiceImpl newService(ChatTraceRecorder traces) {
-        return new ChatServiceImpl(credentialResolver, chatSessionService, chatMessageService,
-                chatAssistantTxService, tenantLlmConfigService, chatRateLimiter, discoveryService,
-                traces, turnGateway);
+        return new ChatServiceImpl(providerResolution, chatSessionService, chatMessageService,
+                chatAssistantTxService, chatRateLimiter, turnGateway,
+                new TurnOutcomeMapper(traces, discoveryService));
     }
 
     /** The tenant's one default: vendor and model, verbatim. No fallback is exercised anywhere here. */
@@ -182,6 +194,30 @@ class ChatServiceImplTest {
         verify(chatSessionService).create(eq(promptTemplateId), any(String.class), eq(tenantId), eq(userId));
         verify(chatMessageService).save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), eq("Hello world"));
         verify(chatAssistantTxService).saveAssistantAndTouch(eq(sessionId), eq(tenantId), eq("assistant reply"));
+    }
+
+    /**
+     * The two-parameter overload is the seam a caller with no HTTP session behind it drives, so it must
+     * read neither the tenant nor the user from the environment. Both ambient sources are emptied here:
+     * a reintroduced {@code TenantContext.getCurrentTenant()} or {@code SecurityUtils.currentUserId()}
+     * in this path fails this test instead of quietly coupling the turn to a request thread.
+     */
+    @Test
+    void when_chatIsDrivenByParameters_then_itReadsNothingFromTheEnvironment() {
+        prepareChat();
+        stubClient("resposta sem sessao");
+        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
+        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
+
+        SecurityContext ambient = SecurityContextHolder.getContext();
+        SecurityContextHolder.clearContext();
+        try {
+            ChatResponse response = service.chat(newRequest(), tenantId, userId);
+
+            assertThat(response.getMessage()).isEqualTo("resposta sem sessao");
+        } finally {
+            SecurityContextHolder.setContext(ambient);
+        }
     }
 
     @Test
@@ -493,11 +529,11 @@ class ChatServiceImplTest {
     }
 
     // `isModelNotFound` used to have four tests here, when the rule was a static method on this class.
-    // It belongs to the generation seam now, and `LangChain4jTurnGatewayTest` covers it more fully —
-    // the same four cases plus a null, a JSON 404 that does not mention the model, and a chain that
-    // wraps the model error twice. What this class has to prove about that rule is not the rule itself
-    // but what the turn does with the verdict, and that is the two tests above and below: a stale
-    // model evicts the vendor list and becomes a 422, and an HTML 404 does not.
+    // It belongs to the turn policy now — `agent/api/util/ModelNotFound`, with `ModelNotFoundTest`
+    // covering it more fully: the same four cases plus a null, a JSON 404 that does not mention the
+    // model, and a chain that wraps the model error twice. What this class has to prove about that
+    // rule is not the rule itself but what the turn does with the verdict, and that is the two tests
+    // above and below: a stale model evicts the vendor list and becomes a 422, and an HTML 404 does not.
 
     @Test
     void when_chat_with_html404Route_then_throwsProviderExceptionAndKeepsCache() {
@@ -620,9 +656,9 @@ class ChatServiceImplTest {
         ChatTraceRecorder failingTraces = trace -> {
             throw new IllegalStateException("trace down");
         };
-        ChatServiceImpl service = new ChatServiceImpl(credentialResolver, chatSessionService,
-                chatMessageService, chatAssistantTxService, tenantLlmConfigService, chatRateLimiter,
-                discoveryService, failingTraces, turnGateway);
+        ChatServiceImpl service = new ChatServiceImpl(providerResolution, chatSessionService,
+                chatMessageService, chatAssistantTxService, chatRateLimiter, turnGateway,
+                new TurnOutcomeMapper(failingTraces, discoveryService));
         stubClient("reply");
         when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
         when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));

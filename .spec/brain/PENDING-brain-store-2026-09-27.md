@@ -486,3 +486,141 @@ obrigatório, `agent_knowledge_base` tinha FK para `agent(id)`.
 A V15 documentava que **nunca se escreva `$$` num arquivo de migration** — o parser de script do
 Flyway corta o arquivo no delimitador, mesmo dentro de comentário. As 4 migrations novas **não usam
 nenhum bloco dollar-quoted**, o que elimina a classe inteira do problema.
+
+---
+
+## PENDENTE 2 — correções documentais da API pública aplicadas (2026-09-27, ~23:59)
+
+- **O quê:** 9 blocos de correção (D1–D8 + P6) aplicados nos 6 artefatos de `.spec/backend/public-api/`,
+  no ADR-014 e em `workflow-state.json`. Criado `RUNBOOK-prompt-edition.md`.
+- **Respostas do usuário:** P1 tripwire · P2 FOLLOW_ACTIVE (condição do PM) · P3 log pesquisável ·
+  P4 gateway tocado · P5 SecurityFilter.java inalterado · P6 re-medir baseline.
+- **Lição de processo (regra candidata, scope=projetos):** quando um parecer arbitra uma divergência,
+  a pergunta que desempata deve ser formulada pelo **próprio autor da posição perdedora** — o PM
+  escreveu a condição ("1 integração, mesmo time do deploy") que derrubou a própria proposta. Arbitragem
+  externa sem condição declarada vira disputa de autoridade; com condição, vira medição.
+- **Lição de doc (scope=projetos):** causa errada documentada é pior que ausência de causa — B2
+  (`loadUserByUsername:51` inalcançável; falha real `validateTokenRevoke:49` → `aud`) quase fez o
+  próximo corrigir o arquivo errado. Toda causa em ADR precisa do `file:line` do **caminho que
+  executa**, não do que parece executar.
+- **Resta:** SEC-02 sem arbitragem (401 na chain humana).
+
+---
+
+## PENDENTE 3 — baseline de suíte medido para `public-api-chat` (2026-10-09)
+
+> `brain_ping`/`brain_store` **não foram tentados** — Brain MCP está FORA (HTTP 410 desde
+> 2026-09-26). Registrado aqui para replay.
+
+- **O quê:** BATCH 0 / task 0.1 da feature `public-api-chat`. Suite completa medida contra
+  HEAD `e6d289e033efbeeb0fd1dbcd2fe6b9ffc4aabad8`. Resultado
+  `.spec/backend/public-api/SUITE-BASELINE.md`.
+- **Baseline canônico:** `371` unit / `75` IT / `189` frontend — 0 falhas, 0 erros, 0 skipped.
+- **Destino quando o Brain voltar:**
+  `layer=regras`, `path=hive/eng/testes/baseline-medido-vs-numero-de-planejamento`, `scope=projetos`
+  tags: eng/testes, baseline, harness, h2.2, planejamento, metrica
+
+### A lição
+
+Os 3 artefatos de planejamento tinham **3 contagens diferentes** (376/76/158 · 505/118/222 ·
+341/63/177) e **nenhuma era a real** (371/75/189). Nove números, nove errados, todos plausíveis.
+
+> **Número de planejamento não é baseline.** Ele descreve o que o plano *acredita* que existe;
+> baseline descreve o que a suíte *faz agora*. São grandezas diferentes e a segunda só existe
+> depois de medida. Portão de entrada que adota número de plano como verde está afirmando verde
+> sobre uma suíte que ninguém rodou.
+
+### Achado correlato — a suíte NÃO depende do compose de dev
+
+Os ITs rodam em `@ActiveProfiles("test")` com datasource e Redis injetados por
+`@DynamicPropertySource` a partir de **Testcontainers** (`pgvector/pgvector:pg16` +
+`redis:7-alpine`). O `docker-compose-vetor.yml` / `docker-compose-redis.yml` são necessários para
+`spring-boot:run` e para H3 (browser real), **não** para a suíte. Subir compose para "passar a
+suite" é trabalho na direção errada — e, neste batch, o `up` do Redis falhou com
+`Conflict. container name "/hive-redis"` justamente porque o serviço **já estava no ar**.
+
+### Armadilha de ambiente registrada (não tratada, não é falha de teste)
+
+`backend/bootstrap/src/main/resources/application-dev.properties` está **sujo** na árvore
+(modificação pré-existente de outro agente): datasource trocado de `localhost:5433`
+(postgres/postgres) para `localhost:5432` (dev_user/dev_password). Não altera a suíte — o profile
+`dev` não é carregado nos ITs — mas **quebrará `mvn spring-boot:run` no profile `dev`**, que
+passará a apontar para o postgres de outro projeto, em `:5432`, com credenciais que o volume
+`docker_postgres_data` pode não ter. Decisão do orquestrador.
+
+
+---
+
+## PENDENTE 4 — BATCH 1 `public-api-chat` (extração D4/D5) executado (2026-10-09)
+
+> `brain_ping`/`brain_store` **não foram tentados** — Brain MCP está FORA (HTTP 410, 9a vez
+> consecutiva). Registrado aqui para replay.
+
+- **O quê:** tasks 1.1–1.8 do PLAN (`.spec/backend/public-api/PLAN.md`). Extração de
+  `ProviderResolution` e `TurnOutcomeMapper`; `toProviderMessages` promovido a estático em
+  `agent/api/util`; `isModelNotFound` + `ModelNotFound` (+ `MODEL_NOT_FOUND_PATTERN` +
+  `isProviderModelErrorPayload`) mudados para `agent/api/util`; `PromptTemplateService.findByCodeAndVersion`.
+- **Resultado:** `386` unit (baseline 371, +15) / `75` IT / `189` frontend — 0 falhas, 0 erros, 0 skip.
+  E2E antes/depois com **igualdade byte a byte** do request ao provider (ver abaixo).
+- **Destino quando o Brain voltar:**
+  - `layer=arquitetura`, `path=hive/decisoes/public-api-batch1-extracao`, `scope=projetos`
+    tags: hive, public-api, adr-014, refactor, d4, d5, gate-de-comportamento
+  - `layer=regras`, `path=hive/eng/refactor/medir-o-fio-nao-o-trace`, `scope=projetos`
+    tags: eng/refactor, e2e, prova-de-comportamento, proxy, telemetria
+
+### A lição que o gate 1.6 comprou — meça o FIO, não o telemetria
+
+O gate mandava comparar `systemBlockChars` (o que hoje é `promptChars` na linha de trace). O problema:
+**essa métrica é da própria telemetria que estava sendo movida** — `recordTurn` saiu de
+`ChatServiceImpl` e foi para `TurnOutcomeMapper`. Se a extração quebrasse a medição, a medida quebraria
+junto e a prova diria "igual" sobre um prompt diferente.
+
+A solução foi medir por fora: um proxy de captura (node:http, zero dependências) entre o backend e o
+Ollama, com a credencial do provider apontando para `http://localhost:11500`. Ele encaminha intacto e
+grava `sha256` + corpo de cada request. Assim a prova não depende de nenhuma linha do Hive.
+
+```
+antes: bytes=359 sha256=793153e1… promptSignature=471ef90d… systemChars=72 total=93
+depois: bytes=359 sha256=793153e1… promptSignature=471ef90d… systemChars=72 total=93
+trace: promptChars=93 promptMessages=2 historySize=1 maxTokens=512 temperature=0.7 (igual nos dois)
+```
+
+> **Regra: quando o refactor move a telemetria, a evidência de comportamento não pode ser a
+> telemetria.** Meça o efeito no fio (request ao provider, DOM, arquivo gerado) ou por um caminho que
+> o refactor não toca. Um teste que afirma o invariante pelo mesmo código que está sendo movido é
+> tautologia — a 3a ocorrência da mesma família neste projeto (as outras duas: o filtro do PrimeVue e
+> o `res.data as Page<T>`).
+
+### Segunda lição — "igual ao baseline" sem métrica homônima exige tradução declarada
+
+O gate falava de `systemBlockChars`, campo que **não existe mais** (morreu com o RAG). O sucessor é
+`promptChars` (`ChatTrace` + `LoggingChatTraceRecorder:45`). Trocar a métrica sem dizer é publicar
+"igual ao baseline" comparando grandezas diferentes. A tradução está declarada aqui e no relatório.
+
+### Terceira — o método de prova por bloco
+
+O gate pedia "git diff das linhas load-bearing mostra só movimentação". Em vez de ler o diff e
+concordar, cada bloco foi extraído mecanicamente dos dois lados e diffado:
+
+| bloco | resultado |
+|---|---|
+| 3 ramos do outcome (`ChatServiceImpl:203-246` → `TurnOutcomeMapper`) | idênticos, salvo `elapsedMs(startedAt)` → parâmetro `elapsedMs`, `isModelNotFound` pela nova casa (task 1.7) e reflow de 2 comentários/1 `log.error` |
+| `recordTurn` + 4 helpers | idênticos (só reflow de assinatura) |
+| `toProviderMessages` | idêntico (só `private static` → `public static`) |
+| `isModelNotFound` / `isProviderModelErrorPayload` | idênticos (só visibilidade) |
+| `MODEL_NOT_FOUND_PATTERN` | idêntico (só `static` → `private static`) |
+| 3 leituras do provider (`ChatServiceImpl:176-186` → `ProviderResolution`) | idênticas (comentário virou javadoc) |
+
+### Quarta — o que a extração decidiu, e o custo honesto
+
+- `ChatServiceImpl` foi de 9 para 7 construtores e perdeu `recordTurn`, os 4 helpers e
+  `toProviderMessages`. As linhas de log dos ramos de falha **mudaram de logger**
+  (`ChatServiceImpl` → `TurnOutcomeMapper`); mensagem, nível e campos intactos. É o custo
+  inevitável de mover um ramo em vez de copiá-lo.
+- `chat(request, tenantId, userId)` já não lia ambiente — a task 1.4 era **preservar**, não criar.
+  O que ela ganhou de prova: `when_chatIsDrivenByParameters_then_itReadsNothingFromTheEnvironment`,
+  que roda um turno com `SecurityContextHolder` vazio.
+- Achado para o batch 9 (não tratado aqui): o filtro de tenant do Hibernate
+  (`TenantAspect` → `TenantContext.getCurrentTenant()`) **não** é satisfeito pelos parâmetros. Um
+  chamador stateless da API pública precisa de `TenantContext.runWithTenant(...)` para o isolamento
+  de banco, mesmo passando `tenantId` por argumento.

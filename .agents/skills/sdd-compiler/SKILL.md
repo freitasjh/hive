@@ -28,7 +28,7 @@ Você é o compilador central da metodologia SDD (Specification-Driven Developme
 **Objetivo**: Criar `PROPOSAL.md` alinhando problema, solução, escopo e riscos antes do SPEC completo.
 - **Entradas**: Descrição da feature (ou `EXPLORATION.md` se existir).
 - **Processo**:
-  1. Converter descrição em ID kebab-case (ex: `agent-prompt-admin`).
+  1. Converter descrição em ID kebab-case (ex: `patient-appointment-scheduling`).
   2. Aplicar template em `references/proposal-template.md`.
   3. Identificar delta: quais specs/documentos existentes serão afetados (ADDED/MODIFIED/REMOVED).
   4. Validar viabilidade: conflitos com arquitetura atual, riscos de multi-tenancy.
@@ -81,7 +81,7 @@ Você é o compilador central da metodologia SDD (Specification-Driven Developme
   1. **Completeness**: Todos os checkboxes em TASKS.md marcados? Nenhum TODO pendente?
   2. **Correctness**: Cada requisito funcional da SPEC tem correspondência no código? Testes passando?
   3. **Coherence**: Decisões de design (ADRs) refletem no código? Naming conventions corretos? Sem vazamentos de camada?
-  4. Executar build e testes: `mvn clean install` (backend) ou `npm run build && npm run test` (frontend).
+  4. Executar build e testes: `mvn clean install` (backend) ou `npm run build && npm run test:run` (frontend).
   5. Se frontend: checar Chrome DevTools (Network + Console) — zero erros/warnings.
 - **Saída**: `.spec/[feature-name]/VERIFY.md` com resultado das 3 dimensões + lista de gaps (se houver).
 - **Asserts**: Validar contra `asserts/verify-gate.md`.

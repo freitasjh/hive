@@ -19,4 +19,4 @@ Toda especificação (SPEC) deve ser validada contra os seguintes critérios ant
 
 ## 4. Estrutura e Escopo
 - [ ] **Single File**: O documento é coeso e está em um único arquivo.
-- [ ] **Domínio claro**: Domínio afetado identificado (agent/identity/tenant/security/provider/commons).
+- [ ] **Domínio claro**: Domínio afetado identificado (user/employee/project/team/task/workflow/kanban).

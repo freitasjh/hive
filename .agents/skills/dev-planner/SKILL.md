@@ -205,8 +205,8 @@ Exemplos rápidos:
 | `.agents/rules/unit-testing-standards.md` | Regras de testes unitários |
 | `.agents/rules/db-migration-liquibase.md` | Regras de migração |
 | `.agents/rules/workflow-rules.md` | Workflow SDD completo |
-| `backend/README.md` | Arquitetura detalhada do projeto |
-| `AGENTS.md` | Stack tecnológica e versões |
+| `.doc/ARCHITECTURE.md` | Arquitetura detalhada do projeto |
+| `.doc/STACK.md` | Stack tecnológica e versões |
 | `AGENTS.md` | Visão geral do projeto |
 
 ---

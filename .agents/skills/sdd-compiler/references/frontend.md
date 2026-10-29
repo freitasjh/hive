@@ -47,7 +47,7 @@ src/
 ## 5. UI/UX Libraries & Styling
 - **Component Libraries**: 
   - React: Radix UI, Shadcn/ui, or MUI.
-  - Vue: PrimeVue 4 (Aura preset).
+  - Vue: PrimeVue or Vuetify.
   - Angular: Angular Material or PrimeNG.
 - **Styling**: **Tailwind CSS** is universally recommended for utility-first styling. Avoid custom CSS/SCSS unless strictly necessary.
 

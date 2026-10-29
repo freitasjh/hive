@@ -4,6 +4,7 @@ import br.com.systec.hive.agent.api.domain.InferenceParams;
 import br.com.systec.hive.agent.api.domain.TurnReply;
 import br.com.systec.hive.agent.api.domain.TurnRequest;
 import br.com.systec.hive.agent.api.port.ChatTurnGateway;
+import br.com.systec.hive.agent.api.util.ModelNotFound;
 import br.com.systec.hive.agent.impl.util.ProviderMessages;
 import br.com.systec.hive.provider.api.LlmClientFactory;
 import br.com.systec.hive.provider.langchain4j.LlmRetryPolicy;
@@ -14,11 +15,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
  * The LangChain4j-backed {@link ChatTurnGateway}: prompt assembly, the provider call, the retry
- * policy, the empty-reply guard and the model-not-found rule.
+ * policy and the empty-reply guard.
  *
  * <p>It knows nothing about sessions, tenants or telemetry. It is handed a
  * {@link TurnRequest} and returns a {@link TurnReply} already measured in the shape the trace
@@ -29,29 +29,27 @@ import java.util.regex.Pattern;
  * {@link TurnReply}, because the prompt measurements the caller has to report belong to this class
  * and a thrown exception would take them with it.
  *
- * <h3>Why the model-not-found rule lives here and not in the caller</h3>
+ * <h3>The model-not-found rule no longer lives here</h3>
  *
- * <p>It is a statement about how providers speak HTTP, and this is the layer that speaks HTTP: a
- * {@code 404} means "the model was removed" only when the body is a JSON error naming the model,
- * and means "your {@code baseUrl} is missing the {@code /v1}" when the body is an HTML landing
- * page. The same status code carries two opposite diagnoses, and the difference is in the transport's
- * vocabulary — so the rule is a transport rule, and putting it in the caller meant re-implementing
- * the transport's vocabulary one layer up. See {@link #isModelNotFound}.
+ * <p>It used to, as a static method, because this was the layer that speaks HTTP: a {@code 404} means
+ * "the model was removed" only when the body is a JSON error naming the model, and means "your
+ * {@code baseUrl} is missing the {@code /v1}" when the body is an HTML landing page. The same status
+ * code carries two opposite diagnoses, and the difference is in the transport's vocabulary — so the
+ * rule is a transport rule, and putting it in the caller meant re-implementing the transport's
+ * vocabulary one layer up.
  *
- * <p>What stayed outside on purpose: the eviction of the cached vendor list, the two log lines and
- * the {@code 422}. Those name a session and a tenant, they are what an operator reads, and this
- * class sees neither.
+ * <p>It moved to {@link ModelNotFound}, in the {@code api} module, with the second caller of this port
+ * in sight. The rule decides a status code and an operator-facing sentence, which makes it policy:
+ * two copies would each be locally correct and would disagree silently, which is the one failure mode
+ * a rule about an HTTP status code cannot be allowed to have. This class is the adapter that speaks
+ * the transport; the verdict about what the transport said is now stated once, above it.
+ *
+ * <p>What stayed outside that class on purpose: the eviction of the cached vendor list, the log line
+ * and the {@code 422}. Those name a session and a tenant, they are what an operator reads, and a rule
+ * about HTTP status codes should not know that any of it exists.
  */
 @Component
 public class LangChain4jTurnGateway implements ChatTurnGateway {
-
-    /**
-     * Wording a provider uses to say the model is gone. Deliberately narrow: it is applied to
-     * exception messages and to provider error bodies, and a loose pattern here turns a routing
-     * problem into a "model removed" verdict.
-     */
-    static final Pattern MODEL_NOT_FOUND_PATTERN = Pattern.compile(
-            "(?i)(model_not_found|no such model|unknown model|\\bmodel\\b.*(not found|does not exist))");
 
     private final LlmClientFactory<ChatModel> llmClientFactory;
     private final LlmRetryPolicy retryPolicy;
@@ -73,6 +71,12 @@ public class LangChain4jTurnGateway implements ChatTurnGateway {
 
         dev.langchain4j.model.chat.response.ChatResponse chatResponse;
         try {
+            // Gate R2 (public-api-chat): createClientWithSession does NOT tolerate a null sessionId
+            // (LangChain4jClientFactory throws IllegalArgumentException; opencodeHeaders calls
+            // sessionId.toString()). In the stateless public flow, TurnRequest.sessionId carries a
+            // synthetic per-request UUID (the turn id of the response), while ChatTrace.sessionId
+            // stays null. No null-coercion is performed here: a null propagates as the factory's
+            // IllegalArgumentException, which is returned as a failed TurnReply.
             ChatModel client = llmClientFactory.createClientWithSession(request.provider(), request.model(),
                     params.getTemperature(), params.getMaxTokens(),
                     params.getTopP(), request.apiKey(), request.baseUrl(), request.sessionId());
@@ -123,57 +127,5 @@ public class LangChain4jTurnGateway implements ChatTurnGateway {
 
         messages.addAll(request.conversation());
         return messages;
-    }
-
-    /**
-     * Whether this failure means "the provider removed the model", as opposed to every other reason
-     * a provider call can fail.
-     *
-     * <p>The whole chain is walked, because a timeout arrives wrapped twice by the time the caller
-     * sees it. A {@code 404} is the interesting case and it is <b>not</b> enough on its own: only a
-     * JSON error body that mentions the model counts. A {@code 404} carrying an HTML page is a route
-     * that does not exist — a {@code baseUrl} without {@code /v1} — which is a configuration error
-     * and must not become a misleading {@code 422 "model unavailable"}. The generic pattern is
-     * therefore not applied to an HTML body: an opencode landing page contains the words
-     * "model ... not found" in its navigation and would match.
-     */
-    static boolean isModelNotFound(Throwable e) {
-        Throwable current = e;
-        while (current != null) {
-            if (current instanceof dev.langchain4j.exception.ModelNotFoundException) {
-                return true;
-            }
-            if (current instanceof dev.langchain4j.exception.HttpException http) {
-                if (http.statusCode() == 404) {
-                    if (isProviderModelErrorPayload(http.getMessage())) {
-                        return true;
-                    }
-                    current = current.getCause();
-                    continue;
-                }
-            }
-            String message = current.getMessage();
-            if (message != null && MODEL_NOT_FOUND_PATTERN.matcher(message).find()) {
-                return true;
-            }
-            current = current.getCause();
-        }
-        return false;
-    }
-
-    /**
-     * The body of the {@code HttpException} is the provider's raw payload. Only a JSON error that
-     * names the model indicates a removed model; anything else (HTML, empty, a JSON about the route)
-     * is an endpoint configuration failure.
-     */
-    private static boolean isProviderModelErrorPayload(String body) {
-        if (body == null) {
-            return false;
-        }
-        String payload = body.stripLeading();
-        if (!payload.startsWith("{")) {
-            return false;
-        }
-        return MODEL_NOT_FOUND_PATTERN.matcher(payload).find();
     }
 }

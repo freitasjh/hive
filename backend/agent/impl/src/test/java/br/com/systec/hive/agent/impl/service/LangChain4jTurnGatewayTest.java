@@ -33,13 +33,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * The generation seam, on its own: the prompt it builds, the measurements it reports, and the two
- * rules that decide whether a turn answers, reports an empty reply, or fails.
+ * The generation seam, on its own: the prompt it builds and the measurements it reports.
  *
  * <p>These are the paths that found the defects this code was validated against — a reasoning model
  * that answers with nothing, and a {@code 404} that means two different things depending on the body
  * the provider sent. They used to be reachable only through a whole chat turn, where a failure test had
  * to stub a session, a prompt template and a message store to observe one classification.
+ *
+ * <p>The model-not-found rule left this class for {@code agent/api} (D5) and its tests left with it —
+ * they are in {@code ModelNotFoundTest} now, unchanged. What this class still owns is the prompt, the
+ * call and the measurements.
  */
 @ExtendWith(MockitoExtension.class)
 class LangChain4jTurnGatewayTest {
@@ -248,68 +251,6 @@ class LangChain4jTurnGatewayTest {
 
         assertThat(reply.status()).isEqualTo(TurnReply.Status.FAILED);
         verify(chatModel, times(1)).chat(anyPrompt());
-    }
-
-    // ------------------------------------------------------------------ the model-not-found rule
-
-    private static final String PROVIDER_JSON_404 =
-            "{\"error\":{\"message\":\"The model `mimo-v2.5` does not exist or you do not have access to it.\","
-                    + "\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}";
-
-    /** The opencode landing page: a 404 that means the baseUrl is missing its {@code /v1}. */
-    private static final String HTML_404 =
-            "<!DOCTYPE html><html><head><title>opencode.ai</title></head><body>not found</body></html>";
-
-    @Test
-    void when_theProviderAnswers404WithAModelError_then_itIsTheModelThatIsGone() {
-        assertThat(LangChain4jTurnGateway.isModelNotFound(
-                new dev.langchain4j.exception.HttpException(404, PROVIDER_JSON_404))).isTrue();
-        assertThat(LangChain4jTurnGateway.isModelNotFound(
-                new dev.langchain4j.exception.ModelNotFoundException("model_not_found: mimo-v2.5"))).isTrue();
-        assertThat(LangChain4jTurnGateway.isModelNotFound(
-                new RuntimeException("model_not_found"))).isTrue();
-    }
-
-    /**
-     * A 404 carrying an HTML page is a route that does not exist, which is a configuration error. The
-     * generic pattern is deliberately not applied to it: a landing page contains the words
-     * "model ... not found" in its navigation, and matching that would turn a missing {@code /v1} into
-     * a misleading "the model was removed".
-     */
-    @Test
-    void when_theProviderAnswers404WithHtml_then_itIsTheRouteThatIsMissing() {
-        assertThat(LangChain4jTurnGateway.isModelNotFound(
-                new dev.langchain4j.exception.HttpException(404, HTML_404))).isFalse();
-        assertThat(LangChain4jTurnGateway.isModelNotFound(
-                new dev.langchain4j.exception.HttpException(404, "{\"error\":{\"message\":\"Not Found\"}}")))
-                .as("a JSON 404 that does not mention the model is a route, not a model")
-                .isFalse();
-    }
-
-    @Test
-    void when_theFailureIsSomethingElse_then_itIsNotAModelProblem() {
-        assertThat(LangChain4jTurnGateway.isModelNotFound(
-                new dev.langchain4j.exception.HttpException(500, "internal error"))).isFalse();
-        assertThat(LangChain4jTurnGateway.isModelNotFound(
-                new dev.langchain4j.exception.HttpException(401, "invalid api key"))).isFalse();
-        assertThat(LangChain4jTurnGateway.isModelNotFound(
-                new dev.langchain4j.exception.HttpException(403, "forbidden"))).isFalse();
-        assertThat(LangChain4jTurnGateway.isModelNotFound(new RuntimeException("LLM down"))).isFalse();
-    }
-
-    /** The chain is walked: a timeout arrives wrapped twice by the time the caller sees it. */
-    @Test
-    void when_theModelErrorIsWrapped_then_itIsStillFound() {
-        RuntimeException wrapped = new RuntimeException("calling the provider",
-                new IllegalStateException("transport",
-                        new dev.langchain4j.exception.ModelNotFoundException("model_not_found")));
-
-        assertThat(LangChain4jTurnGateway.isModelNotFound(wrapped)).isTrue();
-    }
-
-    @Test
-    void when_thereIsNoFailure_then_nothingIsAModelProblem() {
-        assertThat(LangChain4jTurnGateway.isModelNotFound(null)).isFalse();
     }
 
     private static dev.langchain4j.model.chat.response.ChatResponse answer(

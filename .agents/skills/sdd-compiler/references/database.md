@@ -57,7 +57,7 @@ CREATE TABLE outbox_events (
 - **PII Protection**: Personally Identifiable Information (PII) MUST be encrypted at rest. Do not rely solely on disk encryption; use application-level cryptography (AES-256) for fields like `cpf`, `ssn`, or `medical_notes` before persisting.
 
 ## 5. Schema Evolution & Migrations
-- **Tooling**: Schema changes MUST be versioned using Flyway (module-isolated migrations).
+- **Tooling**: Schema changes MUST be versioned using Flyway or Liquibase.
 - **Zero-Downtime Rule (Expand and Contract)**:
   - You are FORBIDDEN from performing destructive operations (e.g., `DROP COLUMN`, `RENAME COLUMN`) in a single deployment.
   - *Phase 1 (Expand)*: Add the new column. App writes to both, reads from old.

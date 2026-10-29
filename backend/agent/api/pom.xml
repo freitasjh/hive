@@ -26,11 +26,13 @@
         </dependency>
         <!--
           `provided`, like every other dev.langchain4j artifact in dependencies/pom.xml, and needed
-          only because TurnRequest speaks the provider's message type: it carries a
-          `dev.langchain4j.data.message.ChatMessage` as `conversation`, alongside the persisted
-          `history` of its own type, and wrapping it in a project type only to unwrap it later would
+          only because this module speaks the provider's message type: `TurnRequest` carries a
+          `dev.langchain4j.data.message.ChatMessage` as `conversation`, and `ProviderMessages`
+          builds those very objects; `ModelNotFound` walks
+          `dev.langchain4j.exception.ModelNotFoundException` and `HttpException` to say whether the
+          model was removed. Wrapping any of it in a project type only to unwrap it later would
           make the block size reported on the diagnostic and the block actually sent two separate
-          facts instead of one. TurnRequest is the only class in this module that needs it.
+          facts instead of one.
         -->
         <dependency>
             <groupId>dev.langchain4j</groupId>

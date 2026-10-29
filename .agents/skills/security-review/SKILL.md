@@ -1,7 +1,7 @@
 ---
 name: security-review
-description: "Security review skill integrated into the SDD workflow. Validates security at each SDD phase gate against OWASP Top 10, ASVS 4.x, MASVS 2.x, and the Hive AI security-standard.md (source of truth). Covers web, API, and mobile."
-license: Hive AI Security Standard
+description: "Security review skill integrated into the SDD workflow. Validates security at each SDD phase gate against OWASP Top 10, ASVS 4.x, MASVS 2.x, and the TaskFlow security-standard.md (source of truth). Covers web, API, and mobile."
+license: TaskFlow Security Standard
 ---
 
 # Security Review — SDD Integrated Skill
@@ -34,7 +34,7 @@ Security review as a **phase-integrated gate** in the Spec-Driven Development (S
 
 | Document | Purpose |
 |----------|---------|
-| `.agents/rules/security-standard.md` | **Fonte da verdade** — OWASP Top 10, ASVS 4.x, MASVS 2.x, regras Hive AI |
+| `.agents/rules/security-standard.md` | **Fonte da verdade** — OWASP Top 10, ASVS 4.x, MASVS 2.x, TaskFlow rules |
 | `.agents/rules/backend-coding-standards.md` | Backend coding patterns (injection prevention, DTO projection) |
 | `.agents/rules/frontend-coding-standards.md` | Frontend security (XSS, CSP, CSRF, token storage) |
 | `.agents/rules/backend-integration-tests.md` | Security test patterns (401/403, IDOR, injection) |
@@ -78,7 +78,7 @@ For each new endpoint or data flow, identify:
 ### Threat Model (STRIDE)
 | Threat | Endpoint/Flow | Risk | Mitigation |
 |--------|---------------|------|------------|
-| Elevation of Privilege | GET /v1/chat/sessions/{id} | High | @HasPermission + ownership check |
+| Elevation of Privilege | GET /v1/tasks/{id} | High | @HasPermission + ownership check |
 | Information Disclosure | Error response | Medium | Generic error messages |
 
 ### Requirements Coverage
@@ -104,7 +104,7 @@ For each new endpoint or data flow, identify:
 
 ### Fase 3 — Review: Security-Focused Code Review
 
-After the `fullstack-code-reviewer` completes the general review, run the security-specific review:
+After the `code-reviewer` completes the general review, run the security-specific review:
 
 #### 3.1 OWASP Top 10 Code Review
 - [ ] **A01 (Broken Access Control):** Every endpoint has `@HasPermission`. Ownership check in service layer. No IDOR patterns.

@@ -34,6 +34,9 @@ public class LoggingChatTraceRecorder implements ChatTraceRecorder {
     static String format(ChatTrace trace) {
         StringBuilder sb = new StringBuilder(220);
         sb.append("chat turn sessionId=").append(trace.sessionId())
+                .append(" tenantId=").append(trace.tenantId())
+                .append(" turnId=").append(trace.turnId())
+                .append(" clientId=").append(trace.clientId())
                 .append(" promptTemplateId=").append(trace.promptTemplateId())
                 .append(" provider=").append(trace.provider())
                 .append(" model=").append(trace.model())

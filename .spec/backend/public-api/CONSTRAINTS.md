@@ -28,6 +28,16 @@ Consequências que valem para **cada** coluna nova desta feature:
 - Nenhuma migration pode conter delimitador `$$` (dollar-quote), **nem em comentário** — o parser de
   script do Flyway corta no delimitador e o arquivo passa a ser SQL inválido. Isso já custou 3 erros
   de PL/pgSQL no Batch 2 (registrado em `workflow-state.json → batch2_assistant.achados_durante_execucao`).
+- **`pin_mode` (D1):** o `DEFAULT 'FOLLOW_ACTIVE'` no DDL **não** é usado pelo provisionamento — o
+  `CommandLineRunner` (10.5) informa `pin_mode` **explicitamente** em toda linha. O DEFAULT só atende
+  INSERT fora do runner (seed, teste, SQL manual). Motivo do valor: `PINNED` torna todo `PUT` de
+  rotina do prompt um 409 para a integração (ver `RUNBOOK-prompt-edition.md`). O trio
+  `(pin_mode, pinned_version)` continua amarrado pelo `CHECK` — `PINNED` sem versão é **recusado pelo
+  banco**, e qualquer texto que afirme o contrário está errado.
+- **Tetos de payload (D2):** `max_messages`/`max_message_chars`/`max_total_chars` são colunas com
+  `NOT NULL DEFAULT` + `CHECK` de faixa, reclamadas no claim `plim`. Onde o código trata o valor
+  como número, a garantia fica no schema, não no chamador — mesma lição do
+  `prompt_template.version`.
 
 ### 1.2 O `repair()` do Flyway — e por que o módulo novo NÃO deve copiar o padrão
 
@@ -270,6 +280,11 @@ RAG · tools · memória de longo prazo · anexos/arquivo · voz · streaming (S
 auto-serviço de provisionamento · SDK · marketplace de prompts · **matriz de papéis de usuário
 (RBAC completo)** · cliente agente (fase 2).
 
+**D6 (revisão de 2026-09-27): "sem auto-serviço" ganhou forma concreta — não há tela.** O
+provisionamento é `CommandLineRunner` + `ProvisioningPayloadBuilder` em código. `ux-designer` **não**
+é obrigatório nesta feature. Gatilho para voltar: 2 credenciais de produção, ou alguém sem acesso ao
+ambiente precisar provisionar — aí o parecer de UX é **gate do batch**.
+
 O ADR-013 §"O que este ADR não decide" nomeia explicitamente esta feature:
 *"**APIs públicas** — modelo de autenticação e cota, indefinido. É a próxima decisão de produto."*
 Este documento é essa decisão.
@@ -346,11 +361,30 @@ se autentica continua sendo superusuário. Esta feature **não** paga nem corrig
 superfatoração de usuário é um problema **interno** (acesso ao painel), e a superfície pública nova é
 **fechada por cadeia**, não por lista.
 
+### 4.3 Exceções ao `security-standard.md` — registradas, não escondidas (D8)
+
+Veredito do `security-engineer`: das 4 exceções apontadas, **nenhuma sai com risco aceito sem
+mitigação**, e 2 **não são exceção** (esticar a norma seria scope-stretch):
+
+| # | Item | Veredito | Ação |
+|---|---|---|---|
+| 1 | HMAC256 simétrico no token público | **Exceção ACEITA**, registrada | Risco: `iss`/`aud`/`exp` são campos que o **atacante** escreve. Gatilho para revisitar: 2º cliente externo, ou `kid`/rotação |
+| 2 | Chave única para token humano e de máquina | **Correção barata (~10 linhas), NÃO é exceção** | `api.security.public.token.secret` + `decodeAndVerify` por parâmetro + JUnit dos dois sentidos. Sem isso, `aud` separa só o token **honesto** |
+| 3 | TLS não terminado no processo Java | **Não é violação como escrita** (a norma fala de dados em trânsito) e **incomprovável no repo** (`grep server.ssl` = 0) | Correção: falhar o boot em prod sem `HIVE_TLS_MODE` explícito. Prova é do edge = débito com owner de ops |
+| 4 | Perfil `dev` como default do boot | **Correção barata (~10 linhas)** | `prod` já é fail-fast (`${JWT_TOKEN}`); o furo é o caminho que ninguém escolhe: sem `SPRING_PROFILES_ACTIVE`, o boot **sucede** com chave de 6 bytes. Segredos de dev versionados **não** são exceção (placeholders documentados) |
+| 5 | `/v3/**` e `/actuator/**` em `permitAll` | **Correção barata**, e o caso é pior: springdoc é **COMPILE** de bootstrap | `springdoc.api-docs.enabled=false` em prod + allowlist explícita de actuator + IT |
+
+⚠️ Autocrítica do `security-engineer`, registrada: *"`DataIntegrityViolationException` ecoa dado
+interno"* estava **ERRADO** (mapeia constraint por literal, manda a mensagem do driver só para o
+log); *"teto de corpo 160 KB"* era falso (`\uXXXX` = 6 bytes/char → 960 KB, teto 1 MiB); e
+*"HMAC é um risco"* são **dois** (algoritmo = exceção; chave única = correção).
+
 ## 5. Dívidas registradas que esta feature **não** corrige
 
 | Dívida | Arquivo | Efeito nesta feature |
 |---|---|---|
-| `/actuator/**` em `permitAll` | `SecurityConfig.java:44` | 🟡 **Adjacente.** A cadeia nova casa só `/v1/public/**`, então actuator fica como está. **Vira 401 quando o chain humano declarar `.requestMatchers("/v1/public/**").denyAll()`?** Não — são chains diferentes. Deixa como está e registra. |
+| `/actuator/**` em `permitAll` | `SecurityConfig.java:44` | 🟡 **Adjacente.** A cadeia nova casa só `/v1/public/**`, então actuator fica como está. Correção barata em código (D8): `management.endpoints.web.exposure.include` explícito + IT |
+| `/v3/**` em `permitAll` | `SecurityConfig.java:44` | 🔴 **Pior do que o parecer original dizia.** `springdoc-openapi-starter-webmvc-scalar` é dependência **COMPILE** de `bootstrap/pom.xml:53-57` — `/v3/api-docs` está no jar de **prod** e publica o schema de **todos** os endpoints internos, inclusive `POST /hive/v1/provider-credential`. Correção barata (D8): `springdoc.api-docs.enabled=false` em prod + IT. O enquadramento antigo ("adjacente, não afetado") era certo para actuator e **falso** para /v3 |
 | RBAC decorativo | `.spec/tech-debts/security-rbac/` P1-1 | 🔴 Aberto. Não pago aqui. |
 | `PROMPT_MANAGE` barra a leitura | `.spec/tech-debts/prompt-read-permission/` | 🟢 **Confirmado irrelevante.** O caminho novo resolve o template por `code` **em serviço**, por dentro do `@Filter` de tenant, e **não passa** por `PromptTemplateControllerV1:64`. O bloqueio continua existindo para a UI — que é a intenção do débito (produto, não segurança). |
 | `ChatSessionEntity.summary` TEXT vs DDL `VARCHAR(2000)` | `db-migration-flyway.md` #2 | 🟢 Não toca. |

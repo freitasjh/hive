@@ -1,75 +1,32 @@
-// HITL Guardrail — Hive AI Orchestrator
-// ============================================================
-// Guardrail de Human-in-the-Loop para o workflow SDD do Hive AI.
+// HITL Guardrail — no-op plugin (FIX-01, Batch 3/7).
 //
-// O que faz:
-// 1. Injeta regra permanente no system prompt reforçando que o
-//    orquestrador DEVE parar e aguardar aprovação humana entre
-//    batches/fases (nunca encadear delegações).
-// 2. Loga conclusão de delegações via task tool para auditoria.
+// FIX-01 removed two dead mechanisms from this module (SPEC §21.1, PLAN GATE-01):
+//   1. Prose re-injection via the system-transform hook (G14/N5/H2): assigning
+//      the transform output as a scalar never propagated to the caller, so the
+//      guardrail text never reached the model. The blocking pause between
+//      batches lands in GATE-04 on the confirmed deny primitive instead.
+//   2. The bus-event handler filtering a nonexistent event (N7/H3): it never
+//      fired, so the delegation audit log it promised never happened.
 //
-// Como funciona:
-// - `experimental.chat.system.transform`: injeta o bloco HITL no
-//   system prompt antes de cada chamada ao modelo.
-// - `event`: observa tool.execute.after para tool "task" e loga.
+// This module stays a valid no-op plugin until GATE-04 implements the HITL
+// pause (with the developer→reviewer loop exemption, I6). No prose, no dead
+// handlers.
 //
-// Carregado automaticamente de .opencode/plugins/ (ver opencode.json).
-// Aplicar: reiniciar o opencode.
+// v2-only (opencode-v2-only, EX2-BE-02): the v1 `server` entry and the
+// `Plugin.define` branch were removed (the owner decided v2-only). MEASURED
+// contract of the installed runtime (v2.0.32): the module default MUST be an
+// object `{ id, setup }`, and `setup(ctx)` MUST return `undefined` — the runtime
+// hands the return value to Effect.acquireRelease and CALLS a truthy value.
+// The previous `return { … }` here was called as a function, producing the
+// `TypeError: t is not a function` that failed the plugin load (58x since
+// 2026-10-15) and, in this runtime, took the agent registry down with it.
+export const HitlGuardrail = async (_input = {}) => ({});
 
-export const HitlGuardrail = async ({ client }) => {
-  const HITL_RULE = `
-## 🚨 REGRA DE GUARDRAIL — HUMAN-IN-THE-LOOP OBRIGATÓRIO (NON-NEGOTIABLE)
-Guardrail automático do opencode. Regra de governança do Hive AI:
-
-1. **PARADA OBRIGATÓRIA ENTRE BATCHES**: após concluir QUALQUER batch de
-   delegação (developer-engineer → fullstack-code-reviewer), o orquestrador
-   DEVE parar e apresentar ao usuário o resumo (tasks concluídas, code
-   review, testes) + perguntar explicitamente: "Posso avançar para o próximo
-   batch/fase?". NUNCA iniciar o próximo batch na mesma resposta sem resposta
-   humana explícita.
-
-2. **PORTÕES DE FASE**: entre fases SDD (P0→P1→P2→P3→P4→P5→P6), apresentar
-   status + resultados + decisão requerida. Aguardar resposta. Exceção única:
-   loop de correção automática (re-delegar developer → reviewer) até 3
-   iterações; após 3, parar e reportar.
-
-3. **PROIBIDO encadear múltiplas delegações em sequência** na mesma rodada.
-   Cada delegação via task tool deve ser seguida de processamento do
-   resultado + PARADA para portão humano.
-
-4. **Override** só com sintaxe explícita do usuário ("avance mesmo assim",
-   "override portão [nome]"). Registrar no workflow-state.json e no Brain.
-
-5. Se a resposta terminar sem portão humano e houver batch pendente, o
-   orquestrador VIOLOU a regra. Corrija: pare, apresente o último batch e
-   peça aprovação antes de continuar.
-`
-
-  return {
-    "experimental.chat.system.transform": async (input, output) => {
-      const existing = output.system ?? ""
-      if (!existing.includes("HUMAN-IN-THE-LOOP OBRIGATÓRIO")) {
-        output.system = existing + HITL_RULE
-      }
-    },
-
-    event: async ({ event }) => {
-      if (event.type === "tool.execute.after" && event.tool === "task") {
-        try {
-          await client.app.log({
-            body: {
-              service: "hitl-guardrail",
-              level: "info",
-              message: "Delegação via task concluída — verificar portão HITL antes do próximo batch",
-              extra: { tool: event.tool, sessionID: event.sessionID },
-            },
-          })
-        } catch {
-          // log é best-effort; não quebra o fluxo
-        }
-      }
-    },
-  }
+// V2 entry: no-op registration. Registers zero hooks and returns `undefined`
+// (nothing to clean up). Takes any stub ctx, throws never, logs no args.
+export async function setup(_ctx = {}) {
+  // no-op by design: the HITL pause lands in GATE-04 (I6); this module must
+  // never register a dead hook nor return a truthy value.
 }
 
-export default HitlGuardrail
+export default { id: "hitl-guardrail", setup };

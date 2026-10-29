@@ -43,7 +43,7 @@
 
 | Aspecto | Impacto | ADR Necessário? |
 |---------|---------|-----------------|
-| Backend (módulos afetados) | [ex: agent/api, agent/impl] | [Sim/Não] |
+| Backend (módulos afetados) | [ex: scheduling/api, scheduling/impl] | [Sim/Não] |
 | Frontend (componentes/stores) | [ex: AnamnesisStore, AnamnesisForm.vue] | [Sim/Não] |
 | Banco de dados (migrations) | [ex: nova tabela, alter column] | [Sim/Não] |
 | Multi-tenancy | [impacto no isolamento de tenant] | [Sim/Não] |

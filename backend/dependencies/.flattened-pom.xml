@@ -328,6 +328,30 @@
         <version>${project.version}</version>
         <scope>provided</scope>
       </dependency>
+      <dependency>
+        <groupId>br.com.systec.hive</groupId>
+        <artifactId>hive-publicapi-api</artifactId>
+        <version>${project.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>br.com.systec.hive</groupId>
+        <artifactId>hive-publicapi-impl</artifactId>
+        <version>${project.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>br.com.systec.hive</groupId>
+        <artifactId>hive-publicapi-dbupdate</artifactId>
+        <version>${project.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>br.com.systec.hive</groupId>
+        <artifactId>hive-publicapi-web-internal-v1</artifactId>
+        <version>${project.version}</version>
+        <scope>provided</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>

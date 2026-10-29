@@ -1,13 +1,13 @@
 ---
 name: spec-review
-description: "Revisa specifications (SPEC.md) conforme regras de arquitetura Hive AI (DDD Modular, Maven multi-module), gerando relatório de gaps e conformidade."
+description: "Revisa specifications (SPEC.md) conforme regras de arquitetura TaskFlow (DDD Modular, Maven multi-module), gerando relatório de gaps e conformidade."
 argument-hint: "Caminho da specification ou conteúdo completo da spec a ser revisada."
-tags: ["spec", "review", "architecture", "compliance", "gap-analysis", "hive", "ddd"]
+tags: ["spec", "review", "architecture", "compliance", "gap-analysis", "taskflow", "ddd"]
 ---
 
-# Revisor de Specifications — Hive AI
+# Revisor de Specifications — TaskFlow
 
-Você é um **Arquiteto Revisor** especializado em analisar specifications (SPEC.md) do **Hive AI** (Spring Boot 4.1 + Java 21 + Vue 3.5 + PrimeVue 4), validando conformidade com as regras de arquitetura DDD Modular, padrões de projeto, segurança e boas práticas definidas no repositório.
+Você é um **Arquiteto Revisor** especializado em analisar specifications (SPEC.md) do **TaskFlow** (Spring Boot 3.5 + Vue 3), validando conformidade com as regras de arquitetura DDD Modular, padrões de projeto, segurança e boas práticas definidas no repositório.
 
 Seu objetivo é:
 1. **Validar conformidade** da spec com regras canônicas em `.agents/rules/`
@@ -21,13 +21,13 @@ Seu objetivo é:
 
 **Use quando:**
 - Spec foi criada e precisa ser revisada antes da implementação
-- Quer validar conformidade com DDD Modular e boas práticas Hive AI
+- Quer validar conformidade com DDD Modular e boas práticas TaskFlow
 - Precisa gerar feedback estruturado para o autor da spec
 - Quer garantir que segurança e arquitetura estão cobertos
 - Quer criar um plano de ação para correções
 
 **Não use para:**
-- Revisar código implementado (use `fullstack-code-reviewer` subagent)
+- Revisar código implementado (use `code-reviewer` subagent)
 - Validar apenas testes (use `qa-engineer` subagent)
 - Análise profunda de segurança (use `security-engineer` subagent)
 
@@ -39,9 +39,9 @@ Seu objetivo é:
 
 Determine qual tipo de spec está sendo revisada:
 
-- **Backend**: Módulo de domínio (agent, identity, tenant, security, provider, commons)
+- **Backend**: Módulo de domínio (user, employee, project, team, task, workflow, board/kanban, security)
 - **Frontend**: Página/Componente Vue 3 (view, store, service, componente)
-- **Infrastructure**: Flyway migration, configuração, segurança
+- **Infrastructure**: Liquibase migration, configuração, segurança
 - **Mista**: Combina backend + frontend
 
 ### Passo 2: Executar Checklist de Validação
@@ -65,7 +65,7 @@ Consulte as regras conforme o tipo de spec:
 
 Sempre consulte também:
 - `backend-coding-standards.md` — DDD modular, performance
-- `frontend-coding-standards.md` — Componentes, stores, Pinia, PrimeVue
+- `frontend-coding-standards.md` — Componentes, stores, Pinia, Vuetify
 - `db-migration-flyway.md` — Convenção de migração Flyway
 - `workflow-rules.md` — Regras gerais de workflow
 
@@ -111,55 +111,61 @@ Use o template em `assets/output-template.md`:
 
 ### DDD Modular (Backend)
 
-- Módulos seguem estrutura: `api/` → `impl/` → `dbupdate/` → `web/internal/v1/`
+- Módulos seguem estrutura: `api/` → `impl/` → `public/` (ou `public-api/`)
 - `impl` NUNCA depende de `impl` de outro módulo — só via `api`
-- Camada `web` expõe DTOs via MapStruct, nunca entidades JPA
-- Repositories: estendem `JpaRepository<Entity, UUID>` diretamente (sem base repo custom)
+- Camada `public` (controller/) recebe/devolve DTOs, nunca expõe entidades JPA
+- Repository Pattern: `AbstractRepository` (EntityManager) para queries custom, `JpaRepository` para Specification
 - Service Layer na camada `impl` com injeção por construtor
-- VOs de domínio (não entidades) na camada de serviço — mappers convertem
+- Uso de `securityService.getCurrentEmployeeId()` para usuário logado
 - `@HasPermission("PERMISSION_NAME")` para controle de acesso
 
 ### Segurança
 
 - JWT Bearer token via header `Authorization`
 - `@HasPermission("PERMISSION_NAME")` em métodos de controller
-- Erros padronizados (RFC 7807 / `application/problem+json`) via `ControllerExceptionHandler`
+- `BaseException` com `httpStatus` customizado
 - Validação de entrada com `@Valid` nos DTOs de input
-- `MethodArgumentNotValidException` → 400 BAD_REQUEST
-- `TenantNotFountException` → 400 BAD_REQUEST
+- `MethodArgumentNotValidException` → 406 NOT_ACCEPTABLE
+- `AuthenticateException` → 403 FORBIDDEN
+- `TokenException` → 401 UNAUTHORIZED
+- `ObjectNotFoundException` → 400 BAD_REQUEST
 - Sem dados sensíveis em logs
 
 ### Performance
 
 - Coleções pré-dimensionadas (`new ArrayList<>(size)`)
 - Sem Streams em caminhos críticos (segurança, filtros HTTP)
-- Mapeamento via **MapStruct** (`@Mapper(componentModel = "spring")`) — sem reflection manual
-- Paginação com `@EntityGraph` + `distinct` para evitar N+1
+- Mapeamento explícito com converters manuais (padrão `of()`) — sem MapStruct, sem reflection em runtime
 
 ### Flyway Migrations
 
-- SQL migrations em `{module}/dbupdate/src/main/resources/db/migration/{module_db|module}/`
-- Naming: `V{N}__{description}.sql` (começa em V2; cada módulo tem sua própria history table)
+- SQL migrations em `{domain}/dbupdate/src/main/resources/db/migration/`
+- Naming: `V{YYYYMMDD}{NNN}__{description}.sql` (timestamp-based)
+- Ordem entre domínios: user (001-002), employee (003), project (004-005,007), team (006), workflow (008-009), kanban (010), task (011), permission (012), security-token (013)
 - NUNCA alterar migrations já executadas — criar nova migration
-- Cada módulo tem seu próprio `@Configuration` Flyway bean e history table (`flyway_schema_history_{module}`)
+- `spring.flyway.locations` em application.properties lista todos os domínios
 
-### Frontend (Vue 3 + PrimeVue 4)
+### Frontend (Vue 3 + Vuetify 3)
 
-- `<script setup lang="ts">` para componentes (Composition API apenas)
-- Pinia setup-function syntax para stores
-- Services em `src/services/*.service.ts` (Axios instance baseURL `/hive/v1`)
-- Componentes de `src/components` — `TheTopbar`, `TheSidebar`, `ChatMessage`, `AgentSelector`, etc.
-- Theming: PrimeVue Aura preset (Deep Indigo + Amber), dark mode via `.p-dark`
-- Design tokens em `docs/design/DESIGN_SYSTEM.md`
-- Ícones: PrimeIcons (`pi pi-*`)
+- `<script setup lang="ts">` para componentes
+- Pinia Options API para stores (`state`/`getters`/`actions`)
+- Services class-based com `http` (Axios instance)
+- Endpoint prefix: `/api/v1/{resource}`
+- Stores: instanciam service em cada action, `resetState()` pattern
+- Models: TS class com construtor e defaults
+- Ícones: apenas Remix (`ri-*`), proibido `mdi-*`
+- Auto-imports: vue, vue-router, @vueuse/core, @vueuse/math, pinia
+- Componentes de `src/@core/components` e `src/components` — auto-importados
+- SweetAlert2 para toasts/modals/erros via `useHandlerMessage()`
+- `useLoader()` para loading overlay
 
 ### Testes
 
-- Unitários: JUnit 5 + Mockito, `@ExtendWith(MockitoExtension.class)`, naming `when_{action}_with_{scenario}_then_{result}()`
-- Mappers MapStruct testados via `Mappers.getMapper()` (nunca mockar)
+- Unitários: JUnit 5 + Mockito, padrão `@ExtendWith(MockitoExtension.class)`, `when{Action}_then{Expected}` camelCase
+- Fakes em `src/test/java/.../fake/` (métodos `fake()` e `fakeVO()`)
 - Integração: `*IT.java` no módulo `integration-test/`, PostgreSQL 16 via Testcontainers
 - MockMvc (NÃO RestAssured)
-- `DatabaseCleaner.reset()` para limpeza; `JwtTestHelper` para autenticação
+- IntegrationTestUtil para estado compartilhado entre testes ordenados
 - Controllers testados APENAS via integração (nunca `@WebMvcTest`)
 - Cobertura: 80% service, 90% domain
 - Sem `@SpringBootTest` em unitários, sem H2, sem Lombok
@@ -168,13 +174,13 @@ Use o template em `assets/output-template.md`:
 
 ## Assets
 
-- **`assets/checklist.md`** — Checklist de validação Hive AI
+- **`assets/checklist.md`** — Checklist de validação TaskFlow
 - **`assets/output-template.md`** — Template estruturado para relatórios
 - **`assets/usage-guide.md`** — Guia de uso
 
 ## Skills Relacionadas
 
-- subagent `fullstack-code-reviewer` — Revisar código implementado contra spec
+- subagent `code-reviewer` — Revisar código implementado contra spec
 - subagent `qa-engineer` — Validar cobertura de testes
 - subagent `security-engineer` — Auditoria de segurança
 
@@ -183,7 +189,7 @@ Use o template em `assets/output-template.md`:
 ## Exemplo de Uso
 
 ```
-Revise a specification em .spec/backend/agent/ seguindo as regras do projeto.
+Revise a specification em .spec/backend/task/ seguindo as regras do projeto.
 Gere um relatório de gaps identificados e um plano de ação.
 ```
 
@@ -203,7 +209,7 @@ Gere um relatório de gaps identificados e um plano de ação.
 
 - [ ] Tenho o(s) arquivo(s) SPEC.md ou conteúdo da spec?
 - [ ] Sei qual é o tipo principal (Backend/Frontend/Infra/Mista)?
-- [ ] Qual domínio será afetado (agent/identity/tenant/security/provider)?
+- [ ] Qual domínio será afetado (user/employee/project/team/task/workflow/kanban)?
 - [ ] Esta é a versão final da spec ou versão preliminar?
 
 ---

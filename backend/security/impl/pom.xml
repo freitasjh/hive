@@ -57,6 +57,11 @@
         </dependency>
         <dependency>
             <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-publicapi-impl</artifactId>
+            <version>${revision}</version>
+        </dependency>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-identity-api</artifactId>
         </dependency>
         <dependency>

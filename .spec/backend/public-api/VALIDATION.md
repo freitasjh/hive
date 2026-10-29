@@ -54,7 +54,7 @@ alternativa mais barata que a escolhida — que é justamente o motivo de estare
 | V5 | `sessionId=null` vira header `"null"` no provider (GO/ZEN) | Gate R2 no batch 2, **antes** do batch 9. Decisão tomada com o código na mão |
 | V6 | Cota em Redis = nova dependência do caminho de chat | fail-open + `log.error`; `ChatRateLimiter` em memória intocado para `/v1/chat` |
 | V7 | `PUBLIC_CHAT_COMPLETE` vira a 4ª lista hardcoded | Sai de **linha de banco**; e **não** entra em `SecurityConstants.DEFAULT_PERMISSIONS` (que é exibição e tem teste de paridade com `LoginIT`) |
-| V8 | O ERP reenvia o histórico inteiro e o custo de prompt cresce sem limite | Teto de 20 mensagens + 8000 chars por `content`, com erro `too_many_messages` |
+| V8 | O ERP reenvia o histórico inteiro e o custo de prompt cresce sem limite | Teto = **dado da credencial** (D2): `max_messages` 200 / `max_message_chars` 32000 / `max_total_chars` 256000, claim `plim`; recusa explícita 400/413, **nunca** truncamento |
 | V9 | `user` virado de âncora de segurança por engano future | Documentado: `user` é correlação e log, **nunca** `@Filter`, nunca prompt, nunca confiável |
 | V10 | Erro de provisionamento (`prompt_code` na allowlist que não existe) vira mistério | `404 prompt_not_found` com mensagem que diz "erro de provisionamento", e log `warn` com `clientId` |
 
@@ -99,7 +99,7 @@ cobre, e o critério de "pronta" é outro.
 ### 4.1 Pré-condições
 
 - [ ] Suíte completa verde: `mvn clean install -DskipTests` → `mvn test` → `mvn verify -pl integration-test -Pintegration -am` (H1, 3 comandos)
-- [ ] `npm run test` e `npm run build` verdes (o batch 10 toca a UI de provisionamento)
+- [ ] `npm run test` e `npm run build` verdes (o batch 10 **não** toca UI — D6, runner; servem como rede de segurança)
 - [ ] `code_review.last_status == "passed"`, zero 🔴
 - [ ] `tenant_llm_config` do tenant configurado, `provider_credential` com chave **real** (não a de dev)
 - [ ] Prompt template criado, `code` = o esperado, `status = ACTIVE`
@@ -118,7 +118,7 @@ cobre, e o critério de "pronta" é outro.
 | 7 | `prompt_code` **não** na allowlist | **403** `prompt_not_in_allowlist` | 404, 500, ou 200 |
 | 8 | `prompt_code` na allowlist mas **inexistente** no tenant | **403** `prompt_not_in_allowlist` — **igual ao passo 7** | 404. *Esta é a prova de anti-enumeração* |
 | 9 | Prompt fica `DRAFT` | **409** `prompt_not_active` | 400 genérico |
-| 10 | Token público em rota interna: `GET /hive/v1/prompt-templates` e `POST /hive/v1/provider-credential` | **401** nos dois | 403 (vazou a chain) ou 200 (**breach**) |
+| 10 | Token público em rota interna: `GET /hive/v1/prompt-templates` e `POST /hive/v1/provider-credential` | **401** nos dois | 403 (vazou a chain), 200 (**breach**) ou **500** (o defeito P-d passando — B3: o gate antigo só tratava 403/200) |
 
 ### 4.3 Os 3 cenários que os testes não pegam
 
@@ -174,6 +174,33 @@ task, então o `TASKS.md` é mecânico a partir dele.
 **Uma decisão de esforço, não de arquitetura:** aprova-se criar o módulo Maven `publicapi` (4 poms,
 1 config Flyway)? É a recomendação (D1) e evita a aresta `agent → security`, mas é o item com mais
 arquivos novos do plano. A alternativa é 2 módulos existentes + 1 aresta nova entre brothers.
+
+---
+
+## 6. Revisão de 2026-09-27 — 3 pareceres e as respostas do usuário
+
+`security-engineer`, `product-manager` e `architect` revisaram ADR-014 + os 6 artefatos (2.708
+linhas, zero código). Veredito unânime: **APROVADO COM CONDIÇÕES** — 10 blockers (B1–B10), 6
+contradições documentais, 16 omissões que quebravam o desenho. Correções aplicadas nos artefatos
+como decisões **D1–D8** (registro completo em `workflow-state.json → public_api_chat_review`).
+
+**Respostas do usuário (2026-09-27), todas aplicadas:**
+
+| # | Pergunta | Resposta | Efeito |
+|---|---|---|---|
+| 1 | Ratificar `PINNED` como tripwire (não snapshot)? | **Sim** | P1 ratificada; snapshot é dívida condicionada ao editor |
+| 2 | Default de `pin_mode`? | **"1 integração, mesmo time do deploy"** → `FOLLOW_ACTIVE` | D1 arbitrada pela própria condição do PM |
+| 3 | Log do ambiente é pesquisável por `clientId`/`turnId` após 1 dia? | **Sim** | D4 fica **log** + Batch 1B; tabela segue como reversão |
+| 4 | Aceita tocar `LangChain4jTurnGateway` (`isModelNotFound` sai)? | **Sim** | Task 1.7 criada |
+| 5 | Aceita "`SecurityFilter.java` inalterado" (correção do registro duplo no `SecurityConfig`)? | **Sim** | Task 6.1 reescrita |
+| 6 | Baseline: aceita 376/76/158 ou re-mede? | **Re-medir** | Task 0.1 + `SUITE-BASELINE.md` com sha |
+
+**Divergência que segue sem arbitragem: SEC-02.** 401 na cadeia humana — o `security-engineer` propõe
+o fix no `SecurityFilter` (arquivo que a Conformidade promete não tocar); o PLAN 6.3 diz "não mexer
+em `SecurityTokenServiceImpl`"; o `architect` não se pronunciou (rodou em paralelo). **Pergunta ao
+usuário antes do Batch 6.**
+
+**Esforço reestimado: 52–66 h** (PLAN dizia 32–44 h).
 
 ---
 

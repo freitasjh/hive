@@ -1,15 +1,18 @@
 # ADR-014 — API pública de chat: superfície HTTP stateless no formato OpenAI para integração interna
 
-- **Status:** Aceito (2026-09-27) — **com 2 premissas marcadas para revisão pelo usuário: P1
-  (semântica de `PINNED`) e P2 (módulo Maven novo).** As 10 decisões numeradas foram fechadas pelo
-  usuário. **P1 e P2 NÃO foram ratificadas** — ver "Premissas adotadas".
+- **Status:** Aceito (2026-09-27) — **revisado em 2026-09-27 por 3 pareceres** (`security-engineer`,
+  `product-manager`, `architect`: APROVADO COM CONDIÇÕES). **P1 (tripwire) e P2 (módulo novo)
+  RATIFICADAS pelo usuário**, junto com as decisões D1–D8 da revisão — ver §"Revisão de 2026-09-27".
+  As 10 decisões numeradas foram fechadas pelo usuário.
 - **Data:** 2026-09-27
 - **Contexto:** Hive AI (Java 21 + Spring Boot 4.1.0 + LangChain4j 1.19.0 + PostgreSQL 16 + Redis) ·
   produto é o **Assistant** (ADR-013): chat simples, prompt escolhido por conversa, sem agente, sem
   tools, sem base de conhecimento, não-agentico
-- **Decisores:** usuário (escopo, premissas de produto, 10 decisões numeradas) + product-manager
-  (BYOK descartado, sem billing, sem metering) + architect (desenho, 18 decisões técnicas) ·
-  **security-engineer e ux-designer não foram consultados** — ver "Conformidade"
+- **Decisores:** usuário (escopo, premissas de produto, 10 decisões numeradas + D1–D8 da revisão)
+  + product-manager (BYOK descartado, sem billing, sem metering) + architect (desenho, decisões
+  técnicas) · **security-engineer consultado em 2026-09-27** (parecer APROVADO COM CONDIÇÕES, 10
+  blockers endereçados nas decisões D1–D8) · **ux-designer NÃO exigido** — superfície headless,
+  decisão D6
 - **Supersede:** nada. É **aditivo** — nenhuma decisão anterior é revertida
 - **Refina:** [ADR-012](ADR-012-Chat-Turn-Gateway-vs-AI-Services.md) — confirma que o **gatilho 5 não
   dispara** e registra a API pública como a **primeira implementadora da porta que não é agente**.
@@ -115,7 +118,7 @@ Ver "Decisões que parecem detalhe".
 As 10 decisões acima foram fechadas. As 2 premissas abaixo e as 4 respostas de discovery **não** foram:
 foram adotadas com a premissa explicitada, e estão aqui porque cada uma muda o contrato ou o esforço.
 
-### P1 — `PINNED` é **tripwire**, não snapshot ⚠️ requer ratificação
+### P1 — `PINNED` é **tripwire**, não snapshot ✅ **RATIFICADO pelo usuário (2026-09-27)**
 
 A credencial declara a versão esperada do prompt. Se a versão não bater, vem
 `prompt_version_not_found`. **`PINNED` detecta drift; não previne.**
@@ -152,7 +155,7 @@ obrigatórios em `metadata.hive{}`. Com eco, seguir o publicado é legítimo e m
 **Se o usuário exigir snapshot de verdade, este ADR precisa ser reaberto** — não é um detalhe de
 implementação, é uma mudança de schema e de comportamento do editor.
 
-### P2 — módulo Maven novo `publicapi` ⚠️ requer ratificação
+### P2 — módulo Maven novo `publicapi` ✅ **RATIFICADO pelo usuário (D5 da revisão)**
 
 4 submódulos (`api`/`impl`/`dbupdate`/`web`) + 1 `pom` pai + 1 `@Configuration` Flyway, para **não**
 criar a aresta `agent → security`. Motivo: `agent` e `security` são **brothers** hoje — `agent/api`
@@ -165,9 +168,9 @@ novo; a decisão é do usuário, porque é uma escolha de **esforço**, não de 
 
 | # | Pergunta | Premissa adotada |
 |---|---|---|
-| 1 | `role: "system"` no `messages[]` é aceito? | **Aceito, e reescrito pelo servidor** — o `system` do cliente é **descartado** e substituído pelo template do tenant. O cliente não escolhe o system prompt. ⚠️ E a reescrita **precisa ser declarada na resposta** (`hive{}`), senão é um override silencioso — ver "A lição" |
-| 2 | O transcript é persistido? | **Não.** Só metadados: `clientId`, `prompt_code`, versão, tokens in/out, latência, status. Compatível com `ChatTrace`, que já registra tamanhos e contagens e **não** texto |
-| 3 | Limite de mensagens por requisição? | **Sem limite no servidor no MVP; o teto é do proxy.** ⚠️ **Contestado pelo architect** — ver "Onde o architect discorda" |
+| 1 | `role: "system"` no `messages[]` é aceito? | **REJEITADO com 400 `system_role_not_allowed`** (D3 da revisão, 3/3 pareceres + usuário). `buildMessages:121-124` põe o template do cliente **primeiro**; aceitar-e-sobrescrever deixaria o system do ERP chegar por último. Por ser rejeição, **não há override a declarar** — a IT falsificável afirma a **ausência** de efeito (sem `metadata.hive`, sem turno registrado) |
+| 2 | O transcript é persistido? | **Não.** Só metadados em **log** (D4): `ChatTrace` ganha `tenantId` + `turnId` + `clientId` no escopo do **Batch 1B** (~15 linhas, zero migration). Premissa: log do ambiente **coletado e pesquisável** por `clientId`/`turnId` depois de 1 dia — confirmada pelo usuário. Reversão: vira **tabela** (+1 migration, retenção, LGPD) |
+| 3 | Limite de mensagens por requisição? | **Dado da credencial** (D2), não constante de código: `max_messages` 200 / `max_message_chars` 32000 / `max_total_chars` 256000, reclamados no claim `plim`. **Recusa explícita, nunca truncamento:** 400 `too_many_messages`/`request_too_large`; 413 só para bytes, decidido no filtro por `Content-Length` antes do Jackson (teto 1 MiB — JSON escapa non-ASCII como `\uXXXX`, 6 bytes/char) |
 | 4 | `client_secret` no header ou no body? | **`client_secret_basic`** no header `Authorization` (RFC 6749 §2.3.1 — evita que access log registre o body) |
 
 ### Onde o architect discorda
@@ -175,7 +178,9 @@ novo; a decisão é do usuário, porque é uma escolha de **esforço**, não de 
 Registradas aqui e não só no retorno, porque as duas mudam o contrato e o próximo implementador
 precisa saber que elas foram contestadas.
 
-**1. "Sem limite de mensagens; o teto é do proxy" — discordo, e recomendo um teto no servidor.**
+**(RESOLVIDO — D2) "Sem limite de mensagens; o teto é do proxy" — o architect discordou, e a revisão
+fechou com a forma dele:** teto no servidor, **dado da credencial** (não constante), recusa explícita
+(400/413), nunca truncamento silencioso. Registro do argumento original, que segue valendo:**
 
 O ERP chama o Hive **direto**. Não há proxy no caminho descrito, e um teto que não existe no caminho
 real não é um teto. Além disso, três consequências que o argumento "o proxy cuida" não cobre:
@@ -195,17 +200,45 @@ real não é um teto. Além disso, três consequências que o argumento "o proxy
 vez de truncamento silencioso, e teto fino onde o proxy existir. Truncar em silêncio é pior que
 recusar: o ERP recebe 200 OK com metade da conversa e não sabe.
 
-**2. "Metadados persistidos" — a formulação é ambígua, e a diferença importa.**
+**(RESOLVIDO — D4) "Metadados persistidos" — a formulação era ambígua, e a diferença importava.**
 
 "O transcript não é persistido, só metadados" é compatível com `ChatTrace`, que **já** registra
-`clientId` equivalente, `prompt_template_id`, versão efetiva, tokens, latência e status — **e não
-texto**. Nesse sentido a premissa é a que eu recomendo e não custa nada: os metadados vão para a
-**linha de log** que `LoggingChatTraceRecorder` já escreve, sem tabela nova e sem escrita no hot path.
+`prompt_template_id`, versão efetiva, tokens, latência e status — **e não texto**. Fechado: os
+metadados vão para a **linha de log** que `LoggingChatTraceRecorder` já escreve, sem tabela nova e sem
+escrita no hot path — **com 3 condições** (a 3ª foi acrescentada na revisão): (1) `ChatTrace` ganha
+`tenantId` + `turnId` + `clientId` (Batch 1B); (2) o `turn_id` que o ERP recebe casa com a linha de
+log; (3) o log do ambiente é **coletado e pesquisável** após 1 dia — confirmado pelo usuário em
+2026-09-27. Se qualquer condição cair, vira **tabela** (+1 migration, retenção, LGPD).
 
-Se a intenção for **tabela**, isso é uma adição, não uma reconciliação: 4ª tabela, escrita no hot path
-(invalidando o "hot path sem banco" do planejamento), e **política de retenção** — porque metadado de
-uso de integração é dado de cliente e a LGPD aparece no `ADR-011` como concern explícito. Nenhum dos
-dois está decidido aqui. **Pergunta para o usuário:** log ou tabela?
+---
+
+## Revisão de 2026-09-27 — 3 pareceres, 8 decisões fechadas
+
+`security-engineer`, `product-manager` e `architect` revisaram este ADR e os 6 artefatos de
+planejamento (2.708 linhas, **zero código**). Veredito unânime: **APROVADO COM CONDIÇÕES** — 10
+blockers (B1–B10), 6 contradições documentais, 16 omissões que quebravam o desenho. As correções
+viraram 8 decisões fechadas (**D1–D8**), mais a ratificação das premissas P1/P2 e o re-measure do
+baseline (Batch 0). Registro completo: `workflow-state.json → public_api_chat_review` e
+`.spec/backend/public-api/VALIDATION.md §6`.
+
+| # | Decisão | Quem fechou | Efeito |
+|---|---|---|---|
+| D1 | Default de `pin_mode` = **`FOLLOW_ACTIVE`**; `PINNED` só onde o contrato exigir | product-manager + security-engineer, **arbitrado pelo usuário** | A divergência (PM queria `PINNED`) foi desfeita pela própria condição do PM: *"1 integração, prompt do mesmo time que faz o deploy"* → `FOLLOW_ACTIVE`. Provisionamento **sempre informa** `pin_mode` explicitamente; o `DEFAULT` do DDL só atende insert fora do runner |
+| D2 | Teto de mensagens = **dado da credencial** (`plim` no claim) | product-manager + architect | 400 `too_many_messages`/`request_too_large`, **nunca** truncamento; 413 só para bytes no filtro (1 MiB) |
+| D3 | `role: "system"` → **400** | 3/3 + usuário | IT falsificável (ausência de `metadata.hive` + turno não registrado) |
+| D4 | Metadados em **log**; `ChatTrace` ganha `tenantId`/`turnId`/`clientId` no **Batch 1B** | product-manager | 3 condições; reversão para tabela se o log do ambiente não for pesquisável |
+| D5 | Política do turno: porta e função pura em `agent/api`, adaptador em `agent/impl`; `isModelNotFound` sobe; `LangChain4jTurnGateway` **é tocado** | architect | P2 ratificada; zero aresta `impl → impl`; zero query nova |
+| D6 | Provisionamento por **`CommandLineRunner`** (tela cortada) | product-manager | `ux-designer` **não** exigido; gatilho para voltar nomeado |
+| D7 | `FilterRegistrationBean.setEnabled(false)`; `SecurityFilter.java` com 0 linhas alteradas | architect + security-engineer | `shouldNotFilter` rejeitado; IT de sentinel + teste estático |
+| D8 | Exceções de segurança **registradas**; 4 correções baratas em código | security-engineer | Chave separada (`api.security.public.token.secret`), fail-fast de perfil, springdoc em prod, `typ`/`kid` |
+
+**Esforço reestimado pelo architect após as correções: 52–66 h** (o PLAN dizia 32–44 h). Entram:
+correções documentais, `ModelNotFound` movido, `FilterRegistrationBean` + 3 ITs de cadeia, IT de
+cota-vs-allowlist + claim. Sai: `TurnContext` (não existe).
+
+**Divergência que segue sem arbitragem: SEC-02** — o `security-engineer` propõe o fix do 401 na
+cadeia humana no `SecurityFilter` (arquivo que a Conformidade promete não tocar); o `architect` não
+se pronunciou. Fica registrada, não decidida.
 
 ---
 
@@ -213,27 +246,25 @@ dois está decidido aqui. **Pergunta para o usuário:** log ou tabela?
 
 Este é o achado mais importante do planejamento, e ele **não estava no briefing**.
 
-`SecurityFilter.doFilterInternal` chama, **incondicionalmente**:
+`SecurityFilter.java:28` é `@Component` — **auto-registrado no container para `/*`, fora do
+`FilterChainProxy`** (B1). E um token `aud=hive.public` falha **antes** de qualquer lookup de usuário:
+`SecurityFilter:49` chama `validateTokenRevoke` → `decodeAndVerify:167-171` exige `aud=hive.web` →
+`BaseException` relançada em `:63` → **HTTP 500, não 401**. Nenhum controller é alcançado, e o
+sintoma mente: diz "erro interno" onde o integrador diria "credencial inválida".
 
-```
-48:  if (bearerToken != null) {
-50:      var username = securityTokenService.getSubject(bearerToken);
-51:      var userDetails = authenticationService.loadUserByUsername(username);   ← ← ←
-```
-
-`AuthenticationServiceImpl.loadUserByUsername` → `userService.findByUsername(username)`. Um token de
-`client_credentials` tem `clientId` como `sub`, que **não é** um `users.username`. O resultado medido
-por leitura do fluxo: `ObjectNotFoundException` → `UsernameNotFoundException` → capturado pelo
-`catch (Exception e)` de `SecurityFilter.java:66` → lançado como `SecurityException` **para fora do
-`FilterChainProxy`** → **HTTP 500, não 401**. Nenhum controller é alcançado, e o sintoma mente: diz
-"erro interno" onde o integrador diria "credencial inválida".
+**A causa original foi apontada errada no planejamento e corrigida na revisão (B2):**
+`loadUserByUsername:51` é **inalcançável** nesse caminho — a validação de audiência morre antes. Ele
+segue sendo um defeito latente (um token `aud=hive.web` forjado com `sub` de não-usuário chegaria lá),
+mas **não é a causa do 500 da rota pública**. registrar a causa errada é o que faz o próximo corrigir
+o lugar errado.
 
 E a correção **resolve dois problemas que não são o mesmo**:
 
-1. **Tecnicamente**, é a razão de a cadeia ser **separada** e não um ramo por claim. O
-   `loadUserByUsername` é incondicional hoje, então qualquer ramo ainda deixa o caminho legado
-   exposto no mesmo chain. Separar é o que torna a suposição "todo bearer tem um usuário
-   correspondente" uma **premissa da cadeia humana**, e não do sistema.
+1. **Tecnicamente**, é a razão de a cadeia ser **separada** e não um ramo por claim — e a correção
+   é **D7**: `FilterRegistrationBean<SecurityFilter>` com `setEnabled(false)` em `SecurityConfig`,
+   mais nada. **`SecurityFilter.java` fica com zero linhas alteradas**; o duplo registro
+   (`@Component` + bean do container) é desfeito por 1 `@Bean`. `shouldNotFilter` foi rejeitado:
+   criaria um 2º lugar com a lista de paths, divergindo em silêncio do `SecurityConfig`.
 2. **Em segurança**, a cadeia separada é o que **fecha o `AGENT_MANAGE` por ausência de rota** —
    ver Consequência 2.
 
@@ -305,10 +336,19 @@ para provar exatamente isso, e a IT correspondente é a que **não pode ser cort
 | `:248-252` | trace + TX2 | ❌ persiste |
 | `:328-344` | `toProviderMessages` — a conversão para o tipo do provider | ✅ **é a mesma conversão, com outra fonte** |
 
-**Nenhuma linha é reusável como está, e nenhuma precisa ser.** O que falta extrair não é linha de
-código — é **decisão que mora no lugar errado porque o método também faz transação**: `ProviderResolution`
-(`:176-186`) e `TurnOutcomeMapper` (`:203-246`), mais `toProviderMessages` compartilhado. ~110 linhas
-movidas, 3 colaboradores de 1 método, `ChatServiceImpl` encolhe para ~265.
+**Nenhuma linha é reusada como está, e nenhuma precisa ser.** O que sai de lá é **decisão que mora
+no lugar errado porque o método também faz transação**, e o recorte final (D5 da revisão) é:
+
+| # | Collaborator | Forma final |
+|---|---|---|
+| 1 | `ProviderResolution` | `agent/impl`, 1 método. (`ProviderResolution` **não** sobe para `agent/api`: `CredentialResolver` está em `agent/impl` e `agent/api → agent/impl` é ciclo Maven) |
+| 2 | `TurnOutcomeMapper` | `agent/impl`, 1 método |
+| 3 | `toProviderMessages` | **estático em `agent/api/util/ProviderMessages`** — a porta e a função pura vivem no `api`; o adaptador, no `impl` |
+| 4 | `isModelNotFound` + `ModelNotFound` | **movem para `agent/api`** — `LangChain4jTurnGateway` **é tocado** (emenda ratificada pelo usuário), 1 checkbox de Conformidade |
+
+`~72` é a região **medida**; `~28` é o código que muda. A estimativa "~110 linhas" do planejamento
+confundia região com diff, e foi essa confusão que gerou a divergência de esforço entre os 3
+pareceres (32–44 h vs 46–58 h).
 
 E `LangChain4jTurnGateway` (179 linhas) **já decide cinco coisas** que a porta existe para centralizar:
 a precedência do `SystemMessage` sobre a conversa, a regra de "modelo removido" (404 com corpo JSON
@@ -376,7 +416,8 @@ conveniência de sprint.
 | **1º** | Extração de `ProviderResolution` + `TurnOutcomeMapper` + `toProviderMessages` compartilhado | **Fork.** Escrita contra o `ChatServiceImpl` monolítico, a API pública **força** a cópia — e a extração depois vira refactor em cima de código já duplicado, que é a forma mais cara de fazer as duas coisas. ⚠️ E em **batch próprio**, com gate de `systemBlockChars` igual ao baseline: se o refactor e a API forem o mesmo batch, a evidência que sustenta `ChatServiceImpl` passa a ser só mock, e é assim que o `PromptSelector` com `size=100` contra servidor que corta em 50 passou por 145 testes e quebrou 400 em toda montagem |
 | **2º** | P-a (grant model persistido) + P-b (`tenantId` no token) + P-c (ciclo de vida do segredo) | **O primeiro token emitido é um superusuário.** Não existe "só um endpoint de teste": o primeiro token já é o breach. Sem P-a não há registro do que revogar, auditar ou testar 403; sem P-b não há âncora de tenant e a leitura é cross-tenant; sem P-c o segredo vive em claro |
 | **3º** | `SecurityFilterChain` separada, **antes** de qualquer endpoint público | **O token público alcança `/v1/provider-credential`** e troca a chave de API e o modelo default do tenant. Ver Consequência 2 |
-| **4º** | Os dois endpoints | — |
+| **4º** | **Batch 1B** — `ChatTrace` ganha `tenantId` + `turnId` + `clientId` (D4) | Trace da rota pública **não atribuível**: o `turn_id` que o ERP recebe não casa com linha de log nenhuma. ~15 linhas, zero migration, nenhum teste existente quebrado |
+| **5º** | Os dois endpoints | — |
 
 A regra geral, que vale para o próximo: **nenhuma emissão de credencial antes do seu modelo de
 concessão, e nenhuma rota antes da fronteira que a contém.**
@@ -432,11 +473,12 @@ incondicional.** `UNIQUE` que não protege NULL, `ORDER BY version DESC` que tra
 (`NULLS FIRST` no PostgreSQL), `totalElements` que não está onde o tipo diz, `version` que não é
 imutável. Em todos, o banco, o servidor e o tipo **aceitam** o valor e **nenhum reclama**.
 
-⚠️ **Corolário sobre a correção de premissa 1 e a premissa 1 deste ADR (o `system` reescrito):** se
-o servidor descarta o `system` do cliente e substitui pelo template do tenant, isso **precisa ser
-declarado na resposta**. Um override silencioso é a mesma classe de mentira que o ADR-013 registrou
-para os campos `rag*` de `ChatTrace` (*"uma métrica que não pode ser verdadeira é pior que uma
-ausente"*): o consumidor que acha que o seu system prompt foi honrado, e não foi.
+⚠️ **Corolário sobre a premissa 1 (o `system` do cliente):** a solução inicial — aceitar e
+sobrescrever declarando em `metadata.hive{}` — **era** um override silencioso por construção. A
+revisão fechou **rejeição** (400, D3): um override declarado ainda deixa o consumidor achando que o
+system dele foi honrado, e a declaração vive onde ele não olha. Rejeitar é a única forma de não
+mentir — e a prova é falsificável (a IT afirma a **ausência** de `metadata.hive` e de turno
+registrado).
 
 ---
 
@@ -454,8 +496,13 @@ ausente"*): o consumidor que acha que o seu system prompt foi honrado, e não fo
 - **Catálogo / marketplace de prompts.**
 - **RBAC de usuário** — dívida pré-existente, explicitamente fora do escopo.
 - **Snapshot real de prompt** — depende de mudar o editor; ver P1.
-- **`/actuator/**` em `permitAll`** (`SecurityConfig.java:44`) — adjacente, **não** afetado: a cadeia
-  nova casa só `/v1/public/**`. Registrado como dívida, não corrigido aqui.
+- **`/actuator/**` e `/v3/**` em `permitAll`** — o enquadramento original ("adjacente, não afetado")
+  era **meio verdade** (correção do `security-engineer`): certo para `/actuator/**`, **falso para
+  `/v3/**`** — `springdoc-openapi-starter-webmvc-scalar` é dependência **COMPILE** de
+  `bootstrap/pom.xml:53-57`, então `/v3/api-docs` está no jar de prod e publica o schema de **todos**
+  os endpoints internos, inclusive `POST /hive/v1/provider-credential`. Correção barata em código
+  (D8): `springdoc.api-docs.enabled=false` em prod + `management.endpoints.web.exposure.include`
+  explícito + IT.
 
 ---
 
@@ -479,32 +526,51 @@ ausente"*): o consumidor que acha que o seu system prompt foi honrado, e não fo
 ## Conformidade
 
 - [ ] Nenhum endpoint público exposto **antes** de P-a, P-b e P-c verdes
-- [ ] `SecurityFilter` **inalterado**; `SecurityTokenServiceImpl` **inalterado** (`:182` continua
-      hardcoded, e o P1 de `security-rbac` segue aberto por decisão)
-- [ ] `LangChain4jTurnGateway` **inalterado** — reusada, não copiada
+- [ ] `SecurityFilter.java` **inalterado** (0 linhas); o duplo registro é corrigido por 1 `@Bean`
+      (`FilterRegistrationBean.setEnabled(false)`) em `SecurityConfig` — D7
+- [ ] `SecurityTokenServiceImpl` **inalterado** (`:182` continua hardcoded, e o P1 de
+      `security-rbac` segue aberto por decisão)
+- [ ] `LangChain4jTurnGateway` **intacto exceto `isModelNotFound`**, que muda para `agent/api`
+      (emenda ratificada — D5). Sem a emenda, ou o gateway fica intacto e D3 vira mentira, ou a regra
+      é copiada
 - [ ] Nenhuma linha de `ChatServiceImpl` copiada; extração validada por `git diff` das linhas
       load-bearing + E2E com `systemBlockChars` igual ao baseline
 - [ ] `ChatSessionEntity`, `ChatMessageEntity` e `PromptTemplateEntity` **inalterados** — a API
       pública não escreve nenhuma das três
 - [ ] `provider_credential` continua sendo do módulo `agent` e **não** é tocado (ADR-013 §"`provider_credential` fica no módulo `agent`")
 - [ ] IT de superfície: token público em `/v1/prompt-templates`, `/v1/provider-credential`,
-      `/v1/chat` e `/v1/tenant/llm-config` → **401**, e token humano na API pública → **401**
+      `/v1/chat` e `/v1/tenant/llm-config` → **401 (nunca 200, nunca 500)**, e token humano na API
+      pública → **401**; mais IT de **caracterização** do 500 atual (documenta o defeito antes de
+      corrigir) e IT de **sentinel** (corpo não-MVC que falha antes do handler)
 - [ ] IT de anti-enumeração: `prompt_code` fora da allowlist devolve o **mesmo** código exista ou não
 - [ ] IT de versionamento: `PINNED` numa versão + `PUT` no template → `409 prompt_version_not_found`
+- [ ] IT de `system` **falsificável**: `role: "system"` → 400 **e** a resposta não tem
+      `metadata.hive` **e** nenhum turno é registrado (a ausência é a prova)
+- [ ] Teto: `max_messages`/`chars` da credencial no claim `plim`; acima → 400
+      `too_many_messages`/`request_too_large`; corpo > 1 MiB → **413 no filtro** (antes do Jackson);
+      `max_tokens` do provider com clamp; **nunca** truncamento silencioso
+- [ ] Envelope: handler local com **catch-all** (`HttpMessageNotReadable`, `MethodArgumentNotValid`,
+      405, `DataIntegrityViolation`) — **nunca** `application/problem+json` na rota pública
+- [ ] `typ` no JWT; **chave separada** `api.security.public.token.secret` (HMAC compartilhado entre
+      token humano e de máquina é correção barata, não exceção); `jti` na blacklist com escritor
 - [ ] `client_secret` nunca em log, nunca em `toString()`, nunca em resposta de erro; comparação em
       tempo constante
 - [ ] `Cache-Control: no-store` no token (RFC 6749 §5.1)
-- [ ] `system_role` reescrito **e declarado** em `metadata.hive{}`
+- [ ] `system` **rejeitado** com 400 (D3) — não há override a declarar
 - [ ] Flyway do módulo novo **sem** `repair()`, e `mvn clean install -DskipTests` antes de subir
       qualquer migration
-- [ ] `security-engineer` e `ux-designer` consultados **antes** da implementação — **não
-      consultados neste ciclo** (ver "Status")
+- [ ] `security-engineer` consultado em 2026-09-27 — **APROVADO COM CONDIÇÕES**, 10 blockers
+      endereçados em D1–D8. **ux-designer não exigido** (D6: superfície headless; gatilho para voltar:
+      2 credenciais de produção, ou provisionamento por alguém sem acesso ao ambiente)
+- [ ] Exceções ao `security-standard.md` **registradas, não escondidas**: HMAC256 simétrico =
+      exceção aceita (gatilho: 2º cliente externo); TLS = prova do edge, débito de ops; demais
+      correções baratas em código (chave separada, fail-fast de perfil, springdoc em prod)
 
-⚠️ **A última caixa é uma dívida deste ADR, não da implementação.** Uma superfície HTTP externa é
-exatamente o que `security-engineer` audita, e a decisão de não pagar RBAC de usuário foi do
-`product-manager` e não do `security-engineer`. Se os dois discordassem, quem tem o último palavra é o
-usuário — mas o parecer do `security-engineer` **ainda não existe**, e isso deve existir antes do
-primeiro token ser emitido.
+✅ **A dívida de parecer foi paga em 2026-09-27.** Os 3 pareceres (security-engineer, product-manager,
+architect) são registrados em `workflow-state.json → public_api_chat_review`; os blockers B1–B10 e as
+contradições documentais foram endereçados nas decisões D1–D8. **Uma divergência segue sem
+arbitragem: SEC-02** (401 na cadeia humana — o `security-engineer` propõe o fix no `SecurityFilter`,
+o PLAN 6.3 diz "não mexer em `SecurityTokenServiceImpl`"; o `architect` não se pronunciou).
 
 ---
 

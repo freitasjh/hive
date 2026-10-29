@@ -2,57 +2,83 @@
 
 Estas regras definem o fluxo de desenvolvimento obrigatório. Devem ser seguidas rigorosamente por todos os agentes de IA.
 
+> **Fusão DOC-02:** este arquivo absorveu `harness-continuous.md` (H0–H7 + anexos,
+> agora §5). Referências ao arquivo antigo re-apontam para cá (mapa em
+> `.spec/governance/harness-v7/back-refs-DOC-02.md`). Comandos/portas abaixo vêm de
+> `harness.config.json` (nunca de literal copiado — SPEC ADR-003).
+
 ---
 
 ## 0. Prompt Gate — ANÁLISE OBRIGATÓRIA (NON-NEGOTIABLE)
 
-> 🚨 **TODA demanda do usuário DEVE ser analisada ANTES de qualquer ação.**
+> 🚨 **TODA demanda de MUDANÇA do usuário DEVE ser analisada ANTES de qualquer ação.**
+> Comandos de consulta (leitura de estado) pulam o gate — ver "Exceção" abaixo.
 
 ### Regra Absoluta
 
 1. **Carregar skill `prompt-optimizer`** via `skill` tool
-2. **Carregar skill `brain`** → `brain_search(prompt, top_k=3)` para contexto
-3. **Classificar prompt:**
-   - **Tier 1 (Crítico):** PARAR, perguntar 3-5 vezes antes de qualquer ação
-   - **Tier 2 (Ambíguo):** PERGUNTAR 1-3 vezes
-   - **Tier 3 (Claro):** PROSSEGUIR com workflow normal
-4. **Se vago:** fazer perguntas clarificadoras e AGUARDAR resposta
-5. **Se claro:** prosseguir
+2. **Carregar skill `brain`** → `brain_search(prompt literal, top_k=3)` para contexto
+3. **Contar os 6 elementos AFIRMADOS pelo usuário:**
+
+   | # | Elemento | Ausente = |
+   |---|----------|-----------|
+   | E1 | Objetivo — o que muda no mundo quando estiver pronto? | crítico |
+   | E2 | Escopo — o que entra e o que NÃO entra? | crítico |
+   | E3 | Contexto — módulo/domínio/tela/endpoint afetado | alto |
+   | E4 | Restrições — o que não pode quebrar? | alto |
+   | E5 | Critério de aceite — como se sabe que ficou pronto? | médio |
+   | E6 | Intenção de rota — Feature/Bugfix/Refactor/Melhoria? | médio |
+
+   **Presente = o usuário AFIRMOU.** O que a IA deduziu conta como ausente.
+
+4. **Duas rotas por score:**
+   - **Rota A (score < 6/6):** PARAR. Máximo 3 perguntas ordenadas por impacto no retrabalho (E1 > E2 > E3 > E4 > E5 > E6). Máximo 2 rodadas; na 2ª, apresentar 2 interpretações e pedir desempate. Nenhuma outra skill, subagente ou artefato antes disso. Nada é criado.
+   - **Rota B (score = 6/6):** emitir re-encoding em bloco PICCO com delimiter tags (`<role>/<task>/<context>/<constraints>/<acceptance>/<open_questions>`), fazer 1 confirmação, então seguir o workflow com o bloco como contexto.
+5. **Pedido que viola regra do projeto** → rota de conflito: nomear a regra com caminho, oferecer o caminho permitido mais próximo, perguntar sobre exceção explícita (registrada em `workflow-state.json.overrides`)
+
+   **Precedência:** a rota de conflito vence. Não é ambiguidade, é contradição — perguntar por elemento faltando não resolve violação de regra. Se o pedido for violador E incompleto: trate o conflito primeiro, retome a Rota A só para o que falta.
 
 ### Proibido
 
-- ❌ Adivinhar o que o usuário quer
+- ❌ Preencher lacuna com default do modelo
 - ❌ "Vou assumir que você quer X"
 - ❌ Delegar com contexto vago
 - ❌ Pular brain_search
-- ❌ Interpretar "melhorar", "corrigir", "fazer" sem contexto
+- ❌ Tratar dedução da IA como elemento afirmado
+- ❌ Bloco PICCO com mais de 10 constraints
 
 ### Obrigatório
 
 - ✅ Carregar `prompt-optimizer` via skill tool
-- ✅ Perguntar se houver qualquer ambiguidade
-- ✅ Confirmar entendimento antes de prosseguir
-- ✅ Salvar patterns de prompts no Brain
+- ✅ Contar E1..E6 explicitamente antes de agir
+- ✅ Rota B: 1 confirmação antes de executar
+- ✅ Salvar patterns de prompts no Brain (quando o padrão se repetir 2x)
 
-### Template de Perguntas
+### Exceção — comandos de consulta
+
+`show status`, `o que bloqueia X?`, `onde paramos?`, `onde está X?`, `o que Y faz?`, `existe Z?` (consulta factual ao repo — leitura, não mudança), leitura de `workflow-state.json` **pulam** o gate.
+`add feature X`, `move X before Y`, `skip X` **não pulam** — alteram estado. Override de 1 palavra ("já vai") também vale.
+
+### Template de Perguntas (Rota A)
 
 ```markdown
-## ❓ Preciso de mais contexto
+## Falta contexto — preciso de X resposta(s)
 
-Para prosseguir corretamente, preciso esclarecer:
+Bloqueio (o que não vou assumir): [elemento ausente, ex: E2 Escopo]
 
-1. **{PERGUNTA_1}**
-2. **{PERGUNTA_2}**
-3. **{PERGUNTA_3}**
+1. **[pergunta de E1]**
+2. **[pergunta de E2]**
 
-### Contexto que já entendi:
-- {contexto_identificado}
+### Já entendi (afirmado por você)
+- E3: módulo `identity`
+- E6: Bugfix
 
-### O que NÃO entendi:
-- {ambiguidades}
-
-**Responda para que eu possa ajudar de forma precisa.**
+### Regra
+Não vou assumir o que ficou em branco. Escolher por você é palpite caro.
 ```
+
+Variações de pergunta por elemento e perguntas de desempate: `.agents/skills/prompt-optimizer/references/clarifying-questions.md`.
+Contrato de saída e exemplos (bons e ruins): `.agents/skills/prompt-optimizer/references/picco-template.md`.
 
 ---
 
@@ -64,7 +90,7 @@ Para prosseguir corretamente, preciso esclarecer:
 |------|------------------|
 | **Orchestrator** (este agente) | Triagem, governance, SPEC, PLAN, TASKS, code review, brain, workflow-state.json |
 | **developer-engineer** | **Implementação de código** (Java/Vue/SQL/tests) |
-| **fullstack-code-reviewer** | Code review após cada batch |
+| **code-reviewer** | Code review após cada batch |
 | **architect** | Decisões arquiteturais (validação) |
 | **product-manager** | Validação de negócio |
 | **qa-engineer** | Cobertura de testes |
@@ -77,7 +103,7 @@ Para prosseguir corretamente, preciso esclarecer:
 4. **Salvar no Brain** aprendizados/erros/decisões
 5. **Delegar para `developer-engineer`** via `task` tool
 6. **Receber retorno** do developer
-7. **Delegar para `fullstack-code-reviewer`** (regra non-negotiable, ver seção 6)
+7. **Delegar para `code-reviewer`** (regra non-negotiable, ver seção 6)
 8. **Aplicar fixes** se necessário (re-invocar developer se crítico)
 9. **Atualizar `workflow-state.json`** campo `code_review`
 10. **Só então** declarar phase completa
@@ -121,6 +147,31 @@ Toda nova funcionalidade/inovação **OBRIGATORIAMENTE** segue o fluxo SDD (Spec
 
 **Ciclo completo**: `Explore (opcional) → Proposal → SPEC → PLAN → TASKS → [implementar] → Verify → Archive`
 
+### Vocabulário canônico de fase (V17)
+
+O **estado canônico** é o de `sdd-workflow-standard.md` (é o que vive em
+`workflow-state.json`). Portões `P0..P6` e a esteira `Explore→…→Archive` são
+**rótulos de etapa** mapeados para o canônico. Só o canônico é validado por
+`gate.js` (I2); rótulo fora do mapa ⇒ aviso, não deny. `verify` ocorre em
+`Testing`; `archive` ocorre em `Completed`.
+
+| Etapa (rótulo) | `current_phase` canônico |
+|---|---|
+| Explore, Proposal | Discovery |
+| SPEC, PLAN, TASKS | Planning |
+| PRD, RESEARCH | Discovery |
+| ADR-INDEX, ADR | Planning |
+| P0 (triagem) | Discovery |
+| P1 (spec) | Planning |
+| P2 (plan/tasks) | Planning |
+| Implementação / P3 | Execution |
+| Review + harness / P4 | Testing |
+| Verify / P5 | Testing |
+| Archive / P6 | Completed |
+| Análise de bug | BugAnalysis |
+| Correção de bug | BugFix |
+| Revisão de bug | BugReview |
+
 ### Fase 0 — Exploração & Planejamento Técnico
 > Para features com escopo claro, pular direto para Fase 1. Para features complexas/inovações, usar `dev-planner` para planejamento detalhado.
 
@@ -152,7 +203,7 @@ Toda nova funcionalidade/inovação **OBRIGATORIAMENTE** segue o fluxo SDD (Spec
 8. **Gerar PROPOSAL**: `sdd-compiler` modo `generate-proposal` → `.spec/[feature]/PROPOSAL.md`
    - Validar contra `asserts/proposal-gate.md` antes de avançar
 9. **Gerar SPEC**: `sdd-compiler` modo `generate-spec` → `.spec/[feature]/SPEC.md`
-   - SPEC inclui seção **Delta Specs** (impacto em `docs/product/`)
+   - SPEC inclui seção **Delta Specs** (impacto em `.doc/`)
 10. **Revisar SPEC**: skill `spec-review` — gerar relatório de gaps e conformidade
 11. **Corrigir gaps**: endereçar todos 🔴 críticos e 🟠 alta prioridade
 12. Salvar artefatos em `.spec/backend/{dominio}/` ou `.spec/frontend/{dominio}/`
@@ -170,7 +221,7 @@ Toda nova funcionalidade/inovação **OBRIGATORIAMENTE** segue o fluxo SDD (Spec
 7. Verificar quebras de contrato com `mvn compile` a cada task concluída
 
 ### Fase 3 — Review
-1. Invocar agente `fullstack-code-reviewer` para revisar o código
+1. Invocar agente `code-reviewer` para revisar o código
 2. Corrigir todos os débitos 🔴 **Críticos**
 3. Avaliar e corrigir débitos 🟡 **Atenção** se aplicável
 4. **Ao final**: `mvn clean install` na raiz do backend (zero erros, testes passando)
@@ -189,12 +240,12 @@ Toda nova funcionalidade/inovação **OBRIGATORIAMENTE** segue o fluxo SDD (Spec
 > Executar somente com `VERIFY.md` aprovado (todas as 3 dimensões ✅)
 
 1. Carregar `sdd-compiler` modo `archive`
-2. Mesclar **Delta Specs** do `SPEC.md` nos documentos `docs/product/` correspondentes
+2. Mesclar **Delta Specs** do `SPEC.md` nos documentos `.doc/` correspondentes
 3. Mover `.spec/[feature]/` → `.spec/archive/[YYYYMMDD]-[feature]/`
 4. **Registrar aprendizados** no Brain (skill `brain`):
    - Tipo: `success` | `decision` | `anti-pattern`
-   - Template em `.agents/rules/brain-context.md` (Regras obrigatórias)
-   - Salvar via tool `brain_store` (layer `regras`/`estudos`/`arquitetura`)
+   - Template em `.agents/rules/brain-context.md` (ponte → `BRAIN.MCP.md`, dono brain; detalhe no `BRAIN.MCP.md`, não nesta ponte)
+   - Salvar via `brain_store` em `lessons/{tipo}/{subcategoria}/`
 5. Commit sugerido pelo `sdd-compiler archive` — confirmar antes de executar
 
 ### 3.6 Feedback Obrigatório (10-Point Summary)
@@ -264,227 +315,140 @@ Toda nova funcionalidade/inovação **OBRIGATORIAMENTE** segue o fluxo SDD (Spec
 
 **Bloqueia archive** se score <60%. Warn se 60-79% (arquivo com justificativa).
 
+### 3.10 Esteira PRD → ADR → SDD (features)
+
+Fluxo: PRD aprovado → RESEARCH → ADR-INDEX → ADR (unidade/branch) → SDD scoped.
+Contrato completo, limiar de isenção e níveis de garantia: `.agents/rules/prd-adr-pipeline.md`.
+Nível: `PRD-01`/`ADR-01`/`ADR-02` em `.agents/skills/prd-adr-pipeline/checks.mjs`,
+via `scripts/static-checks.mjs` no `suiteFull` (🟢 neste repo; 🟡 processo em repo-destino
+até F3). Bug fora do funil (§4). Limiar de isenção: mudança sem comportamento observável
+não gera PRD/ADR. Os rótulos `PRD`/`RESEARCH`/`ADR-INDEX`/`ADR` mapeiam para o canônico
+(tabela V17 acima) — **não** são valores novos de `current_phase`.
+
 ---
 
 ## 4. Workflow Bugfix (obrigatório para toda correção de bug)
 
-Toda demanda de correção de bug (backend, frontend ou fullstack) **OBRIGATORIAMENTE** segue o fluxo abaixo em 4 fases. Durante todo o bugfix, manter `/caveman` ativo para economia de tokens.
+Toda correção de bug (backend, frontend ou fullstack) **OBRIGATORIAMENTE** segue as 4 fases abaixo. Manter `/caveman` ativo.
 
-### 4.0 Regras Mandatórias de Harness e Análise para Bugfix (NON-NEGOTIABLE)
+### 4.0 Regras Mandatórias de Harness e Análise (NON-NEGOTIABLE)
 
-> 🚨 **Estas 4 regras são OBRIGATÓRIAS e NON-NEGOTIABLE. Violação = retrabalho completo do bugfix.**
+> 🚨 **Violação = retrabalho completo do bugfix.**
 
-#### R1 — Harness-First: Verificar o erro REAL na tela antes de codificar
-- Sempre que um **bug for reportado**, o agente de codebase (`developer-engineer` ou `qa-engineer`) **DEVE**:
-  1. Subir o sistema (backend `:8080` + frontend `:5173` se down — `mvn spring-boot:run -pl bootstrap` + `npm run dev`; credenciais dev se necessário).
-  2. Abrir o sistema via **Chrome DevTools** (`mcp__chrome-devtools__new_page` → URL, `take_snapshot`, `list_network_requests`, `list_console_messages`, `take_screenshot`).
-  3. **Reproduzir o fluxo exato reportado** e **confirmar que o erro realmente existe na tela** (status 500/400, payload, console `[ERROR]`/`[WARN]`, snapshot vazio/dados ausentes).
-  4. **Só APÓS confirmar na tela**, analisar o código e retornar **relatório detalhado** do que foi encontrado (arquivo:linha, causa, stack trace, evidências de network+console+snapshot).
-- **PROIBIDO adivinhar no escuro.** Sem evidência de harness (screenshot, network 5xx, console erro), a análise é considerada inválida e o orquestrador deve **re-delegar**.
-- Artefatos obrigatórios no retorno do subagente: `backend UP/DOWN`, `frontend UP/DOWN`, `console N errors`, `network M 2xx/5xx`, `screenshot path`, status do erro (reproduzido ✅/não reproduzido ❌).
+#### R1 — Harness-First: ver o erro REAL na tela antes de codificar
+- O agente (`developer-engineer` ou `qa-engineer`) **DEVE**: subir o sistema com os comandos de `harness.config.json` (`commands.backendRun`/`frontendRun`, portas de `infra.ports`); abrir via **Chrome DevTools** (`new_page` → `take_snapshot` → `list_network_requests` → `list_console_messages` → `take_screenshot`); reproduzir o fluxo exato e confirmar o erro (status 4xx/5xx, console `[ERROR]`/`[WARN]`, snapshot vazio).
+- **PROIBIDO adivinhar no escuro.** Sem evidência de harness, a análise é inválida → re-delegar.
+- Retorno obrigatório: `backend UP/DOWN`, `frontend UP/DOWN`, `console N errors`, `network M 2xx/5xx`, `screenshot path`, erro reproduzido ✅/❌.
 
-#### R2 — Encerramento limpo: finalizar front e backend ao terminar DevTools
-- Ao finalizar os **testes do sistema com DevTools** (harness), o subagente **SEMPRE** deve **finalizar tanto o front quanto o backend que foram iniciados** para o teste.
-- Não deixar processos órfãos (`:8080`/`:5173`) consumindo porta/CPU. Use `lsof -i :8080` / `lsof -i :5173` + `kill` ou equivalente, ou garantir que o harness encerra os processos ao sair.
-- O orquestrador deve verificar no retorno: `processos finalizados ✅/❌`. Se deixado aberto, registrar como débito técnico e corrigir na próxima iteração.
+#### R2 — Encerramento limpo
+- Ao terminar o DevTools, **SEMPRE** finalizar front+backend iniciados. Nunca deixar órfão em `infra.ports`. Caminho único: `lsof -ti :PORT` → conferir dono (`ps -o pid,command`) → `kill` por PID (ver §5 H5.1). **Nunca `pkill -f`.**
+- Retorno declara `processos finalizados ✅/❌`; aberto = débito técnico.
 
 #### R3 — Análise detalhada ANTES do desenvolvimento
-- Para **todo bug**, deve ser **SEMPRE validado primeiro o comportamento real do sistema** (R1), **realizar uma análise bem detalhada** (causa raiz com arquivo:linha, camada, módulo) e **só DEPOIS iniciar o desenvolvimento**.
-- Sem essa análise, o agente se perde na hora de avaliar o real problema do sistema — gera correções no lugar errado, mascarando o bug.
-- Artefato obrigatório: `.spec/bugs/{contexto}/TASKS.md` com **Bug**, **Causa raiz** (com referência a código), **Solução proposta** (arquivos a alterar, impacto), **Testes necessários**, **Riscos** — preenchido **antes** de delegar B2 (Implementação).
-- **Portão B1→B2 (HITL):** orquestrador apresenta bug + causa raiz + evidências de harness ao usuário e pergunta: *"Bug analisado: [causa] em [arquivo:linha]. Solução proposta: [resumo]. Aprova seguir para implementação da correção?"* — aguardar resposta explícita.
+- Causa raiz com arquivo:linha, camada, módulo — só depois, codificar.
+- Artefato obrigatório **antes** de delegar a correção: `.spec/bugs/{contexto}/TASKS.md` (Bug, Causa raiz, Solução + arquivos + impacto, Testes, Riscos).
+- **Portão B1→B2 (HITL):** apresentar bug + causa + evidências e perguntar *"Aprova seguir para implementação?"* — aguardar resposta explícita.
 
 #### R4 — Persistência de erros no Brain
-- **Sempre salvar qualquer erro encontrado no Brain do projeto.**
-- Classificação obrigatória de `scope`:
-  - Erro/líção **específica do projeto** (ex: `ChatSessionRepository.findById` tenant-blind no módulo `agent`) → `scope="projetos"` em `brain_store(layer="regras"|"arquitetura"|"estudos", scope="projetos")`.
-  - Erro/líção **de regra da stack** (ex: padrão Hibernate `open-in-view=false` + `EntityGraph` + `distinct` p/ paginação, ou padrão `ControllerExceptionHandler` não traduzir `i18nKey`) → `scope="global"` para reuso entre todos os projetos.
-- Tipos: `sessoes/hive/<data>` (resumo da sessão) + `estudos/hive/<feature>/<conceito>` (conteúdo completo) + `regras/hive/<regra>` (quando virar regra).
-- **Checklist:** antes de marcar bug como `Completed`, verificar `brain_store` executado com scope correto. Sem registro no Brain, o bug NÃO está fechado.
+- Todo erro vai ao Brain: específico do projeto → `scope="projetos"`; regra de stack reutilizável → `scope="global"`.
+- Tipos: `sessoes/projeto/<data>` + `estudos/projeto/<feature>/<conceito>` + `regras/projeto/<regra>`.
+- Sem `brain_store` com scope correto, o bug NÃO está fechado.
 
 ### Fase 1 — Análise do Bug
-
-1. **Carregar `brain`** — consultar memória de longo prazo do sistema, buscar lições aprendidas relacionadas
-2. **Reproduzir o bug** — entender:
-   - Cenário exato que dispara o erro
-   - Comportamento esperado vs comportamento atual
-   - Stack trace / mensagem de erro completa
-   - Evidências (logs, prints, requests)
-3. **Análise de causa raiz** — rastrear até a origem:
-   - Qual camada? (backend/frontend/ambos)
-   - Qual módulo/domínio? (agent, identity, tenant, security, provider)
-   - Qual arquivo/função? (usar `grep`, `glob`, `explore` para localizar)
-4. **Criar TASKS.md** em `.spec/bugs/{contexto}/TASKS.md` documentando:
-   - **Bug**: descrição concisa do problema
-   - **Causa raiz**: explicada com referência ao código
-   - **Solução proposta**: abordagem, arquivos a alterar, impacto
-   - **Testes necessários**: unitários, integração, frontend
-   - **Riscos**: efeitos colaterais potenciais
-5. **Atualizar `workflow-state.json`**: registrar bug em análise
+1. `brain_search` por lições relacionadas; reproduzir (esperado vs atual + stack trace + evidências R1); causa raiz (camada/módulo/arquivo via grep/glob/explore); criar `.spec/bugs/{contexto}/TASKS.md`; atualizar `workflow-state.json`.
 
 ### Fase 2 — Implementação da Correção
-
-1. Executar as tasks na ordem definida no TASKS.md
-2. Para bugs **fullstack** (backend + frontend):
-   - Carregar skill `java-architecture-specialist` + `frontend-vue-specialist`
-3. Implementar a correção seguindo as tasks:
-   - **Backend**: alterar código, atualizar testes unitários existentes (se quebrarem), adicionar novos testes se necessário
-   - **Frontend**: alterar código, atualizar/adicionar testes (`*.spec.ts`)
-4. **Verificar compilação** a cada task concluída:
-   - Backend: `mvn compile -pl {modulo} -am`
-   - Frontend: `npx vite build` (verificação rápida) ou `npm run build`
-5. Se aplicável: criar/adicionar **testes de integração** no módulo `integration-test/`
+Executar TASKS.md na ordem (skills `java-architecture-specialist` + `frontend-vue-specialist` se fullstack); corrigir código + testes (`*.spec.ts` / unitários); compilar a cada task (`mvn compile -pl {modulo} -am` / `vite build`); IT no `integration-test/` se aplicável.
 
 ### Fase 3 — Revisão Obrigatória (Iterativa)
-
-1. **Invocar `fullstack-code-reviewer`** com contexto completo do bug e das correções — passar diff ou arquivos alterados
-2. **Avaliar resultado da revisão**:
-   - Se 🔴 **Críticos** ou 🟡 **Atenção** → retornar para Fase 2, corrigir todos os gaps apontados
-   - Se apenas 🟢 **Sugestões** → avaliar e corrigir se pertinente
-3. **Loop de qualidade**:
-   - Após corrigir gaps na Fase 2, invocar novamente `fullstack-code-reviewer`
-   - Repetir até que o relatório aponte **zero 🔴 e zero 🟡**
-   - Máximo de 3 iterações; se exceder, escalar para revisão manual
-4. **Frontend — Teste Obrigatório com Chrome DevTools** (NÃO PULAR):
-   - Servidor dev rodando (`npm run dev`)
-   - Chrome DevTools (F12) aberto nas abas **Network** + **Console**
-   - Executar o fluxo completo que foi corrigido
-   - **Validar Network**:
-     - URLs corretas (sem `/api/api/` duplicado)
-     - Métodos HTTP corretos (GET/POST/PUT/DELETE)
-     - Headers de autorização presentes (Bearer token, X-Tenant-ID)
-     - Payloads com estrutura esperada pelo backend
-     - Status codes 200/201 (nunca 400/404/500)
-   - **Validar Console**: zero erros (`[ERROR]`), zero warnings (`[WARN]`)
-   - **Validar UI**: renderização correta, dados aparecendo, sem tela branca
-   - **Se DevTools falhar** (qualquer ponto acima) → retornar para Fase 2
-5. Se correção for **apenas backend** (sem frontend envolvido), pular etapa 4
+1. Invocar `code-reviewer` com diff/contexto; 🔴/🟡 → Fase 2; só 🟢 → avaliar.
+2. Loop até zero 🔴/🟡 (máx 3 iterações; excedeu → revisão manual).
+3. **Frontend — Chrome DevTools OBRIGATÓRIO:** Network (sem `/api/api/`, métodos/headers/payload corretos, 200/201, nunca 4xx/5xx) + Console (zero `[ERROR]`/`[WARN]`) + UI (renderiza, sem tela branca). Falhou → Fase 2. Correção só-backend pula esta etapa.
 
 ### Fase 4 — Finalização
-
-> Zero tolerância a falhas pré-existentes — ver `.agents/rules/harness-continuous.md` H2.
-
-1. **Backend**: **H1 (suite completa, 3 comandos — ver nota):** `mvn clean install -DskipTests` → `mvn test` → `mvn verify -pl integration-test -Pintegration -am` na raiz (zero erros, todos os testes passando — **incluindo pré-existentes**)
-2. **Frontend**: `npm run test` (zero falhas — **incluindo pré-existentes**)
-3. **Atualizar `workflow-state.json`**:
-   - `current_feature`: nome do bug
-   - `current_phase`: `Completed`
-   - Registrar arquivos alterados e resumo da correção
-4. **Registrar aprendizados no Brain** via skill `brain`:
-   - Tipo obrigatório: `error`
-   - Preencher: causa raiz, solução aplicada, prevenção, severity, frequency
-   - Tags: `eng/{backend|frontend|fullstack}` + `type/error` + `bugfix`
-   - Salvar via tool `brain_store` em `{regras|estudos}/hive/<subcategoria>`
-   - Executar checklist de `.agents/rules/brain-context.md`
-5. **Se o bug foi introduzido por implementação anterior**: registrar débito técnico como `related_notes` no Brain
+Suite completa com zero falhas **incluindo pré-existentes** (ver §5 H1+H2); `workflow-state.json` (`current_feature`, `current_phase: Completed`); `brain_store` tipo `error` (causa, solução, prevenção, severity, frequency; tags `eng/*` + `type/error` + `bugfix`); débito técnico em `related_notes` se regressão.
 
 ---
 
-## 5. Testes Obrigatórios
+## 5. Harness Contínuo (NON-NEGOTIABLE — fonte da verdade H1–H7)
 
-> 🚨 **Harness Contínuo é NON-NEGOTIABLE.** Ver `.agents/rules/harness-continuous.md` (fonte da verdade). Esta seção 5 é complementar; em conflito, harness-continuous prevalece.
+> 🚨 **REGRA MÁXIMA.** Testes não são débito; suite completa roda sempre; funciona na mão, não só no CI; tela quebrada = sistema quebrado; regressão bloqueia release. Em conflito com outra seção, este §5 prevalece.
+> Comandos/portas-infra: `harness.config.json` (`commands.*`, `infra.*`, `mcp.required`) — nunca literal de prosa (SPEC ADR-003).
+> Origem: entregas quebradas apesar de regras (2026-09-02).
 
-**TODO** desenvolvimento (features OU bugfixes) **OBRIGATORIAMENTE** deve incluir testes.
+### H0. Princípios Invioláveis
+1. Teste falhando = defeito do produto, não do teste. 2. Suite completa antes de declarar done, mesmo p/ 1 linha. 3. Harness E2E com DB real + browser real obrigatório nos pontos de virada. 4. Frontend é sistema. 5. Provar ponta-a-ponta antes de declarar completo. 6. Teste que quebrava antes e quebra agora = bloqueia até root cause + fix.
 
-### 5.1 Backend — Testes Unitários
+### H1. Suite Completa em Todo Desenvolvimento
+**Gatilhos:** task concluída, sub-fase SDD, bug corrigido, PR/merge, fim de sprint/release — sempre suite completa (`commands.suiteFull`; E2E junto em release).
+**Diante de falha (novo/existente/pré-existente):** PARAR → reportar (classe:linha, mensagem, stack, suíte) → causa raiz (R3) → corrigir código ou teste → re-rodar tudo → registrar no Brain (`regras`/`estudos`, scope correto). Não avançar com falha.
 
-Consultar regras detalhadas em: `.agents/rules/backend-unit-tests.md`
+### H2. Zero Tolerância a Falhas Pré-existentes
+- Referência: suite completa = **0 falhas, 0 erros, 0 skips não-autorizados** antes de QUALQUER dev novo. Débito pré-existente = bug P1 (saneamento em `.spec/tech-debts/{contexto}/TASKS.md`: classificar P1/P2/P3, resolver P1 antes da feature do domínio, via mesmo workflow).
+- **Detecção ao delegar:** orquestrador roda suite antes da Fase 2; N falhas → bloquear dev + TASKS de saneamento.
+- Proibido `@Disabled`/`@Ignore`/`assumeTrue`/skip comentado para "passar".
 
-**Obrigatório:**
-- **Service Layer**: todo `*ServiceImpl.java` deve ter teste unitário cobrindo:
-  - Fluxo principal (happy path)
-  - Fluxos de erro (validações, entidade não encontrada, conflitos)
-  - Casos de borda (edge cases)
-- **Domain Entities**: invariantes, métodos de fábrica, validações
-- **Mappers/Converters** (MapStruct): via `Mappers.getMapper()` — nunca mockar
-- **Validators**: regras de negócio customizadas
-- **Utils/Helpers**: funções utilitárias puras
+### H3. Harness E2E Greenfield (Wipe + Re-cadastro)
+**Quando (MANDATORY):** fim de cada sub-fase SDD, cada bug UI/fullstack, fim de sprint, release, mudança em stack/router/i18n/auth/migration base.
+**Protocolo:** subir dependências (`infra.composeFile` se houver) → WIPE + recreate → subir backend/frontend (`commands.backendRun`/`frontendRun`, portas de `infra.ports`) → Chrome DevTools (`new_page` na URL do front → snapshot).
+**Re-cadastro manual via UI:** login → admin → 2 employees → team → project → workflow → kanban → task completa → transicionar TODOS os status → dashboard/backlog → i18n (trocar locale) → logout.
+**Por passo (DevTools):** Network sem rota duplicada e sem 4xx/5xx; Console zero `[ERROR]`/`[WARN]`; snapshot renderiza; screenshot bate com o padrão visual; navegação preserva state; 1280x800 + 375x800; aria-labels + foco visível.
+Testes unitários/integração **não pegam** tela branca, rota duplicada, i18n faltando, CORS/auth em browser real — só este harness pega.
 
-**Proibido em testes unitários:**
-- ❌ Repository layer — testado via integração
-- ❌ Controller/REST layer — testado via integração (`*IT.java`)
-- ❌ `@SpringBootTest` — apenas integração
-- ❌ `@WebMvcTest` — proibido, controllers vão para integração
-- ❌ H2 / banco de dados — mocks isolam a lógica
-- ❌ Lombok (proibido no projeto)
-- ❌ `Thread.sleep()` — usar Awaitility
+### H4. Avaliação Contínua (Telas, Regras, Melhorias)
+Por entrega UI/fullstack avaliar: **Telas** (padrão de lista/filtro, loading/empty/error, form tabs+preview, i18n total, contraste/foco); **Negócio** (edge cases, RBAC por perfil, tenancy sem leak, auditoria populada); **Lógica** (N+1 → `@EntityGraph`+`distinct`, transações nos boundaries, idempotência de consumers, validação server-side); **Performance** (paginação, debounce, lazy load).
+Melhorias: P1 (quebra UX) → `.spec/bugs/`; P2 → `.spec/tech-debts/`; P3 → `.spec/roadmap/`; achados relevantes → `brain_store(regras, projeto/ux-patterns/*)`.
 
-**Ferramentas:**
-- JUnit 5 (`@Test`, `@BeforeEach`, `@DisplayName`, `@ExtendWith(MockitoExtension.class)`)
-- Mockito (`@Mock`, `@InjectMocks`, `verify()`, `ArgumentCaptor`)
-- AssertJ (preferencial) ou JUnit assertions
-- Fakes em `src/test/java/.../fake/` para dados de teste
-
-**Execução:**
+### H5. Encerramento Limpo + Brain Obrigatório
+Toda vez que o harness subir portas de `infra.ports`, encerrar ao terminar:
 ```bash
-mvn test                              # Todos os testes unitários
-mvn test -pl agent/impl               # Testes de um módulo específico
+lsof -ti :PORT > /tmp/harness-pids-PORT.txt   # pela PORTA, nunca por nome
+ps -o pid,command -p "$(head -1 /tmp/harness-pids-PORT.txt)"  # confere o dono
+xargs -r kill -9 < /tmp/harness-pids-PORT.txt  # só o deste projeto
+lsof -i :PORT || echo "PORT free"              # evidência obrigatória no report
 ```
+#### 🚨 Proibido `pkill -f` (B8.3, 2026-09-27)
+Casa por command line, não por porta — já derrubou stack de outro projeto. **Nunca `pkill -f`.** Porta de outro projeto ⇒ não mata, declara ocupação e usa alternativa. Derrubar stack alheia = incidente a reportar, nunca nota de rodapé.
+**Brain por achado:** erro → `regras`/`estudos`; ADR → `arquitetura`; conceito → `estudos`; sessão → `sessoes`; anti-pattern → `regras` (scope `projetos` se específico, `global` se universal).
+**Retorno do subagente sem `processos finalizados ✅` + `brain_store ✅` + `suite OK ✅` = re-delegar.**
 
-### 5.2 Backend — Testes de Integração
+### H6. Portão de Conclusão Expandido
+Antes de declarar QUALQUER fase completa, tudo verdadeiro:
+Build+testes (suite completa 0 falhas; front test+build 0 erros) · H3 quando aplicável (12 passos OK, Network/Console limpos, screenshots em `.spec/{feature}/harness/`) · H4 avaliado (P1→bugs, P2/P3 registradas) · review (`code-reviewer` após última mudança, zero 🔴, 🟡 corrigidos/justificados) · Brain+state (`brain_store` executado; `workflow-state.json` com `code_review_status: passed` + `harness_status: passed`) · encerramento (portas livres). **Qualquer ❌ = não completa.**
 
-Consultar regras detalhadas em: `.agents/rules/backend-integration-tests.md`
+### H7. Cadência
+Suite por task/bug/feature (`developer-engineer`) · E2E por sub-fase/sprint/release (`qa-engineer`/`developer-engineer`, ~30–60min) · H4 por entrega UI · Brain por achado (2–5min) · saneamento quando débito > 0 · auditoria mensal (`architect`+`qa-engineer`).
 
-**Obrigatório:**
-- **REST Controllers**: TODO controller DEVE ter teste de integração validando:
-  - HTTP success paths (200, 201, 204)
-  - Error/validation paths (400, 404, 409)
-  - Auth/Authorization paths (401, 403)
-  - Multi-tenancy isolation (SAAS mode)
-- **Repository Layer**: queries JPA, `@Query` nativas, paginação, constraints
-- **Cross-module flows**: outbox patterns, eventos, sagas
-- **Flyway migrations**: bootstrap smoke test valida migrations
+### Anexo A — Comandos
+Resolver sempre de `harness.config.json`: `commands.suiteFull` (referência absoluta), `commands.unit`, e por stack `integration`/`frontendTest`/`frontendBuild`/`backendRun`/`frontendRun` (ausente com justificativa `N/A` quando a stack não existe). Infra: `infra.composeFile` + `infra.ports`. Neste repo: `node --test ".opencode/plugins/__tests__/*.spec.mjs" && node scripts/static-checks.mjs`.
 
-**Regras:**
-- Arquivos: `*IT.java` (nunca `*Test.java`)
-- Localização: `backend/integration-test/src/test/java/`
-- Banco: PostgreSQL 16.3-alpine real via Testcontainers (nunca H2)
-- Base class: `WebIntegrationTest` (SAAS) ou `WebOnPremiseIntegrationTest` (ONPREMISE)
-- Limpeza entre testes: `DatabaseCleaner.reset()` com `TRUNCATE ... CASCADE`
-- Autenticação: `JwtTestHelper.loginAndGetToken()` ou `loginAndGetToken()` (legado)
-- Setup de dados: `TestUserFactory`/`TestTenantFactory` (preferencial) ou `seedCommonData()` (legado)
+### Anexo B — Template de Relatório de Harness
+Retorno de developer/qa que executou H1/H3/H4 **DEVE** conter: H1 (comando, ✅/❌, counts unit/IT, falhas classe:linha); H2 (débito antes do dev + ação); H3 (wipe, UPs, 12 passos, Network/Console, screenshots, processos finalizados); H4 (telas/regras/lógica/perf); H5 (brain_store paths); conclusão + bloqueios.
 
-**Proibido em testes de integração:**
-- ❌ H2 ou banco em memória — PostgreSQL real obrigatório
-- ❌ `@WebMvcTest` — usar `@SpringBootTest(webEnvironment = RANDOM_PORT)`
-- ❌ `repository.deleteAll()` para limpeza — usar `DatabaseCleaner.reset()`
-- ❌ RestAssured — projeto usa MockMvc
-- ❌ Testes de integração em módulos de domínio — apenas no módulo `integration-test/`
+### Governança do §5
+Mudanças exigem aprovação do orquestrador + `workflow-state.json`. Violação = retrabalho completo. Auditoria mensal (H7).
 
-**Execução:**
-```bash
-mvn verify -pl integration-test                     # Todos os ITs (requer Docker)
-mvn verify -pl integration-test -Dit.test=LoginIT # IT específico
-mvn clean install -Dintegration.test.skip=false     # Build completo com ITs
-```
+---
 
-### 5.3 Frontend — Testes
+## 5.1 Backend — Testes Unitários (obrigatório)
 
-Consultar regras detalhadas em: `.agents/rules/frontend-coding-standards.md`
+- **Service**: todo `*ServiceImpl` cobre happy path, erros (validação, não-encontrado, conflito) e bordas. **Domain**: invariantes, fábricas, validações. **Converters** (construtor privado + `of()` estático, nunca MapStruct): testar direto, nunca mockar. **Validators** e **Utils** puros: testar direto.
+- **Proibido no unitário:** repository/controller (`*IT.java`), `@SpringBootTest`, `@WebMvcTest`, H2/banco, Lombok, `Thread.sleep()` (usar Awaitility).
+- Ferramentas: JUnit 5 (`@ExtendWith(MockitoExtension.class)`), Mockito (`@Mock`/`@InjectMocks`/`verify`/`ArgumentCaptor`), AssertJ, Fakes em `src/test/java/.../fake/`, padrão `when{Action}_then{Expected}`.
+- Execução: `mvn test` / `mvn test -pl {modulo}` (ou `commands.unit` do config).
 
-**Obrigatório:**
-- **Stores (Pinia)**: testar actions e getters
-- **Views/Páginas**: testar renderização e interações do usuário
-- **Serviços API**: testar chamadas HTTP e tratamento de erros
-- **Componentes**: validar renderização com props, slots e eventos
+## 5.2 Backend — Testes de Integração (obrigatório)
 
-**Ferramentas:** Vitest + jsdom
-**Localização:** `src/**/__tests__/*.spec.ts`
-**Coverage mínima:** 70% nas novas funções/componentes
+- **Controllers**: todo controller tem `*IT.java` (200/201/204, 400/404/409, 401/403, isolamento multi-tenant). **Repositories**: queries/`@Query`/paginação/constraints. **Cross-module** (outbox, eventos) e **Flyway** (bootstrap valida migrations).
+- Regras: `*IT.java` só em `integration-test/`; PostgreSQL real via Testcontainers (nunca H2); base `WebIntegrationTest`; limpeza com `DatabaseCleaner.reset()` (nunca `deleteAll`); auth via `JwtTestHelper`; dados via `TestUserFactory`/`seedCommonData()`. Proibido `@WebMvcTest` e RestAssured (usar MockMvc).
+- Execução: `mvn verify -pl integration-test` / `-Dit.test=XxxIT` (ou `commands.integration`).
 
-**Execução:**
-```bash
-npm run test                              # vitest --run
-npm run build                                 # vue-tsc --noEmit && vite build
-```
+## 5.3 Frontend — Testes (obrigatório)
 
-### 5.4 Regra Geral de Testes
+Stores (Pinia), views, serviços API e componentes: Vitest + happy-dom (nunca jsdom), `src/**/__tests__/*.spec.ts`, coverage ≥70% no novo. Execução: `npm run test:run` + `npm run build` (ou `commands.frontendTest`/`frontendBuild`).
 
-> Substituída por `.agents/rules/harness-continuous.md` H1 + H2 (zero tolerância a falhas pré-existentes).
-
-- Os testes DEVEM passar **antes** de qualquer commit/push.
-- Se um teste falhar — **novo, existente ou pré-existente** — a implementação DEVE ser corrigida até os testes passarem (ver H1.2 do harness).
-- **H1 (suite completa, 3 comandos — ver nota):** `mvn clean install -DskipTests` → `mvn test` → `mvn verify -pl integration-test -Pintegration -am` DEVE retornar 0 falhas/erros/skips não-autorizados antes de finalizar tarefa **E** antes de iniciar próximo dev (ver H2.2).
+## 5.4 Regra Geral
+Testes passam **antes** de commit/push — novo, existente ou pré-existente. Falhou ⇒ corrigir até passar (H1.2). Suite completa 0 falhas antes de finalizar a tarefa **e** antes do próximo dev (H2.2).
 
 ---
 
@@ -494,7 +458,7 @@ npm run build                                 # vue-tsc --noEmit && vite build
 
 > 🚨 **REGRA ABSOLUTA — NÃO PULAR.** Pular o code review após implementação = violar o harness. Sem exceção.
 
-Após finalizar a implementação de **QUALQUER** tarefa, sub-fase ou mudança de código (incluindo sub-fases de SDD, bugfixes, ou qualquer modificação em `src/`), invocar **OBRIGATORIAMENTE** o agente `fullstack-code-reviewer` antes de:
+Após finalizar a implementação de **QUALQUER** tarefa, sub-fase ou mudança de código (incluindo sub-fases de SDD, bugfixes, ou qualquer modificação em `src/`), invocar **OBRIGATORIAMENTE** o agente `code-reviewer` antes de:
 
 - Declarar a tarefa como concluída
 - Avançar para a próxima sub-fase
@@ -522,31 +486,31 @@ Após finalizar a implementação de **QUALQUER** tarefa, sub-fase ou mudança d
 Após o code review, executar loop de correção **SEM SAIR** até zero 🔴:
 
 ```
-1. Receber review do fullstack-code-reviewer
+1. Receber review do code-reviewer
 2. Se 🔴 existir: corrigir TODOS os críticos
 3. Se 🟡 existir: avaliar caso a caso, corrigir os aplicáveis
 4. Re-executar build/tests
-5. Re-invocar fullstack-code-reviewer
+5. Re-invocar code-reviewer
 6. Repetir 2-5 até zero 🔴
 7. Máximo 3 iterações; após 3 iterações, escalar para revisão manual do user
 ```
 
 ### 6.3 Checklist Pré-Conclusão (MANDATORY)
 
-> 🚨 **Substituído** por `.agents/rules/harness-continuous.md` **H6 — Portão de Conclusão Expandido (7 itens)**. Esta versão reduzida é apenas resumo; o portão vinculante é o do harness.
+> Resumo desta seção; o portão vinculante é o §5 H6.
 
 Antes de declarar QUALQUER fase de implementação como completa, **TODOS** os itens abaixo devem ser verdadeiros:
 
 ```markdown
 ## Pre-Completion Checklist (Harness Gate — NON-NEGOTIABLE)
 
-- [ ] `fullstack-code-reviewer` foi invocado APÓS a última mudança de código
+- [ ] `code-reviewer` foi invocado APÓS a última mudança de código
 - [ ] Zero débitos 🔴 Críticos no report mais recente
-- [ ] **H1 (suite completa, 3 comandos — ver nota):** `mvn clean install -DskipTests` → `mvn test` → `mvn verify -pl integration-test -Pintegration -am` → 0 falhas (H1 + H2)
+- [ ] Suite completa → 0 falhas (H1 + H2)
 - [ ] E2E Greenfield executado quando aplicável (H3) — DB wipe + re-cadastro UI 12 passos
 - [ ] Avaliação contínua H4 (telas + regras + lógica + performance) preenchida
 - [ ] `brain_store` de lições executado (H5.2)
-- [ ] Processos :8080/:5173 finalizados (H5.1)
+- [ ] Processos finalizados (H5.1)
 ```
 
 **Se QUALQUER item falhar → fase NÃO está completa.** Voltar e corrigir.
@@ -589,15 +553,21 @@ Para **TODO** desenvolvimento, as skills apropriadas **OBRIGATORIAMENTE** devem 
 
 | Contexto | Skill | Propósito |
 |----------|-------|-----------|
+| **Prompt Gate** | `prompt-optimizer` | Análise obrigatória de toda demanda de mudança (6 elementos, 2 rotas) antes de qualquer ação — ver seção 0 |
 | **Análise inicial** | `brain` | Consultar memória de longo prazo do sistema |
 | **Planejamento Técnico** | `dev-planner` | Planejamento detalhado de features: descoberta, análise de restrições, desafio de soluções, projeto de arquitetura, estimativa e validação (6 fases, gera artefatos para sdd-compiler) |
 | **Arquitetura** | `sdd-architecture-board` | Decisões arquiteturais, ADRs, validação de design |
 | **Desenvolvimento Backend** | `java-architecture-specialist` | DDD, JPA, serviços, segurança, testes |
+| **Desenvolvimento Backend** | `nestjs-architecture-specialist` | NestJS, módulos, DI, guards, testes |
+| **Desenvolvimento Backend** | `node-architecture-specialist` | Node.js, Express/Fastify, módulos, testes |
+| **Desenvolvimento Backend** | `rust-architecture-specialist` | Rust, Axum/Actix, Cargo, async, testes |
 | **Desenvolvimento Frontend** | `frontend-vue-specialist` + `frontend-design` | Componentes, stores, router, API, testes + design visual |
+| **Desenvolvimento Frontend** | `frontend-react-specialist` + `frontend-design` | Componentes React, stores, router, API, testes + design visual |
+| **Design System / Templates** | `template-structure` + `template-best-practices` + `template-deepsearch` (subagente `design-system-specialist`) | Templates de componentes reutilizáveis (props/slots/estados/variantes), boas práticas, estado da arte via deepsearch |
 | **SDD Compiler** | `sdd-compiler` | Geração de SPEC, PLAN, TASK com validação |
 | **Revisão de Spec** | `spec-review` | Revisar SPEC.md contra regras do projeto, gerar relatório de gaps e conformidade |
 | **Revisão de Segurança** | `security-review` | Revisão de segurança integrada ao SDD (Fase 1, 3, 4.5) — OWASP, ASVS, MASVS |
-| **Revisão de Código** | *(invocar agente `fullstack-code-reviewer`)* | Code review completo |
+| **Revisão de Código** | *(invocar agente `code-reviewer`)* | Code review completo |
 | **Microtasks** | `jira-microtask-breaker` | Quebrar tarefas complexas em microtasks |
 | **Comunicação** | `caveman` | Modo ultra-comprimido (~65% menos tokens) durante desenvolvimento |
 
@@ -610,7 +580,7 @@ Para **TODO** desenvolvimento, as skills apropriadas **OBRIGATORIAMENTE** devem 
 - **Nunca** pular a leitura do `workflow-state.json`.
 - **Nunca** implementar sem spec (features) ou sem análise (bugfixes).
 - **Nunca** pular a fase de testes — testes unitários + integração são obrigatórios.
-- **Nunca** pular o code review — invocar `fullstack-code-reviewer` é obrigatório. **Esta regra é NON-NEGOTIABLE.** Ver seção 6 para protocolo completo.
+- **Nunca** pular o code review — invocar `code-reviewer` é obrigatório. **Esta regra é NON-NEGOTIABLE.** Ver seção 6 para protocolo completo.
 - **Nunca** declarar fase completa sem o Code Review Gate da seção 6.3.
 - **Economia de tokens:** Utilizar caveman mode (`/caveman`) como padrão durante desenvolvimento para reduzir consumo de tokens (~65%). Exceções: avisos de segurança, ações irreversíveis, usuário solicitar "normal mode".
 - Atualizar o workflow state ao concluir cada fase ou milestone.
@@ -622,19 +592,19 @@ Para **TODO** desenvolvimento, as skills apropriadas **OBRIGATORIAMENTE** devem 
 
 | Documento | Propósito |
 |-----------|-----------|
-| `AGENTS.md` | Stacks e versões, comandos |
-| `backend/README.md` | Arquitetura detalhada do sistema |
-| `docs/product/SYSTEM_SPECIFICATION.md` | Especificação completa do sistema |
-| `.spec/{backend\|frontend}/{feature}/SPEC.md` | SDD de cada funcionalidade |
+| `.doc/stacks.md` | Stacks e versões |
+| `.doc/arquitetura-backend.md` | Arquitetura detalhada do sistema |
+| `.doc/especificacao-sistema.md` | Especificação completa do sistema |
+| `.spec/backend/sdd-etapa{N}-{dominio}.md` | SDD de cada domínio |
 | `.agents/rules/backend-unit-tests.md` | Regras detalhadas de testes unitários |
 | `.agents/rules/backend-integration-tests.md` | Regras detalhadas de testes de integração |
 | `.agents/rules/backend-coding-standards.md` | Padrões de codificação backend |
 | `.agents/rules/frontend-coding-standards.md` | Padrões de codificação frontend |
 | `.agents/rules/db-migration-flyway.md` | Regras de migração Flyway |
 | `.agents/rules/security-standard.md` | **Fonte da verdade** de segurança (OWASP) — web, API, mobile |
-| `.agents/rules/brain-context.md` | Protocolo de contexto do Brain |
+| `.agents/rules/brain-context.md` | Ponte fina → `BRAIN.MCP.md` (dono brain) |
 | `.agents/rules/sdd-workflow-standard.md` | Padrão do workflow SDD |
 | `.agents/skills/dev-planner/SKILL.md` | **Planejamento técnico detalhado** — 6 fases (Descubra→Analise→Desafie→Projete→Estime→Valide), gera artefatos para sdd-compiler |
 | `AGENTS.md` | Visão geral do projeto e comandos essenciais |
 | `~/.config/opencode/skills/caveman/SKILL.md` | Regras completas do modo caveman |
-| **`.agents/rules/harness-continuous.md`** | **FONTE DA VERDADE** do harness (H1-H7) — suite completa, zero tolerância, E2E greenfield, avaliação contínua, portão de conclusão |
+| **`workflow-rules.md` §5** | **FONTE DA VERDADE** do harness (H0–H7) — fundido do `harness-continuous.md` (DOC-02) |

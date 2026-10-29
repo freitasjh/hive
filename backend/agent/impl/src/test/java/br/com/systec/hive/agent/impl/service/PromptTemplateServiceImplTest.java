@@ -348,6 +348,52 @@ public class PromptTemplateServiceImplTest {
         }
     }
 
+    /**
+     * The pinned-version lookup, which is the one question {@link #findActiveByCode} must not answer:
+     * a pin that quietly resolves to the active version would honour text the caller never chose. No
+     * new query is involved — the repository already carries the tenant-scoped lookup by version.
+     */
+    @Test
+    void when_findByCodeAndVersion_withExistingVersion_then_returnsThatExactVersion() {
+        UUID tenantId = UUID.randomUUID();
+        PromptTemplateEntity entity = new PromptTemplateEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setCode("CODE");
+        entity.setVersion(2);
+        entity.setTenantId(tenantId);
+
+        try (MockedStatic<TenantContext> mocked = mockStatic(TenantContext.class)) {
+            mocked.when(TenantContext::getCurrentTenant).thenReturn(tenantId);
+            when(repository.findByTenantIdAndCodeAndVersion(tenantId, "CODE", 2))
+                    .thenReturn(Optional.of(entity));
+            when(mapper.toDomain(entity)).thenAnswer(i -> {
+                PromptTemplate p = new PromptTemplate();
+                p.setCode(entity.getCode());
+                p.setVersion(entity.getVersion());
+                return p;
+            });
+
+            PromptTemplate result = service.findByCodeAndVersion("CODE", 2);
+
+            assertThat(result.getVersion()).isEqualTo(2);
+            verify(repository).findByTenantIdAndCodeAndVersion(tenantId, "CODE", 2);
+        }
+    }
+
+    @Test
+    void when_findByCodeAndVersion_withMissingVersion_then_throwsNotFound() {
+        UUID tenantId = UUID.randomUUID();
+
+        try (MockedStatic<TenantContext> mocked = mockStatic(TenantContext.class)) {
+            mocked.when(TenantContext::getCurrentTenant).thenReturn(tenantId);
+            when(repository.findByTenantIdAndCodeAndVersion(tenantId, "CODE", 99))
+                    .thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.findByCodeAndVersion("CODE", 99))
+                    .isInstanceOf(PromptTemplateNotFoundException.class);
+        }
+    }
+
     @Test
     void when_findById_withOtherTenant_then_throwsNotFound() {
         UUID tenantId = UUID.randomUUID();

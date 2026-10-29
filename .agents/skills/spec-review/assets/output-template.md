@@ -4,7 +4,7 @@ Use este template **obrigatoriamente** ao gerar relatórios de review de specifi
 
 ---
 
-# Relatório de Revisão de Specification — Hive AI
+# Relatório de Revisão de Specification — TaskFlow
 
 **Data de Revisão:** `[DD/MM/YYYY]`  
 **Revisor:** `[Nome/Skill]`  
@@ -18,7 +18,7 @@ Use este template **obrigatoriamente** ao gerar relatórios de review de specifi
 |-------|-------|
 | **Arquivo analisado** | `[caminho/para/SPEC.md]` |
 | **Tipo de Feature** | Backend / Frontend / Infraestrutura / Mista |
-| **Domínio afetado** | agent / identity / tenant / security / provider / commons |
+| **Domínio afetado** | user / employee / project / team / task / workflow / kanban |
 | **Escopo** | Nova feature / Refactor / Correção |
 | **Status Geral** | Aprovada / Com ressalvas / Reprovada |
 | **Bloqueadores** | Sim / Não — [Quantidade] críticos |
@@ -37,7 +37,7 @@ Use este template **obrigatoriamente** ao gerar relatórios de review de specifi
 | **Estrutura da Spec** | `[XX]%` | / | [Brief comment] |
 | **Requisitos Funcionais** | `[XX]%` | / | [Brief comment] |
 | **DDD Modular** | `[XX]%` | / | [Brief comment] |
-| **Flyway Migrations** | `[XX]%` | / | [Brief comment] |
+| **Liquibase Migrations** | `[XX]%` | / | [Brief comment] |
 | **Frontend (Vue 3)** | `[XX]%` | / | [Brief comment] |
 | **Testes Backend** | `[XX]%` | / | [Brief comment] |
 | **Segurança** | `[XX]%` | / | [Brief comment] |
@@ -64,30 +64,30 @@ Estes gaps **impedem a implementação** e devem ser corrigidos **antes de qualq
 - **Correção Obrigatória:**
   ```
   Depender apenas da camada api do módulo externo:
-  - Certo: agent/impl → identity/api
-  - Errado: agent/impl → identity/impl
+  - Certo: task/impl → project/api
+  - Errado: task/impl → project/impl
   ```
 
 **[#CRÍTICA-002]** — Entidade JPA exposta via controller
 - **Linha da Spec:** [X]
-- **Regra Violada:** `backend-coding-standards.md` — Camada web usa DTOs, nunca entidades JPA
+- **Regra Violada:** `backend-coding-standards.md` — Camada public usa DTOs, nunca entidades JPA
 - **Problema:** Controller recebe ou devolve @Entity diretamente
 - **Impacto:** Viola separação de camadas, expõe detalhes de persistência
 - **Correção Obrigatória:**
   ```
-  Criar DTOs específicos para request/response no módulo web/internal/v1
+  Criar DTOs específicos para request/response no módulo public
   ```
 
-### Flyway
+### Liquibase
 
-**[#CRÍTICA-003]** — Migration sem history table própria
+**[#CRÍTICA-003]** — Migration sem changeset no master-changelog.xml
 - **Linha da Spec:** [X]
-- **Regra Violada:** `db-migration-flyway.md` — Flyway bean + table por módulo
-- **Problema:** Migration sem `flyway_schema_history_{module}` configurada
-- **Impacto:** Flyway não aplica a migration corretamente
+- **Regra Violada:** `db-migration-liquibase.md` — Include no master na ordem correta
+- **Problema:** Migration não incluída no master-changelog.xml
+- **Impacto:** Liquibase não executa a migration
 - **Correção Obrigatória:**
   ```
-  Criar @Configuration Flyway bean com locations e table próprios do módulo
+  Adicionar include em master-changelog.xml na posição correta da ordem de dependências
   ```
 
 ---
@@ -115,8 +115,8 @@ _(Recomendações importantes que devem ser endereçadas antes da implementaçã
 - **Recomendação:** Criar interface no módulo api, implementação no impl
 - **Exemplo esperado:**
   ```
-  agent/api/.../service/AgentService.java (interface)
-  agent/impl/.../service/AgentServiceImpl.java (implementação)
+  task/api/.../service/TaskService.java (interface)
+  task/impl/.../service/TaskServiceImpl.java (implementação)
   ```
 - **Impacto:** Garante baixo acoplamento entre módulos
 
@@ -132,8 +132,8 @@ _(Recomendações importantes que devem ser endereçadas antes da implementaçã
 - **Recomendação:** Definir cobertura mínima e casos de teste principais
 - **Exemplo esperado:**
   ```
-  - Unitários: AgentServiceImpl, mappers MapStruct, exceptions
-  - Integração: AgentControllerV1IT (POST, GET, PUT, DELETE)
+  - Unitários: TaskServiceImpl, domain converters, exceptions
+  - Integração: TaskControllerV1IT (POST, GET, PUT, DELETE)
   - Cobertura mínima: 80% service, 90% domain
   ```
 - **Impacto:** Garante qualidade do código
@@ -148,7 +148,7 @@ _(Melhorias importantes para qualidade, recomendadas mas não blocantes)_
 
 **[#MÉDIA-001]** — Nomenclatura inconsistente
 - **Categoria:** Convenções
-- **Recomendação:** Seguir padrão *ServiceImpl, *Mapper, *ControllerV1, *DTO
+- **Recomendação:** Seguir padrão *ServiceImpl, *Converter, *Controller, *Mapper
 - **Benefício:** Consistência e navegabilidade
 
 **[#MÉDIA-002]** — Idiomas misturados
@@ -165,9 +165,9 @@ _(Melhorias importantes para qualidade, recomendadas mas não blocantes)_
 
 ### Frontend
 
-**[#MÉDIA-004]** — Ícones fora do padrão PrimeIcons
+**[#MÉDIA-004]** — Ícones mdi usados em vez de ri
 - **Categoria:** Frontend
-- **Recomendação:** Usar `pi pi-*` (PrimeIcons), não `mdi-*` / `ri-*`
+- **Recomendação:** Substituir `mdi-*` por `ri-*` (apenas Remix icons permitidos)
 - **Benefício:** Consistência visual
 
 ---
@@ -188,8 +188,8 @@ Aspectos bem estruturados e alinhados com as regras:
 
 - **User stories bem definidas** — Formato claro e objetivo
 - **Escopo explícito** — Deixa claro o que faz e não faz parte
-- **DDD Modular respeitado** — Separação correta entre api/impl/web
-- **Flyway bem estruturado** — Migrations com history table por módulo
+- **DDD Modular respeitado** — Separação correta entre api/impl/public
+- **Liquibase bem estruturado** — Migrations na ordem correta
 - **Testes planejados** — Estratégia de testes definida
 
 ---
@@ -203,7 +203,7 @@ Aspectos bem estruturados e alinhados com as regras:
 
 - [ ] **[#CRÍTICA-001]** Corrigir violação de dependência entre módulos
 - [ ] **[#CRÍTICA-002]** Substituir entidade JPA por DTO no controller
-- [ ] **[#CRÍTICA-003]** Configurar Flyway bean/history table do módulo
+- [ ] **[#CRÍTICA-003]** Adicionar include no master-changelog.xml
 
 **Checklist:**
 - [ ] Todos os críticos foram endereçados
@@ -231,7 +231,7 @@ Aspectos bem estruturados e alinhados com as regras:
 - [ ] **[#MÉDIA-001]** Revisar nomenclatura de classes
 - [ ] **[#MÉDIA-002]** Verificar idioma de métodos vs UI
 - [ ] **[#MÉDIA-003]** Adicionar diagramas de fluxo
-- [ ] **[#MÉDIA-004]** Substituir ícones não-PrimeIcons por `pi pi-*`
+- [ ] **[#MÉDIA-004]** Substituir mdi por ri icons
 
 ---
 
@@ -241,7 +241,7 @@ Regras canônicas verificadas durante a análise:
 
 - `.agents/rules/backend-coding-standards.md` — DDD modular, performance
 - `.agents/rules/frontend-coding-standards.md` — Vue 3, Pinia, componentes
-- `.agents/rules/db-migration-flyway.md` — Flyway versionamento
+- `.agents/rules/db-migration-liquibase.md` — Liquibase versionamento
 - `.agents/rules/backend-unit-tests.md` — Testes unitários
 - `.agents/rules/backend-integration-tests.md` — Testes de integração
 - `.agents/rules/workflow-rules.md` — Regras gerais de workflow
@@ -265,10 +265,10 @@ Regras canônicas verificadas durante a análise:
 | Data de Revisão | [DD/MM/YYYY HH:MM] |
 | Revisor | [Nome / Skill] |
 | Tempo de Revisão | [X minutos] |
-| Versão do Checklist | v2.1 (Hive AI) |
+| Versão do Checklist | v2.1 (TaskFlow) |
 | Total de Gaps | [Críticos: X / Alta: X / Média: X / Baixa: X] |
 | Recomendação | [Aprovada / Com Ressalvas / Reprovada] |
 
 ---
 
-_Relatório gerado seguindo checklist Hive AI `spec-review.v2.1`_
+_Relatório gerado seguindo checklist TaskFlow `spec-review.v2.1`_

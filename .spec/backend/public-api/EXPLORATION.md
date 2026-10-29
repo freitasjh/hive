@@ -39,11 +39,11 @@ Levantei 9. Separei em **BLOQUEANTES** (a resposta muda o desenho, não é param
 
 | # | Pergunta | Por que é bloqueante | Estado |
 |---|---|---|---|
-| **Q1** | `PINNED` deve ser **tripwire** (o prompt se move → a integração é notificada com erro) ou **snapshot** (o prompt se move → a integração continua no texto antigo)? | O modelo de dados **não tem snapshot**. `update()` muta a linha in-place (§4.1). Snapshot exige mudar o editor da UI: batch próprio, fora do escopo. Tripwire é FREE. **Assumindo tripwire, com o nome e os códigos de erro corrigidos.** | ❓ **perguntar** |
-| **Q2** | `messages[]` pode conter `role: "system"`? | Se sim, o ERP sobrescreve o prompt do tenant e a decisão 3 (prompt é do cliente, na plataforma) vira decorativa. Se não, é uma restrição de contrato a declarar. **Assumindo: rejeitar `system`.** | ❓ **perguntar** |
-| **Q3** | O ERP quer o **transcript persistido** no Hive (mesmo sendo stateless no request)? | A resposta muda o modelo: stateless rejeita, mas um `chat_session` órfão criado por chamada muda reuso, quota e privacidade. **Assumindo: não, zero persistência de conteúdo.** | ❓ **perguntar** |
-| **Q4** | O contrato do ERP é estável o bastante para que o Hive **não** seja a fonte da conversa? | Se o ERP reenviar o histórico inteiro a cada turno, o custo de prompt cresce sem limite e a v1 precisa de um teto de mensagens. **Assumindo: o ERP reenvia as últimas N; a v1 recusa acima de um teto.** | ❓ **perguntar** |
-| **Q5** | O caminho de autenticação do ERP prefere `client_secret_basic` (header) ou `client_secret_post` (body)? | Afeta só o parser do endpoint de token. RFC 6749 recommends `client_secret_basic`. **Assumindo: aceitar os dois, `basic` como preferido.** | ❓ **perguntar** |
+| **Q1** | `PINNED` deve ser **tripwire** (o prompt se move → a integração é notificada com erro) ou **snapshot** (o prompt se move → a integração continua no texto antigo)? | O modelo de dados **não tem snapshot**. `update()` muta a linha in-place (§4.1). Snapshot exige mudar o editor da UI: batch próprio, fora do escopo. Tripwire é FREE. **Assumindo tripwire, com o nome e os códigos de erro corrigidos.** | ✅ **respondido (usuário, 2026-09-27): tripwire** |
+| **Q2** | `messages[]` pode conter `role: "system"`? | Se sim, o ERP sobrescreve o prompt do tenant e a decisão 3 (prompt é do cliente, na plataforma) vira decorativa. Se não, é uma restrição de contrato a declarar. **Assumindo: rejeitar `system`.** | ✅ **respondido (D3, 3/3 + usuário): rejeitar com 400** |
+| **Q3** | O ERP quer o **transcript persistido** no Hive (mesmo sendo stateless no request)? | A resposta muda o modelo: stateless rejeita, mas um `chat_session` órfão criado por chamada muda reuso, quota e privacidade. **Assumindo: não, zero persistência de conteúdo.** | ✅ **respondido: não persistir; metadados em log (D4)** |
+| **Q4** | O contrato do ERP é estável o bastante para que o Hive **não** seja a fonte da conversa? | Se o ERP reenviar o histórico inteiro a cada turno, o custo de prompt cresce sem limite e a v1 precisa de um teto de mensagens. **Assumindo: o ERP reenvia as últimas N; a v1 recusa acima de um teto.** | ✅ **respondido (D2): teto = dado da credencial (`plim`), default 200/32000/256000** |
+| **Q5** | O caminho de autenticação do ERP prefere `client_secret_basic` (header) ou `client_secret_post` (body)? | Afeta só o parser do endpoint de token. RFC 6749 recommends `client_secret_basic`. **Assumindo: aceitar os dois, `basic` como preferido.** | ✅ **respondido: ambos, `basic` preferido** |
 
 ### 3.2 PARAMETRO — mudam um valor, não a forma
 
@@ -127,11 +127,14 @@ bearerToken != null
   → TenantContext.runWithTenant(tenantId, () -> filterChain.doFilter(...))
 ```
 
-`AuthenticationServiceImpl.loadUserByUsername` → `userService.findByUsername(username)`.
-O `sub` de um token `client_credentials` é o `clientId`, que **não é** um `users.username`. O
-resultado: `ObjectNotFoundException` → `UsernameNotFoundException` → capturado pelo
-`catch (Exception e)` → lançado como `SecurityException` **para fora do `FilterChainProxy`**, o que
-produz **500**, não 401. Nenhum controller chega a ser chamado.
+**Causa apontada errada no planejamento, corrigida na revisão (B2).** `loadUserByUsername:51` é
+**inalcançável** nesse caminho: a validação de audiência morre antes —
+`SecurityFilter:49` → `validateTokenRevoke` → `decodeAndVerify:167-171` exige `aud=hive.web` →
+`BaseException` relançada em `:63` → **500**, não 401. Nenhum controller chega a ser chamado.
+`loadUserByUsername` segue sendo defeito **latente** (token `aud=hive.web` forjado com `sub` de
+não-usuário chegaria lá), mas não é a causa do 500 da rota pública. E `SecurityFilter.java:28` é
+`@Component` — **auto-registrado no container para `/*`, fora do `FilterChainProxy`**: roda em
+`/v1/public/**` mesmo com a cadeia nova (B1).
 
 Este é um **gate duro**, do mesmo porte que P-a/P-b/P-c, e não estava na lista. Ele também
 invalida a alternativa "ramo dentro do `SecurityFilter`": o `loadUserByUsername` é incondicional

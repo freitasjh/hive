@@ -1,12 +1,12 @@
-# Skill: Spec Review — Hive AI
+# Skill: Spec Review — TaskFlow
 
-**Revisor de Specifications Hive AI** — Valida conformidade de specs com as regras de DDD Modular, padrões Maven multi-module, Vue 3 + PrimeVue 4, identifica gaps e gera plano de ação.
+**Revisor de Specifications TaskFlow** — Valida conformidade de specs com as regras de DDD Modular, padrões Maven multi-module, Vue 3 + Vuetify 3, identifica gaps e gera plano de ação.
 
 ---
 
 ## Propósito
 
-Esta skill foi criada para garantir que todas as specifications criadas no projeto **Hive AI** (Spring Boot 4.1 + Java 21 + Vue 3.5 + PrimeVue 4) seguem as regras de arquitetura, segurança e qualidade definidas no repositório antes da implementação.
+Esta skill foi criada para garantir que todas as specifications criadas no projeto **TaskFlow** (Spring Boot 3.5 + Vue 3) seguem as regras de arquitetura, segurança e qualidade definidas no repositório antes da implementação.
 
 **Objetivos:**
 - Validar conformidade com regras canônicas (`.agents/rules/`)
@@ -21,12 +21,12 @@ Esta skill foi criada para garantir que todas as specifications criadas no proje
 
 ```
 .agents/skills/spec-review/
-├── SKILL.md                    # Definição e procedure da skill (adaptada Hive AI)
+├── SKILL.md                    # Definição e procedure da skill (adaptada TaskFlow)
 ├── README.md                   # Este arquivo
 └── assets/
-    ├── checklist.md            # Checklist de validação Hive AI (50+ itens)
-    ├── output-template.md      # Template de relatório (adaptado Hive AI)
-    └── usage-guide.md          # Guia de uso (adaptado Hive AI)
+    ├── checklist.md            # Checklist de validação TaskFlow (50+ itens)
+    ├── output-template.md      # Template de relatório (adaptado TaskFlow)
+    └── usage-guide.md          # Guia de uso (adaptado TaskFlow)
 ```
 
 ---
@@ -36,9 +36,9 @@ Esta skill foi criada para garantir que todas as specifications criadas no proje
 ### Invocar a Skill
 
 ```
-Revise a specification em .spec/backend/agent/ seguindo as regras do projeto.
+Revise a specification em .spec/backend/task/ seguindo as regras do projeto.
 
-Revise .spec/backend/agent/SPEC.md:
+Revise .spec/backend/task/SPEC.md:
 - Verifique conformidade com DDD Modular e padrões Maven multi-module
 - Identifique gaps por severidade
 - Gere um plano de ação detalhado
@@ -78,41 +78,43 @@ Relatório com:
 
 ### DDD Modular (Backend)
 
-- [ ] Módulos seguem estrutura `api/` → `impl/` → `dbupdate/` → `web/`
+- [ ] Módulos seguem estrutura `api/` → `impl/` → `public/` (ou `public-api/`)
 - [ ] `impl` NUNCA depende de `impl` de outro módulo — só via `api`
-- [ ] Camada `web` usa DTOs, nunca expõe entidades JPA
-- [ ] Repository: estende `JpaRepository<Entity, UUID>` diretamente
+- [ ] Camada `public` usa DTOs, nunca expõe entidades JPA
+- [ ] Repository Pattern: `AbstractRepository` (EntityManager) ou `JpaRepository` + `JpaSpecificationExecutor`
 - [ ] Service Layer com interface na `api`, implementação na `impl`
-- [ ] VOs de domínio (não entidades) na camada de serviço
+- [ ] `securityService.getCurrentEmployeeId()` para usuário logado
 - [ ] `@HasPermission("PERMISSION_NAME")` em métodos de controller
-- [ ] Controllers usam `RestControllerTool.of().buildSuccessResponse()`
+- [ ] Controllers estendem `AbstractController`
 
-### Flyway Migrations
+### Liquibase Migrations
 
-- [ ] SQL em `{module}/dbupdate/src/main/resources/db/migration/{module}/`
-- [ ] Naming `V{N}__{description}.sql` (começa em V2)
-- [ ] Flyway bean + history table própria por módulo (`flyway_schema_history_{module}`)
-- [ ] NUNCA alterar migrations já executadas — nova migration sempre
+- [ ] XML changelogs em `dbupdate/src/main/resources/changelog/changes/`
+- [ ] Changeset id no formato `{timestamp}-{descricao}`
+- [ ] Include adicionado ao `master-changelog.xml` na ordem correta
+- [ ] NUNCA alterar changesets já executados — novo changeset sempre
 
-### Frontend (Vue 3 + PrimeVue 4)
+### Frontend (Vue 3)
 
 - [ ] Composition API `<script setup lang="ts">`
-- [ ] Stores Pinia (setup function)
-- [ ] Services em `src/services/*.service.ts` (Axios baseURL `/hive/v1`)
-- [ ] Componentes seguem padrão `TheTopbar`/`TheSidebar`/`MainLayout`
-- [ ] Theming PrimeVue Aura + dark mode `.p-dark`
-- [ ] Ícones apenas PrimeIcons (`pi pi-*`)
+- [ ] Stores Pinia (Options API: state/getters/actions)
+- [ ] Services class-based com `http` (Axios), endpoint `/api/v1/{resource}`
+- [ ] `resetState()` pattern nas stores
+- [ ] Models: TS class com construtor e defaults
+- [ ] Ícones apenas Remix (`ri-*`), proibido `mdi-*`
+- [ ] Auto-imports: vue, vue-router, @vueuse/core, @vueuse/math, pinia
+- [ ] SweetAlert2 para toasts/modals/erros via `useHandlerMessage()`
 - [ ] CSS scoped nos componentes
 
 ### Testes
 
 - [ ] Unitários: JUnit 5 + Mockito, padrão `@ExtendWith(MockitoExtension.class)`
-- [ ] Fakes em `src/test/java/.../fake/`
-- [ ] Naming: `when_{action}_with_{scenario}_then_{result}()`
+- [ ] Fakes em `src/test/java/.../fake/` com `fake()` e `fakeVO()`
+- [ ] Naming: `when{Action}_then{Expected}` camelCase
 - [ ] AssertJ preferencial, JUnit assertions aceitáveis
 - [ ] Integração: `*IT.java` no módulo `integration-test/`
 - [ ] PostgreSQL 16 via Testcontainers, MockMvc (NÃO RestAssured)
-- [ ] `DatabaseCleaner.reset()` + `JwtTestHelper`
+- [ ] IntegrationTestUtil para estado compartilhado
 - [ ] Controllers testados APENAS via integração
 - [ ] Cobertura: 80% service, 90% domain
 - [ ] Sem `@SpringBootTest` em unitários, sem H2, sem Lombok
@@ -122,20 +124,20 @@ Relatório com:
 - [ ] JWT Bearer token via header `Authorization`
 - [ ] `@HasPermission("PERMISSION_NAME")` em cada método de controller
 - [ ] Validação de entrada com `@Valid` nos DTOs
-- [ ] `MethodArgumentNotValidException` → 400 BAD_REQUEST (RFC 7807)
+- [ ] `MethodArgumentNotValidException` → 406 com lista de erros
 - [ ] Sem dados sensíveis em logs
 
 ### Performance
 
 - [ ] Coleções pré-dimensionadas (`new ArrayList<>(size)`)
 - [ ] Sem Streams em caminhos críticos (segurança, filtros HTTP)
-- [ ] Mapeamento via MapStruct (`@Mapper(componentModel = "spring")`)
+- [ ] Mapeamento explícito com converters manuais (padrão `of()`) — sem MapStruct
 
 ### Convenções
 
 - [ ] Nomes em inglês (classes, métodos, variáveis), mensagens UI em PT-BR
 - [ ] Zero comentários no código
-- [ ] Nomenclatura: `*ServiceImpl`, `*ControllerV1`, `*Mapper`, `*DTO`
+- [ ] Nomenclatura: `*ServiceImpl`, `*Controller`, `*Mapper`, `*Converter`
 - [ ] Testes: `*Test.java` (unit), `*IT.java` (integration)
 - [ ] Lombok NÃO usado
 - [ ] Injeção por construtor (nunca `@Autowired` em campo)
@@ -157,7 +159,7 @@ Relatório com:
 
 ### 1. `SKILL.md` (Definição)
 
-Descreve o propósito, procedure e referências da skill adaptada para Hive AI.
+Descreve o propósito, procedure e referências da skill adaptada para TaskFlow.
 
 **Seções:**
 - When to Use (quando invocar)
@@ -167,13 +169,13 @@ Descreve o propósito, procedure e referências da skill adaptada para Hive AI.
 
 ### 2. `assets/checklist.md` (50+ Itens)
 
-Checklist completo adaptado para Hive AI.
+Checklist completo adaptado para TaskFlow.
 
 **Categorias:**
 1. Estrutura (9 itens)
 2. Requisitos Funcionais (6 itens)
 3. DDD Modular (10 itens)
-4. Flyway (5 itens)
+4. Liquibase (5 itens)
 5. Frontend Vue 3 (10 itens)
 6. Testes Backend (9 itens)
 7. Segurança (6 itens)
@@ -211,7 +213,8 @@ A skill consulta **sempre** as seguintes regras:
 
 - **Backend:** `backend-coding-standards.md`, `backend-unit-tests.md`, `backend-integration-tests.md`
 - **Frontend:** `frontend-coding-standards.md`
-- **Flyway:** `db-migration-flyway.md`
+- **Liquibase:** `db-migration-liquibase.md`
+
 ### Documentos de Referência
 
 - `AGENTS.md` — Visão geral do projeto e comandos
@@ -246,7 +249,7 @@ A skill consulta **sempre** as seguintes regras:
    ├── sdd-compiler generate-plan → PLAN.md
    ├── sdd-compiler generate-tasks → TASKS.md
    ├── Implementação via tasks
-   └── Code review (fullstack-code-reviewer)
+   └── Code review (code-reviewer)
    ↓
 6. QA + Merge
 ```
@@ -257,12 +260,12 @@ A skill consulta **sempre** as seguintes regras:
 
 ### Use spec-review quando:
 - Spec foi criada e precisa ser revisada antes da implementação
-- Quer validar conformidade com DDD Modular e boas práticas Hive AI
+- Quer validar conformidade com DDD Modular e boas práticas TaskFlow
 - Precisa gerar feedback estruturado para o autor
 - Quer criar um plano de ação para correções
 
 ### Não use quando:
-- Quer revisar código implementado (use subagent `fullstack-code-reviewer`)
+- Quer revisar código implementado (use subagent `code-reviewer`)
 - Quer validar testes (use subagent `qa-engineer`)
 - Quer análise profunda de segurança (use subagent `security-engineer`)
 
@@ -279,9 +282,9 @@ A skill consulta **sempre** as seguintes regras:
 
 | Benefício | Descrição |
 |-----------|-----------|
-| **Qualidade** | Specs validadas contra 50+ critérios Hive AI |
+| **Qualidade** | Specs validadas contra 50+ critérios TaskFlow |
 | **Arquitetura** | Garante DDD Modular + padrões Maven multi-module |
-| **Consistência** | Estrutura api/impl/web, padrões Vue 3 + PrimeVue |
+| **Consistência** | Estrutura api/impl/public, padrões Vue 3 |
 | **Eficiência** | Menos retrabalho durante implementação |
 | **Rastreabilidade** | Plano de ação estruturado |
 
@@ -293,8 +296,8 @@ A skill consulta **sempre** as seguintes regras:
 |--------|------|----------|
 | v1.0 | 2026-06-17 | Versão inicial (PDV Java/JavaFX) |
 | v2.0 | 2026-06-20 | Adaptado para MedFlow (DDD Modular, Vue 3) |
-| v2.1 | 2026-07-17 | Adaptado para Hive AI (multi-agent, Flyway, @HasPermission) |
+| v2.1 | 2026-07-17 | Adaptado para TaskFlow (Jira-alternative, Liquibase, @HasPermission) |
 
 ---
 
-_Skill `spec-review` v2.1 — Revisor de Specifications Hive AI_
+_Skill `spec-review` v2.1 — Revisor de Specifications TaskFlow_

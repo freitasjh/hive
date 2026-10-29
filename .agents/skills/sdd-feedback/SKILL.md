@@ -92,7 +92,7 @@ Após cada summary, avaliar se há lição relevante:
 # Se summary revelou gap ou issue crítica:
 brain_store(
     layer="regras",
-    path="hive/sdd-lessons/[feature]/[date]",
+    path="atlas-ecm/sdd-lessons/[feature]/[date]",
     content="## SDD Lesson\n\n### Contexto\n...\n### Issue\n...\n### Solução\n...",
     scope="projetos"
 )
@@ -119,7 +119,7 @@ Stage values: Specifying(20%) → Planning(40%) → Tasking(60%) → InProgress(
 3. **Flyway para migrations** — Rationale: Controle versionado, rollback possibility
 
 ### 📋 What Was Generated
-- `.spec/backend/agent/SPEC.md`: 12 requisitos, 8 ADRs, 5 invariantes
+- `.spec/tenant-user-management/SPEC.md`: 12 requisitos, 8 ADRs, 5 invariantes
 
 ### 🔍 Important Items to Review
 1. **RF-05: invite flow** — Verificar se SHA256+TTL 72h atende caso de uso real
@@ -127,14 +127,14 @@ Stage values: Specifying(20%) → Planning(40%) → Tasking(60%) → InProgress(
 3. **Invariant I-02: tenant isolation** — Validar em todas as queries JPQL
 
 ### ⚠️ Watch Out For
-- **ChatSession ownership** — How to avoid: Filtrar por tenantId + userId no service
+- **CompanyUser composite key** — How to avoid: Usar @IdClass, não @EmbeddedId
 - **Block per-tenant vs global** — How to avoid: Flag `blocked` + `blocked_global` separados
 
 ### 🔄 What This Enables Next
 - **Option 1:** Run `/sdd.plan` — Best if: Requisitos claros
 - **Option 2:** Run `/sdd.clarify` — Best if: Dúvidas em edge cases
 
-📊 **Feature Status:** agent-prompt-admin (Specified) → Next: Planning
+📊 **Feature Status:** tenant-user-management (Specified) → Next: Planning
    Progress: [●○○○○] 20% | Completed: 0 of 3 | Dependencies: None
 
 **Your options:** [A] Proceed to planning [B] Modify requirements [C] Clarify edge cases [D] Show status

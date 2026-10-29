@@ -22,12 +22,16 @@
      autenticado: POST /v1/public/v1/chat/completions   (aud = hive.public)
      ─────────────────────────────────────────────────────────────────────────────
      PublicApiSecurityFilter
+       0. Content-Length > 1 MiB → 413  (antes do Jackson — teto de corpo, D2)
        1. extrai Bearer
        2. verifica assinatura + iss + aud=hive.public + exp      [0 SELECT]
        3. jti em blacklist?          → 401                     [1 Redis GET]
        4. clientId revogado?          → 401                     [1 Redis GET]
        5. TenantContext.runWithTenant(tenant-id do token, …)    ← âncora do @Filter
        6. authorities = concessões do token (do banco, no momento da emissão)
+       7. finally: limpa SecurityContextHolder E TenantContext (SecurityFilter:71 faz; o público
+          também precisa — 2 requests encadeados na mesma thread provam)
+     ⚠️ ScopedValue NÃO propaga pra thread pool: @Async aqui = leitura cross-tenant SEM ERRO.
    ═════════════════════════════════════════════════════════════════════════════════
                                     │
    ┌────────────────────────────────┴───────────────────────────────────────┐
@@ -90,6 +94,14 @@ CREATE TABLE public_api_client
     rate_limit_per_minute    INT NOT NULL DEFAULT 60,
     token_ttl_seconds        INT NOT NULL DEFAULT 600,
 
+    -- D2: o teto de payload também é dado da credencial. Número em código é número que
+    -- ninguém calibra sem deploy. Reclamado no claim `plim`; o gate mede, não a constante.
+    -- Recusa EXPLÍCITA (400), nunca truncamento silencioso: o ERP receber 200 OK com metade
+    -- da conversa é pior que 400.
+    max_messages             INT NOT NULL DEFAULT 200,
+    max_message_chars        INT NOT NULL DEFAULT 32000,
+    max_total_chars          INT NOT NULL DEFAULT 256000,
+
     revoked_at               TIMESTAMP WITHOUT TIME ZONE,  -- revogação cirúrgica (decisão 7)
     last_used_at             TIMESTAMP WITHOUT TIME ZONE,
     expires_at               TIMESTAMP WITHOUT TIME ZONE,  -- NULL = sem expiração
@@ -102,6 +114,9 @@ CREATE TABLE public_api_client
     CONSTRAINT uk_public_api_client_tenant_label UNIQUE (tenant_id, label),
     CONSTRAINT chk_public_api_client_rate_limit  CHECK (rate_limit_per_minute >= 1),
     CONSTRAINT chk_public_api_client_token_ttl    CHECK (token_ttl_seconds BETWEEN 60 AND 3600),
+    CONSTRAINT chk_public_api_client_max_messages CHECK (max_messages >= 1),
+    CONSTRAINT chk_public_api_client_max_msg_chars CHECK (max_message_chars >= 1),
+    CONSTRAINT chk_public_api_client_max_total_chars CHECK (max_total_chars >= max_message_chars),
     -- O segredo anterior só existe enquanto a janela de graça está aberta. Sem este CHECK,
     -- um previous_secret_hash órfão continuaria sendo aceito por indefinitely — a mesma
     -- família de bug que `UNIQUE` inerte em NULL já produziu neste projeto.
@@ -220,6 +235,16 @@ a FK seria para uma chave não-única entre módulos.
 código trata o valor como número, ele é `NOT NULL` e o estado é um `CHECK`. Um valor nullable que
 serve de discriminante é um valor que o próximo lê errado.
 
+⚠️ **Default = `FOLLOW_ACTIVE`, e o provisionamento NUNCA depende do `DEFAULT`** (D1, arbitrado pelo
+usuário). O `CommandLineRunner` do batch 10 **sempre informa** `pin_mode` explicitamente — o
+`DEFAULT 'FOLLOW_ACTIVE'` no DDL só atende INSERT fora do runner (teste, seed, SQL manual). Motivo do
+default: `PINNED` torna **todo PUT de rotina do prompt um 409** para a integração; a condição que
+decidiu (pergunta do product-manager, respondida pelo usuário: *"1 integração, prompt do mesmo time
+que faz o deploy"*)-aponta FOLLOW_ACTIVE. `PINNED` segue disponível, por credencial e por
+`prompt_code`, onde o contrato exigir. O trio `(pin_mode, pinned_version)` continua amarrado pelo
+`CHECK`: `PINNED` sem versão é **recusado pelo banco**, e um texto que afirme o contrário está
+errado.
+
 ### 2.4 Tabela que **não** existe: tokens emitidos
 
 **Não** há tabela de token. A revogação usa o que já existe:
@@ -305,7 +330,10 @@ concedido nunca ser servido.
 | `permissions` | lista das **concessões persistidas** | **P-a.** Sai de `public_api_client_grant`, não de literal |
 | `pcode` | lista dos `prompt_code` permitidos | **decisão 4.** Allowlist no token → **hot path sem banco**. Custo declarado: revogar um código só surte efeito no próximo token (≤10 min) |
 | `plock` | mapa `code → versão pinada` (só os `PINNED`) | **decisão 5.** Mesmo custo/benefício do `pcode` |
+| `plim` | `{m: max_messages, c: max_message_chars, t: max_total_chars}` | **D2.** Teto de payload reclamado do banco **na emissão**, não relido no hot path. Sem ele, calibrar teto = deploy |
 | `exp` | `iat + token_ttl_seconds` | 10 min por default (D17), por credencial |
+| `typ` | `JWT` | RFC 8725 §3.2. Ausente, e um token de outro emissor com o mesmo segredo é aceito |
+| `kid` | id da chave de assinatura | Pré-requisito de rotação. Ausente, e rodar chave = downtime ou aceite duplo | |
 
 **Nada de `role`, `scope` hierárquico, `email`, `name`, ou qualquer claim de PII.** O ERP mandou
 `clientId` e recebe o tenant de volta — é um grant de máquina, não um perfil.
@@ -316,6 +344,13 @@ concedido nunca ser servido.
 `security/api` é **opcional** e fica como tarefa de limpeza, não como dependência. Deixar
 `SecurityTokenServiceImpl` intocado é uma propriedade desejável: é o código que emite token para
 todo usuário autenticado, e o RBAC de usuário está sendo discutido separadamente.
+
+⚠️ **A chave de assinatura É separada** (D8): `api.security.public.token.secret`, com
+`decodeAndVerify` por parâmetro. O segredo HMAC compartilhado entre token **humano** e token **de
+máquina** não é exceção aceita — é correção barata (~10 linhas). Com chave única, `aud` separa só o
+token **honesto**: o forjado, com o mesmo segredo, passa. E a propriedade que D7 reivindica fica
+condicional. `HMAC256` em si (algoritmo simétrico) é a exceção **aceita e registrada** — gatilho para
+revisitar: 2º cliente externo, ou `kid`/rotação.
 
 **Reutilização de `jti` + `tenant-id` + `permissions` na verificação:** o `PublicApiSecurityFilter`
 **não** passa por `SecurityTokenServiceImpl.validateTokenRevoke`, porque esse método valida
@@ -357,7 +392,7 @@ rotina do filtro, com `audience("hive.public")`.
 |---|---|---|
 | `model` | não (o SDK exige) | ausente → default do tenant; presente e ≠ modelo do tenant → **`400 unknown_model`** (D11) |
 | `prompt_code` | **sim** | 1–255 chars, `[A-Za-z0-9._-]`. Ausente/vazio → `400 prompt_code_required` |
-| `messages` | **sim** | 1..20 mensagens; roles `user`\|`assistant` **apenas**; `content` 1..8000 chars, não-blank |
+| `messages` | **sim** | 1..`max_messages` mensagens (default **200**, claim `plim`); roles `user`\|`assistant` **apenas**; `content` 1..`max_message_chars` (default **32000**) chars, não-blank; soma total ≤ `max_total_chars` (default **256000**) |
 | `user` | não | ≤ 128 chars. Correlação e log. **Nunca** é âncora de tenant, nunca é prompt, nunca é confiável |
 | `stream` | não | `true` → **`400 streaming_not_supported`** (D12) |
 | `temperature`, `max_tokens`, `top_p` | **não** | Aceitos e **ignorados** (precedente vast.ai: "parâmetros aceitos e ignorados"). O `inference_params` do prompt manda. Se vier valor e vier divergente, loga em `debug` |
@@ -367,9 +402,16 @@ rotina do filtro, com `audience("hive.public")`.
 | Rejeitado | Código | Por que |
 |---|---|---|
 | `role: "system"` em `messages` | `400 system_role_not_allowed` | **D10.** `buildMessages` põe o template do cliente **primeiro** e `addAll(conversation)` **depois**. Um `system` no request chega por último e é a última instrução do modelo. Aceitar = o ERP sobrescreve o prompt que a plataforma é dona de |
-| `messages` acima de 20 | `400 too_many_messages` | Espelha o limite de 20 do histórico interno (`ChatServiceImpl:191`). Teto de custo de prompt e de payload |
-| `messages` acima de 8000 chars em `content` | `400 content_too_long` | Espelha o limite de 4000 do `ChatRequest` interno |
+| `messages` acima do teto da credencial | `400 too_many_messages` | Teto é **dado da credencial** (D2), não constante. Protege o provider: `LlmRetryPolicy` **retenta**, e payload sem teto × retry é a pior combinação de custo e erro |
+| `content` ou soma total acima do teto | `400 request_too_large` | Idem. **Nunca truncamento silencioso** — o ERP receber 200 com metade da conversa é pior que 400 |
+| corpo > 1 MiB | `413` no **filtro** | Decidido por `Content-Length` **antes** do Jackson. Teto 1 MiB porque JSON escapa non-ASCII como `\uXXXX` (6 bytes/char): 20×8000×6 = 960 KB, e 160 KB recusaria o que o contrato declara válido |
 | campo desconhecido no body | `400 unknown_field` | Jackson `FAIL_ON_UNKNOWN_PROPERTIES` ligado **só** no DTO público. Falhar em campo desconhecido é melhor que ignorar em silêncio: um ERP mandando `functions` (fase 2) precisa saber que não foi atendido |
+
+**Taxonomia de campos (D3):** 9 rejeitados por nome (`response_format`, `tools`, `tool_choice`,
+`functions`, `function_call`, `n`, `logprobs`, `top_logprobs`, `parallel_tool_calls`) + 11
+aceitos-e-ignorados (inclui `max_completion_tokens`) + 3 especiais (`model`, `stream`, `user`) +
+`unknown_field` para o resto. **`max_tokens` do provider é clampeado** (IT-MAXTOKENS-CLAMP): o
+`LangChain4jTurnGateway:76-78` monta o client, logo o teto é nosso.
 
 ### 4.2 Response 200 — formato OpenAI + `hive:{}`
 
@@ -408,7 +450,7 @@ não são OpenAI. Esta é a decisão 3 ("resposta formato OpenAI + `prompt_code`
 |---|---|
 | `turn_id` | correlação entre a resposta do ERP e a linha de trace. **Novo** — o fluxo stateless não tem session id para servir de id |
 | `prompt_version` | **D13.** É o que torna `FOLLOW_ACTIVE` legítimo: o ERP pode logar e afirmar qual versão rodou |
-| `prompt_fingerprint` | sha256 dos primeiros N bytes do texto efetivo. Detecta mudança de conteúdo **sem** mudança de versão — que é o caso que o `version` sozinho não pega |
+| `prompt_fingerprint` | sha256 do texto efetivo **completo**, não "dos primeiros N bytes" (N indefinido truncaria o começo — o pior lado). É a **única identidade que sobrevive à promoção entre ambientes**, e por isso é coluna gravada e comparada, não recomendação |
 | `pin_mode` | o ERP sabe se está sob asserção de conformidade |
 | `elapsed_ms` | espelha `ChatTrace.elapsedMs`, que o ADR-012 nomeia como o sinal que distingue "provider travou" de "pedido grande demais" |
 | `tenant_id` | echo do grant. Não é novo dado — o ERP já o conhece |
@@ -439,7 +481,8 @@ Envelope (OpenAI `error` object, D9 — handler **local** ao controller público
 | — | `unknown_model` | **400** | `invalid_request_error` | `model` ≠ modelo do tenant — **D11** | corrigir a config do ERP |
 | — | `system_role_not_allowed` | **400** | `invalid_request_error` | `system` em `messages` — **D10** | remover |
 | — | `stream_not_supported` | **400** | `invalid_request_error` | `stream:true` — **D12** | remover |
-| — | `too_many_messages` / `content_too_long` / `unknown_field` | **400** | `invalid_request_error` | validação | corrigir |
+| — | `too_many_messages` / `request_too_large` / `unknown_field` | **400** | `invalid_request_error` | validação | corrigir |
+| — | *(body > 1 MiB)* | **413** | `invalid_request_error` |Decidido no **filtro**, antes do handler — 413 morre no middleware, nunca chega ao controller | reduzir |
 | — | `rate_limit_exceeded` | **429** | `rate_limit_error` + `Retry-After` | cota | esperar |
 | — | `model_unavailable` | **422** | `invalid_request_error` | `MODEL_UNAVAILABLE` classificado — **mesma classificação do interno** | revisar config do tenant |
 | — | `model_returned_empty` | **422** | `invalid_request_error` | `EMPTY_RESPONSE` | revisar `max_tokens` do prompt |
@@ -450,8 +493,9 @@ Envelope (OpenAI `error` object, D9 — handler **local** ao controller público
 
 **As três classificações de erro do provider são as mesmas do interno, e é o ponto.** `MODEL_UNAVAILABLE`
 → 422 com evict de discovery, `MODEL_RETURNED_EMPTY` → 422, `ProviderException` → 502. É a razão de
-D3 (reusar a porta): o diagnóstico **não pode divergir** entre os dois caminhos. `ChatServiceImpl:227`
-chama `LangChain4jTurnGateway.isModelNotFound(failure)` estaticamente justamente por isso.
+D3 (reusar a porta): o diagnóstico **não pode divergir** entre os dois caminhos. `TurnOutcomeMapper`
+(branch `FAILED`) chama `ModelNotFound.isModelNotFound(failure)` — estático, e a regra sofre em
+`agent/api` para que os dois caminhos compartilhem o mesmo veredito.
 
 **Os 3 códigos "de prompt" são distinguíveis entre si por status HTTP, não por corpo.** Isso é
 deliberado: o ERP consegue ramificar por status **antes** de fazer parse do corpo, e o corpo
@@ -460,34 +504,52 @@ carrega o código para quem quiser ser mais específico.
 ### 4.4 Ordem de execução da requisição
 
 ```
+ 0. PublicApiSecurityFilter:  Content-Length > 1 MiB → 413  (antes do Jackson)
  1. PublicApiSecurityFilter:  Bearer → assinatura/iss/aud/exp → 401
  2. PublicApiSecurityFilter:  jti blacklist → 401   (Redis)
  3. PublicApiSecurityFilter:  client revogado → 401 (Redis)
- 4. PublicApiSecurityFilter:  TenantContext.runWithTenant(tenant-id do token)
- 5. @HasPermission(PUBLIC_CHAT_COMPLETE)          → 403 se a concessão não veio no token
- 6. validação do body (@Valid + regras do DTO)     → 400
- 7. TenantQuotaGuard.check(clientId)              → 429  (D16: antes do prompt)
- 8. model bate com o default do tenant?            → 400  unknown_model
- 9. prompt_code está no claim `pcode`?             → 403  prompt_not_in_allowlist  ← ANTES de
-                                                                                     qualquer SELECT
-10. ProviderResolution.resolve(tenantId)           → 422 llm_not_configured
-11. PromptGrantResolver:                           → 404 prompt_not_found
-                                                   → 409 prompt_not_active / prompt_version_not_found
+ 4. PublicApiSecurityFilter:  TenantContext.runWithTenant(tenant-id do token) [Callable]
+ 5. validação do body (@Valid + regras do DTO)     → 400
+ 6. @HasPermission(PUBLIC_CHAT_COMPLETE)           → 403 se a concessão não veio no token
+ 7. TenantQuotaGuard.check(clientId)               → 429  (antes do prompt)
+ 8. prompt_code está no claim `pcode`?             → 403 prompt_not_in_allowlist ← ANTES de qualquer SELECT
+ 9. PromptGrantResolver                            → 404 prompt_not_found
+                                                  → 409 prompt_not_active / prompt_version_not_found
+10. model bate com o default do tenant?            → 400 unknown_model
+11. ProviderResolution.resolve(tenantId)           → 422 llm_not_configured
 12. ChatTurnGateway.execute(TurnRequest)           → 422 / 502  (via TurnOutcomeMapper)
-13. resposta OpenAI + metadata.hive{} + trace (sessionId = null)
+13. resposta OpenAI + metadata.hive{} + trace (sessionId = null, turn_id único)
 ```
 
-**Passo 9 antes do 11 é a ordem que mata a enumeração** (decisão 4 / D16). O passo 10 é antes do 11
-porque um tenant sem LLM configurado é erro de config que o ERP não pode corrigir — mas a **allowlist**
-vem primeiro porque é a única que o ERP consegue agir sozinho.
+⚠️ **Duas correções de ordem, ambas medidas (revisão de 2026-09-27):**
+
+1. **A validação (400) roda ANTES do `@HasPermission` (403).** `@HasPermission` é um advice `@Around`
+   e roda **depois** da resolução de argumentos — onde o `@Valid` acontece. A ordem documentada no
+   planejamento ("permissão 5 → validação 6") **não é implementável**, e um desenho que promete o que
+   o framework não entrega ensina o próximo a confiar na ordem errada. O que **não** muda: a
+   allowlist (passo 8) continua antes de qualquer SELECT — é ela que mata a enumeração.
+2. **`unknown_model` (400) vem DEPOIS do prompt (404/409), não antes.** A ordem anterior exigia 1
+   SELECT antes do 1º SELECT. O custo é um `unknown_model` num prompt inexistente devolver 404 — e
+   404 não é oráculo de modelo, porque o modelo do tenant não é segredo.
+
+**D16 reescrito com a ordem real:** `401 → 413/400(validação) → 403(permissão) → 429 → 403(allowlist)
+→ 404 → 409 → 400(unknown_model) → 422 → 502`. O princípio intacto: **allowlist antes do lookup**
+(os passos 7+8 do gate de conexão provam).
 
 ---
 
 ## 5. Como `ChatTurnGateway` é reusado sem forkar `ChatServiceImpl`
 
-**Duas extrações (D4) e nada mais.** `ChatServiceImpl` mantém: sessão, TX1/TX2, `recordTurn`, as
-duas linhas de log, e o `toProviderMessages`. O que sai de lá para 2 colaboradores com 1 método cada
-é **decisão sem sessão** — que é literalmente o critério.
+**A extração (D4/D5) — porta e função pura em `agent/api`, adaptador em `agent/impl`.**
+`ChatServiceImpl` mantém: sessão, TX1/TX2 e a chamada ao seam (`turnOutcomeMapper.resolve(...)`).
+`recordTurn`, os 4 helpers do trace (`maxTokensOf`, `topPOf`, `temperatureOf`, `inferenceParams`) e as
+duas linhas de log moram em `TurnOutcomeMapper` — saíram do `ChatServiceImpl` com os ramos a que
+pertencem. O critério é
+**decisão sem sessão**, e a revisão de 2026-09-27 (D5) moveu o que é função pura para o `api`:
+`toProviderMessages` vira **estático em `agent/api/util/ProviderMessages`**, e `isModelNotFound` +
+`ModelNotFound` sobem para `agent/api` — que é o que permite ao `LangChain4jTurnGateway` **ser
+tocado** (emenda ratificada) sem criar uma segunda cópia da regra. `ProviderResolution`
+**não** sobe: `CredentialResolver` está em `agent/impl`, e `agent/api → agent/impl` é ciclo Maven.
 
 ```
                     ┌──────────────────────────────┐
@@ -531,19 +593,22 @@ mesmo jeito** — a mesma razão pela qual ADR-012 §Decisão 6 diz que `TurnReq
 compartilha: *"converter o histórico duas vezes seriam duas chances de discordar sobre o que foi
 dito"*.
 
-⚠️ **`ChatTrace.sessionId = null`.** Não esconder: a linha de trace da rota pública carrega
-`sessionId=null`, `promptTemplateId=<id>`, `tenantId` (do `TenantContext`) e `clientId`. É o que
-permite ligar a resposta ao ERP. A alternativa — `turn_id` como `sessionId` — seria **mentira** no
-nome do campo, e o ADR-012 já registrou que um campo de trace que não pode ser verdadeiro ensina o
-operador a ler mal.
+⚠️ **`ChatTrace.sessionId = null` + D4 (Batch 1B).** Não esconder: a linha de trace da rota pública
+carrega `sessionId=null`, `promptTemplateId=<id>`, `tenantId` (do `TenantContext`), `turnId` e
+`clientId` — os dois últimos **nascem no Batch 1B**, ~15 linhas, zero migration, nenhum teste
+existente quebrado. Sem eles, o `turn_id` que o ERP recebe **não casa com linha de log nenhuma**, e a
+finalidade declarada de P-a (atribuir o uso) fica sem prova. Retenção: **14 dias declarados como
+premissa** (rotação do ambiente; nada no código impõe). Reversão: tabela (+1 migration + LGPD) se o
+log do ambiente não for pesquisável — condição **verificada com o usuário**: é pesquisável.
 
-**Extração resumida (3 colaboradores, ~110 linhas movidas, zero mudança de comportamento):**
+**Extração resumida (4 itens, ~72 = região medida, ~28 = código que muda, zero mudança de comportamento):**
 
 | # | Collaborator | De onde | Passos |
 |---|---|---|---|
 | D4.1 | `ProviderResolution` | `ChatServiceImpl:176-186` | 10 |
 | D4.2 | `TurnOutcomeMapper` | `ChatServiceImpl:203-246` | 20–50 |
-| D4.3 | `toProviderMessages` → `ProviderMessages`-style | `ChatServiceImpl:328-344` | 4 (já existe uma `ProviderMessages` em `agent/impl/util/` — **verificar se é a mesma função** antes de extrair uma nova) |
+| D5.3 | `toProviderMessages` → **estático em `agent/api/util/ProviderMessages`** | `ChatServiceImpl:328-344` | 4 (já existe uma `ProviderMessages` em `agent/impl/util/` — **verificar se é a mesma função** antes de criar nova) |
+| D5.4 | `isModelNotFound` + `ModelNotFound` → `agent/api`; `PromptTemplateService.findByCodeAndVersion` (1 método novo; `findActiveByCode` já resolve `FOLLOW_ACTIVE`) | `LangChain4jTurnGateway`, `agent/api` | **zero query nova, zero aresta impl→impl** |
 
 ⚠️ **Regra do `harness-continuous.md` H6 e a lição do ADR-013:** estas 3 extrações são um **batch
 próprio, antes da feature**, com suíte + E2E de `systemBlockChars` provando que o prompt montado não
@@ -586,6 +651,11 @@ script(ZREMRANGEBYSCORE key 0 cutoff) → (ZCARD key) → se >= limit então {0,
 - **Rate limit no `/auth/token`:** SEPARADO e mais apertado. Um `client_secret` sendo forjado é brute
   force. Chave `hive:public:quota-token:{clientId}` com limite próprio (proposto 5/min, acima do
   burst de um ERP que reautentica a cada expiração).
+  ⚠️ **B8 (revisão): limitar só por `{clientId}` é contornável** — o forjador rotaciona `client_id`
+  e ganha bucket novo por tentativa. Mitigações: (1) **teto global** do endpoint
+  (`hive:public:quota-token:global`), que nenhum `clientId` furta; (2) teto por **IP** do chamador.
+  Bucket por atacante sem teto global é nenhum teto — o global é o que custa ao atacante, o por-IP é
+  o que custa ao distribuidor.
 
 **O `ChatRateLimiter` em memória não é tocado.** Continua servindo `/v1/chat` com 10 msg/min por
 tenant, exatamente como hoje. Zero regressão, zero mudança de contrato interno. As duas rotas
@@ -613,26 +683,37 @@ linhas. **Nenhuma linha de `ControllerExceptionHandler` é alterada.**
 
 ## 8. Ordem de provisionamento (decisão 10) e o que o ERP recebe
 
-Não há endpoint de auto-serviço. O caminho é o painel (ou SQL direto em dev):
+Não há endpoint de auto-serviço **e não há tela** (D6): o provisionamento é um
+**`CommandLineRunner`** que chama `PublicApiClientService.provisionar()` e imprime o payload
+**uma vez**. O `secret` é **sempre gerado por máquina** — campo de segredo digitado por humano é
+proibido (SHA-256 de baixa entropia quebrável offline a partir de um dump).
+`ProvisioningPayloadBuilder` é **código**, não template: único produtor de `base_url` +
+`prompt_codes` + `limits`.
 
 ```
 1. Admin cria o prompt template (código `resumo-pedido-venda`, status ACTIVE)
-2. Admin provisiona a credencial:  label = "produto X / produção"
-                              rate_limit_per_minute = 60
-                              → grant: PUBLIC_CHAT_COMPLETE
-                              → prompt: (resumo-pedido-venda, PINNED, 4)
-3. O sistema responde, UMA VEZ, com:
+2. Admin roda o runner com: label = "produto X / produção"
+                            rate_limit_per_minute = 60
+                            max_messages/max_message_chars/max_total_chars = 200/32000/256000
+                            pin_mode = FOLLOW_ACTIVE   ← default (D1); PINNED só onde o contrato exigir
+                            → grant: PUBLIC_CHAT_COMPLETE
+3. O runner IMPRIME, UMA VEZ:
      client_id      = "erp_produto_x"
      client_secret  = "<64 bytes base64url>"   ← nunca mais recuperável
      token_url      = "https://host/hive/v1/public/auth/token"
      base_url       = "https://host/hive/v1/public"
-     prompt_codes   = ["resumo-pedido-venda@4 (PINNED)"]
+     prompt_codes   = ["resumo-pedido-venda (FOLLOW_ACTIVE)"]
+     limits         = {m: 200, c: 32000, t: 256000}
 4. O ERP grava client_id/secret no secret store do CI e codifica `base_url`
 ```
 
 **A resposta do passo 3 é o contrato de provisionamento** e é o que substitui o discovery. O
-`secret` só existe naquele corpo — e por isso o requisito de comparação em tempo constante e o de
-nunca logar importam.
+`secret` só existe naquele output — e por isso o requisito de comparação em tempo constante e o de
+nunca logar importam. ⚠️ **IT 10.7:** o segredo impresso pelo runner **autentica** no `/auth/token` —
+prova de que o payload impresso é o payload real.
+
+**Gatilho para voltar a ter UI (D6):** 2 credenciais de produção, ou alguém sem acesso ao ambiente
+precisar provisionar. Aí o parecer do `ux-designer` é **gate do batch**, não revisão posterior.
 
 ---
 

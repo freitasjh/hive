@@ -22,6 +22,9 @@ import java.util.UUID;
  * whose vocabulary no longer describes the system.
  *
  * @param sessionId       chat session
+ * @param tenantId        tenant the conversation belongs to ({@code null} when not known)
+ * @param turnId          public turn id ({@code null} for the human chat flow)
+ * @param clientId        client id of the caller ({@code null} for the human chat flow)
  * @param promptTemplateId template chosen for this conversation
  * @param provider        vendor enum
  * @param model           effective model name
@@ -41,6 +44,9 @@ import java.util.UUID;
  */
 public record ChatTrace(
         UUID sessionId,
+        UUID tenantId,
+        UUID turnId,
+        String clientId,
         UUID promptTemplateId,
         AiProvider provider,
         String model,
@@ -64,6 +70,9 @@ public record ChatTrace(
     public static final class Builder {
 
         private final UUID sessionId;
+        private UUID tenantId;
+        private UUID turnId;
+        private String clientId;
         private final UUID promptTemplateId;
         private final AiProvider provider;
         private final String model;
@@ -85,6 +94,21 @@ public record ChatTrace(
             this.promptTemplateId = promptTemplateId;
             this.provider = provider;
             this.model = model;
+        }
+
+        public Builder tenantId(UUID value) {
+            this.tenantId = value;
+            return this;
+        }
+
+        public Builder turnId(UUID value) {
+            this.turnId = value;
+            return this;
+        }
+
+        public Builder clientId(String value) {
+            this.clientId = value;
+            return this;
         }
 
         public Builder agentLimits(Integer maxTokens, Double topP, Double temperature) {
@@ -120,7 +144,7 @@ public record ChatTrace(
         }
 
         public ChatTrace build() {
-            return new ChatTrace(sessionId, promptTemplateId, provider, model, maxTokens, topP, temperature,
+            return new ChatTrace(sessionId, tenantId, turnId, clientId, promptTemplateId, provider, model, maxTokens, topP, temperature,
                     historySize, promptChars, promptMessages, elapsedMs, promptTokens, completionTokens,
                     totalTokens, finishReason, failure);
         }
