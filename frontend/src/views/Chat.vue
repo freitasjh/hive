@@ -1,5 +1,6 @@
 <template>
   <div class="flex flex-column h-full chat-view">
+    <a href="#chat-input" class="skip-link">Pular para o campo de entrada</a>
     <ChatSidebar
       v-model="sidebarVisible"
       :selectedId="sessionId"
@@ -28,9 +29,9 @@
       </div>
     </div>
 
-    <div ref="chatContainer" class="flex-grow-1 overflow-y-auto px-2 py-4 relative">
+    <div ref="chatContainer" class="flex-grow-1 overflow-y-auto px-2 py-4 relative" role="log" aria-live="polite" aria-relevant="additions">
       <div class="chat-container-centralized flex flex-column gap-6 pb-4">
-        <div v-if="loadingHistory" class="flex flex-column gap-3">
+        <div v-if="loadingHistory" class="flex flex-column gap-3" aria-busy="true" aria-label="Carregando histórico">
           <Skeleton v-for="i in 3" :key="i" height="5rem" borderRadius="16px" />
         </div>
 
@@ -41,22 +42,37 @@
           <h2 class="text-900 text-3xl font-bold mb-2 tracking-tight">Bem-vindo ao <span class="text-primary">Hive AI</span></h2>
           <p class="text-surface-500 max-w-20rem m-auto line-height-3">Escolha um prompt acima e escreva sua pergunta. A resposta segue exatamente aquele prompt.</p>
           <p v-if="!selectedPromptTemplateId" class="text-sm text-amber-600 mt-3">Escolha um prompt acima para começar.</p>
+          <div class="starter-prompts flex flex-wrap gap-2 justify-content-center mt-4" role="group" aria-label="Sugestões de início">
+            <button
+              v-for="sp in starterPrompts"
+              :key="sp"
+              type="button"
+              class="starter-chip"
+              @click="useStarter(sp)"
+              :disabled="sending || !selectedPromptTemplateId"
+            >{{ sp }}</button>
+          </div>
         </div>
 
-        <ChatMessage
-          v-for="msg in messages"
-          :key="msg.id"
-          :role="roleOf(msg.role)"
-          :content="msg.content"
-          :timestamp="msg.createAt"
-        />
+        <template v-for="(msg, idx) in messages" :key="msg.id">
+          <ChatMessage
+            :role="roleOf(msg.role)"
+            :content="msg.content"
+            :timestamp="msg.createAt"
+          />
+          <div v-if="roleOf(msg.role) === 'SYSTEM' && idx === messages.length - 1" class="flex justify-content-start">
+            <button type="button" class="retry-btn" @click="retryLastMessage" :disabled="sending">
+              Tentar novamente
+            </button>
+          </div>
+        </template>
 
-        <div v-if="sending" class="flex justify-content-start fade-in-up">
-          <div class="assistant-msg-bubble p-3 rounded-2xl shadow-sm flex align-items-center gap-3 bg-surface-0 border-1 border-surface-200 backdrop-blur-md">
-            <div class="typing-indicator flex gap-1">
-              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <div v-if="sending" class="flex justify-content-start fade-in-up" aria-busy="true">
+          <div class="assistant-msg-bubble p-3 rounded-2xl shadow-sm flex flex-column gap-2 bg-surface-0 border-1 border-surface-200 backdrop-blur-md progress-bubble">
+            <span class="text-xs text-surface-500 font-medium italic">Gerando resposta...</span>
+            <div class="progress-bar" role="progressbar" aria-label="Gerando resposta" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress-bar-indeterminate"></div>
             </div>
-            <span class="text-xs text-surface-500 font-medium italic">Hive está processando...</span>
           </div>
         </div>
       </div>
@@ -64,7 +80,9 @@
 
     <div class="chat-footer pt-4">
       <div class="chat-container-centralized">
-        <ChatInput v-model="userInput" :disabled="sending || loadingHistory" @send="sendMessage" />
+        <div id="chat-input" tabindex="-1">
+          <ChatInput v-model="userInput" :disabled="sending || loadingHistory" @send="sendMessage" />
+        </div>
         <p class="text-center text-xs text-surface-400 mt-3 px-4">
           Hive AI pode cometer erros. Considere verificar informações importantes.
         </p>
@@ -112,18 +130,17 @@ const selectedPromptTemplateId = ref<string | null>(null)
 const chatContainer = ref<HTMLElement | null>(null)
 const sidebarRef = ref<InstanceType<typeof ChatSidebar> | null>(null)
 const loadSeq = ref(0)
+const lastUserMessage = ref('')
 
 const STORAGE_KEY = 'hive_sessionId'
 
-/**
- * Maps the stored role to the three the bubble knows. `system` is the app speaking about its own
- * failure; it is not a speaker, which is why it needs its own rendering and its own label.
- *
- * The fallthrough is `SYSTEM`, not `ASSISTANT`, on purpose. Defaulting an unknown role to the model
- * is exactly the bug this batch removed: the system pushed its own failure as `assistant`, and the
- * model looked like it had apologised for something it never said. A role nobody recognises is the
- * app's to explain, not the model's to answer for.
- */
+const starterPrompts = [
+  'Explique RAG',
+  'Resuma este texto',
+  'Gere um checklist',
+  'Traduza para inglês',
+]
+
 function roleOf(role: string): 'USER' | 'ASSISTANT' | 'SYSTEM' {
   const upper = role.toUpperCase()
   if (upper === 'USER') return 'USER'
@@ -167,15 +184,18 @@ async function selectSession(id: string) {
 function newChat() {
   sessionId.value = null
   messages.value = []
-  // A conversa nova precisa de um prompt novo: o da conversa anterior não é "um prompt escolhido
-  // nesta tela", é o da outra conversa. Deixá-lo marcado faria a primeira mensagem responder com o
-  // prompt que o usuário não escolheu agora.
   selectedPromptTemplateId.value = null
+  lastUserMessage.value = ''
   localStorage.removeItem(STORAGE_KEY)
 }
 
 function onSessionDeleted(id: string) {
   if (id === sessionId.value) newChat()
+}
+
+async function useStarter(prompt: string) {
+  userInput.value = prompt
+  await sendMessage()
 }
 
 async function sendMessage() {
@@ -193,6 +213,7 @@ async function sendMessage() {
   const promptTemplateId = selectedPromptTemplateId.value
   const currentSession = sessionId.value
   const userMsgText = text
+  lastUserMessage.value = userMsgText
   userInput.value = ''
   sending.value = true
 
@@ -224,9 +245,6 @@ async function sendMessage() {
   } catch (err: unknown) {
     const problem = readApiProblem(err)
     if (problem.code === 'MODEL_RETURNED_EMPTY') {
-      // Não é uma falha de envio: a mensagem chegou e o modelo não respondeu. Dizer "erro ao
-      // processar" mandaria o usuário procurar problema de rede que não existe — a orientação
-      // certaina é aumentar o limite de tokens.
       toast.add({
         severity: 'warn',
         summary: MODEL_RETURNED_EMPTY_TITLE,
@@ -234,16 +252,10 @@ async function sendMessage() {
         life: 6000,
       })
     } else if (problem.code === 'TENANT_LLM_CONFIG_NOT_FOUND') {
-      // A configuração de LLM é do tenant e não tem fallback. A mensagem do servidor já diz onde
-      // configurar; repetir aqui com outro texto seria duas verdades para o mesmo erro.
       toast.add({ severity: 'warn', summary: LLM_CONFIG_NOT_FOUND_TITLE, detail: problem.detail, life: 8000 })
     } else {
       toast.add({ severity: 'error', summary: 'Erro', detail: problem.detail, life: 4000 })
     }
-    // A falha é do app, então ela não sai como `assistant`: um erro de sistema no papel do
-    // assistente faz o modelo parecer ter pedido desculpas por algo que o modelo não fez
-    // (`DESIGN_SYSTEM.md` §4, regra de mensagem de erro). E o texto não se desculpa — a regra pede
-    // causa, consequência e caminho, que é o que o `detail` do servidor já entrega em pt-BR.
     messages.value.push({
       id: `system-${Date.now()}`,
       sessionId: currentSession ?? '',
@@ -257,12 +269,22 @@ async function sendMessage() {
   }
 }
 
-/**
- * Pulls the machine code and the human detail out of a problem+json error.
- *
- * `err.message` is axios's own "Request failed with status code 422", which is both English and
- * useless; the server already sends an actionable pt-BR `detail`, so it is preferred.
- */
+async function retryLastMessage() {
+  if (!lastUserMessage.value) return
+  // Remove a msg de sistema de erro (se houver) e a temp user msg do envio
+  // falho, evitando bolha duplicada ao reenviar.
+  const last = messages.value[messages.value.length - 1]
+  if (last && roleOf(last.role) === 'SYSTEM') {
+    messages.value = messages.value.slice(0, -1)
+  }
+  const prev = messages.value[messages.value.length - 1]
+  if (prev && roleOf(prev.role) === 'USER' && String(prev.id).startsWith('temp-')) {
+    messages.value = messages.value.slice(0, -1)
+  }
+  userInput.value = lastUserMessage.value
+  await sendMessage()
+}
+
 function readApiProblem(err: unknown): { code?: string; detail: string } {
   const e = err as { response?: { data?: { code?: string; detail?: string } } }
   const data = e?.response?.data
@@ -310,16 +332,67 @@ onMounted(async () => {
 .assistant-msg-bubble {
   border-bottom-left-radius: 4px !important;
 }
-.typing-indicator .dot {
-  width: 6px;
-  height: 6px;
-  background-color: var(--p-primary-600);
-  border-radius: 50%;
-  animation: bounce 1.4s infinite ease-in-out both;
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1000;
 }
-.typing-indicator .dot:nth-child(1) { animation-delay: -0.32s; }
-.typing-indicator .dot:nth-child(2) { animation-delay: -0.16s; }
-@keyframes bounce { 0%,80%,100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  background: var(--p-surface-0);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+}
+.progress-bubble {
+  min-width: 220px;
+}
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--p-surface-200);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-bar-indeterminate {
+  width: 40%;
+  height: 100%;
+  background: var(--p-primary-600);
+  border-radius: 999px;
+  animation: indeterminate 1.4s ease-in-out infinite;
+}
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+.starter-chip {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--p-surface-200);
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+.starter-chip:hover {
+  background: var(--p-primary-50);
+  border-color: var(--p-primary-300);
+}
+.retry-btn {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--p-amber-500);
+  background: transparent;
+  color: var(--p-amber-700);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.retry-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 @keyframes fadeInUp { from { opacity:0; transform: translateY(20px);} to { opacity:1; transform: translateY(0);} }
 .fade-in-up { animation: fadeInUp 0.6s cubic-bezier(0.22,1,0.36,1) forwards; }
 .overflow-y-auto::-webkit-scrollbar { width: 6px; }
@@ -327,4 +400,17 @@ onMounted(async () => {
 .overflow-y-auto::-webkit-scrollbar-thumb { background: var(--p-surface-200); border-radius: 10px; }
 .overflow-y-auto::-webkit-scrollbar-thumb:hover { background: var(--p-surface-300); }
 .w-18rem { width: 18rem; }
+
+/* mobile sticky input */
+.chat-footer {
+  position: sticky;
+  bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.chat-view {
+  max-height: 100dvh;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-up, .progress-bar-indeterminate { animation: none !important; }
+}
 </style>

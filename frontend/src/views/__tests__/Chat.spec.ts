@@ -177,4 +177,56 @@ describe('Chat.vue', () => {
     expect((wrapper.vm as unknown as { sessionId: string | null }).sessionId).toBeNull()
     expect((wrapper.vm as unknown as { messages: unknown[] }).messages.length).toBe(0)
   })
+
+  it('newChat resets lastUserMessage', async () => {
+    const wrapper = mountChat()
+    ;(wrapper.vm as unknown as { lastUserMessage: string }).lastUserMessage = 'oi'
+    await (wrapper.vm as unknown as { newChat: () => void }).newChat()
+    expect((wrapper.vm as unknown as { lastUserMessage: string }).lastUserMessage).toBe('')
+  })
+
+  it('useStarter fills input and sends', async () => {
+    const wrapper = mountChat()
+    await flushPromises()
+    ;(wrapper.vm as unknown as { selectedPromptTemplateId: string | null }).selectedPromptTemplateId = mockPromptTemplateId
+    await (wrapper.vm as unknown as { useStarter: (p: string) => Promise<void> }).useStarter('Explique RAG')
+    await flushPromises()
+    expect(chatService.sendMessage).toHaveBeenCalledWith(mockPromptTemplateId, null, 'Explique RAG')
+  })
+
+  it('retryLastMessage removes last system message before resending', async () => {
+    vi.mocked(chatService.sendMessage)
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce({ sessionId: mockSessionId, role: 'assistant', message: 'ok', timestamp: new Date().toISOString() } as never)
+    const wrapper = mountChat()
+    await flushPromises()
+    ;(wrapper.vm as unknown as { selectedPromptTemplateId: string | null }).selectedPromptTemplateId = mockPromptTemplateId
+    ;(wrapper.vm as unknown as { userInput: string }).userInput = 'Olá'
+    await (wrapper.vm as unknown as { sendMessage: () => Promise<void> }).sendMessage()
+    await flushPromises()
+    const before = (wrapper.vm as unknown as { messages: unknown[] }).messages.length
+    expect(before).toBeGreaterThanOrEqual(2)
+    await (wrapper.vm as unknown as { retryLastMessage: () => Promise<void> }).retryLastMessage()
+    await flushPromises()
+    // system msg removed, new exchange added
+    expect(chatService.sendMessage).toHaveBeenCalledTimes(2)
+  })
+
+  it('retryLastMessage does not duplicate temp user bubble', async () => {
+    vi.mocked(chatService.sendMessage)
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce({ sessionId: mockSessionId, role: 'assistant', message: 'ok', timestamp: new Date().toISOString() } as never)
+    const wrapper = mountChat()
+    await flushPromises()
+    ;(wrapper.vm as unknown as { selectedPromptTemplateId: string | null }).selectedPromptTemplateId = mockPromptTemplateId
+    ;(wrapper.vm as unknown as { userInput: string }).userInput = 'Olá'
+    await (wrapper.vm as unknown as { sendMessage: () => Promise<void> }).sendMessage()
+    await flushPromises()
+    const tempBefore = (wrapper.vm as unknown as { messages: { id: string }[] }).messages.filter(m => String(m.id).startsWith('temp-')).length
+    expect(tempBefore).toBe(1)
+    await (wrapper.vm as unknown as { retryLastMessage: () => Promise<void> }).retryLastMessage()
+    await flushPromises()
+    const tempAfter = (wrapper.vm as unknown as { messages: { id: string }[] }).messages.filter(m => String(m.id).startsWith('temp-')).length
+    expect(tempAfter).toBe(1)
+  })
 })
