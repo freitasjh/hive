@@ -1,7 +1,7 @@
 # 🤖 Hive - Multi-Agent System Backend
 
 [![Java Version](https://img.shields.io/badge/Java-25--LTS-orange?style=for-the-badge&logo=openjdk)](https://openjdk.org/projects/jdk/25/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.3-brightgreen?style=for-the-badge&logo=springboot)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-brightgreen?style=for-the-badge&logo=springboot)](https://spring.io/projects/spring-boot)
 [![Architecture](https://img.shields.io/badge/Architecture-Modular%20Monolith-blue?style=for-the-badge)](https://martinfowler.com/articles/modular-monolith.html)
 
 O **Hive** é uma plataforma avançada para orquestração e execução de sistemas multi-agentes autônomos. Projetado para alta escalabilidade e segurança, o sistema utiliza motores de IA de última geração para gerenciar fluxos de trabalho complexos, bases de conhecimento vetoriais e interações em tempo real.
@@ -25,7 +25,7 @@ Para manter o isolamento e a testabilidade, cada módulo é subdividido em:
 ## 🛠 Stack Tecnológica
 
 *   **Linguagem**: Java 25 (Utilizando *Project Leyden*, *Virtual Threads* e *Structured Concurrency*).
-*   **Framework**: Spring Boot 4.0.3.
+*   **Framework**: Spring Boot 4.1.0.
 *   **IA & Agentes**: LangChain4j e LangGraph4j (Motor de orquestração de workflows).
 *   **Persistência**: PostgreSQL 16 com extensão **pgvector** (Vector Store para RAG).
 *   **Cache & Segurança**: Redis (Gestão de sessões, Blacklist de tokens e Rate Limiting).
