@@ -55,6 +55,11 @@ const DEFAULT_TAB: Partial<Record<DashboardViewId, RouteTab>> = {
   prompts: "templates",
 }
 
+/** Fonte única de verdade para views com abas (mesma origem de parseRoute). */
+export function isTabbedView(view: DashboardViewId): boolean {
+  return hasOwn.call(TABS_BY_VIEW, view)
+}
+
 const hasOwn = Object.prototype.hasOwnProperty
 
 function segmentsOf(hash: string): string[] {

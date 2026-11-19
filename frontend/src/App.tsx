@@ -1,16 +1,15 @@
 "use client"
 
 import { useEffect } from "react"
-import { useHashRoute, type RouteTab } from "@/hooks/use-hash-route"
+import { isTabbedView, useHashRoute, type RouteTab } from "@/hooks/use-hash-route"
 import {
   AiAdminPage,
   OverviewPage,
   PlaceholderPage,
   PromptsAdminPage,
   VIEW_LABELS,
+  type PlaceholderPageProps,
 } from "@/modules/hive"
-
-const ADMIN_VIEWS = new Set(["providers", "agents", "prompts"])
 
 /**
  * Cada página embrulha a si mesma em `AtlasAdminTemplate` — DESIGN.md §3.
@@ -23,7 +22,7 @@ export default function App() {
 
   // Páginas admin definem "<View> · <Aba>"; demais views exibem só o rótulo da view.
   useEffect(() => {
-    if (!ADMIN_VIEWS.has(view)) {
+    if (!isTabbedView(view)) {
       document.title = VIEW_LABELS[view]
     }
   }, [view])
@@ -31,7 +30,7 @@ export default function App() {
   if (view === "overview") {
     return <OverviewPage onSelectView={navigate} />
   }
-  if (view === "providers" || view === "ai") {
+  if (view === "providers") {
     return (
       <AiAdminPage
         view="providers"
@@ -51,20 +50,20 @@ export default function App() {
       />
     )
   }
-  if (view === "prompts" || view === "settings") {
-    const activeView = view === "settings" ? "prompts" : view
+  if (view === "prompts") {
     return (
       <PromptsAdminPage
         tab={tab === "editor" ? "editor" : "templates"}
         editorId={id}
         onTabChange={(next) =>
-          replaceRoute(activeView, next, next === "editor" ? id ?? "new" : undefined)
+          replaceRoute(view, next, next === "editor" ? id ?? "new" : undefined)
         }
-        onOpenEditor={(promptId) => navigate(activeView, "editor", promptId ?? "new")}
-        onLeaveEditor={() => replaceRoute(activeView, "templates")}
+        onOpenEditor={(promptId) => navigate(view, "editor", promptId ?? "new")}
+        onLeaveEditor={() => replaceRoute(view, "templates")}
         onSelectView={navigate}
       />
     )
   }
-  return <PlaceholderPage view={view} onSelectView={navigate} />
+  // parseRoute canonicaliza aliases: view nunca é "ai"/"settings" em runtime.
+  return <PlaceholderPage view={view as PlaceholderPageProps["view"]} onSelectView={navigate} />
 }
