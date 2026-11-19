@@ -1,0 +1,37 @@
+{
+  "_note": "Estado pendente (substitui snapshots anteriores). workflow-state.json está 'D' no working tree e a escrita foi negada por opencode.json permission.edit (orchestrator: '*' deny, '.spec/**' allow). Operador deve aplicar. Não contornar via bash.",
+  "type": "bugfix",
+  "current_feature": "glob-override-audit-zero",
+  "current_phase": "Testing",
+  "previous_phase": "Execution",
+  "next_phase": "Completed",
+  "artifacts": {
+    "frontend": "frontend/",
+    "manifest": "frontend/package.json",
+    "lock": "frontend/package-lock.json"
+  },
+  "code_review_status": "passed",
+  "code_review": {
+    "last_status": "passed",
+    "approval_status": "APPROVED",
+    "critical_issues_count": 0,
+    "must_fix_before_done": [],
+    "reviewer_session": "ses_e0c3b04fcffeSW63rbJz7GW7mY",
+    "scope": "override glob 14.0.6; reviews anteriores sucedidos por este"
+  },
+  "harness_status": "suite_green_state_pending",
+  "harness_note": "npm test na raiz exit 0 (Vitest 4/4 + Maven 414 testes). frontend: npm ci / build / test / npm audit / npm audit --omit=dev todos exit 0; audit total 0 (glob 14.0.6, minimatch 11.0.9, path-scurry 3.0.0). Ressalvas: override major 13->14 fora da faixa declarada pelo docgen (risco aceito, documentado) e lockfile v3 não registra a chave overrides — reprodutibilidade depende de package.json + npm ci; removê-lo sem regerar o lock traz a advisory de volta. targets do harness seguem null (ato do operador). H6 não fecha sem workflow-state.json aplicado.",
+  "gates": {
+    "P1_P2": null,
+    "P2_P3": null
+  },
+  "overrides": [
+    {
+      "text": "Operador declarou anteriormente 'agora vai quebrar tudo e tudo novo, não precisa se preocupar' — débito registrado; não apaga falha de baseline.",
+      "at": "2026-11-19T00:00:00Z",
+      "debt": "Baseline do suite raiz restaurada; restam targets do harness e estado pendente."
+    }
+  ],
+  "prompt_assumptions": [],
+  "last_update": "2026-11-19T00:00:00Z"
+}
