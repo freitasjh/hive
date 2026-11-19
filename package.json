@@ -1,0 +1,11 @@
+{
+  "name": "hive",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "npm --prefix frontend test && mvn -f backend/pom.xml test -q",
+    "test:frontend": "npm --prefix frontend test",
+    "test:backend": "mvn -f backend/pom.xml test -q"
+  }
+}
