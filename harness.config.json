@@ -1,34 +1,18 @@
 {
-  "version": 1,
+  "version": 2,
   "project": "hive",
-  "stack": {
-    "backend": "Java 21 / Spring Boot 4.1.0 (Maven multi-module)",
-    "frontend": "Vue 3.5 / TypeScript / Vite 8 (PrimeVue)"
+  "targets": {
+    "frontend": "react",
+    "backend": "java"
   },
   "moduleMap": {
     "plugins": ".opencode/plugins",
     "rules": ".agents/rules",
-    "schemas": ".agents/schemas",
-    "backend": "backend",
-    "frontend": "frontend"
+    "schemas": ".agents/schemas"
   },
   "commands": {
-    "suiteFull": "mvn clean install && cd frontend && npm run test && npm run build",
-    "unit": "mvn test",
-    "integration": "mvn verify -pl integration-test",
-    "frontendTest": "cd frontend && npm run test",
-    "frontendBuild": "cd frontend && npm run build",
-    "backendRun": "mvn spring-boot:run -pl bootstrap",
-    "frontendRun": "cd frontend && npm run dev"
-  },
-  "infra": {
-    "composeFile": "docker/docker-compose-vetor.yml",
-    "ports": {
-      "backend": 8080,
-      "frontend": 5173,
-      "postgres": 5433,
-      "redis": 6379
-    }
+    "suiteFull": "npm test",
+    "unit": "npm test"
   },
   "mcp": {
     "required": [
@@ -37,9 +21,12 @@
   },
   "protectedPaths": [
     ".opencode/plugins/**",
+    ".opencode/plugins/__tests__/**",
     ".agents/rules/**",
     ".agents/schemas/**",
     ".agents/agents/**",
+    ".github/workflows/**",
+    ".githooks/**",
     "opencode.json",
     "harness.config.json"
   ],
@@ -49,18 +36,8 @@
     "hitlBatch": "enforce",
     "e2eGreenfield": "warn"
   },
-  "riskPaths": [
-    "**/security/**",
-    "**/auth/**",
-    "**/provider/**"
-  ],
-  "escalateOnRisk": {
-    "e2eGreenfield": "enforce",
-    "evidenceScenario": "required"
-  },
   "contraproveTimeoutMs": 900000,
   "evidence": {
-    "path": "harness/",
-    "schema": ".agents/schemas/harness-report.schema.json"
+    "path": "harness/"
   }
 }

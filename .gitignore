@@ -70,3 +70,10 @@ docker-compose.override.yml
 # dumps de banco (podem conter dado real e credencial cifrada)
 .spec/snapshots/
 *.dump
+
+# ---------------------------------------------------------------------------
+# Backups locais (migracao frontend / harness) — nao versionar
+# ---------------------------------------------------------------------------
+bkp/front_bkp/
+bkp/v2/
+frontend/.harness-backup/
