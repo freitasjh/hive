@@ -2,25 +2,26 @@
 
 import { useState } from "react"
 import type { DashboardViewId } from "@/components/shadcn/navigation"
-import { AtlasAdminLayout } from "@/layouts"
-import { HiveOverviewView } from "@/modules/hive/HiveOverviewView"
-import { PlaceholderView } from "@/modules/hive/PlaceholderView"
-import { VIEW_LABELS } from "@/modules/hive/overview.data"
+import { AiAdminPage } from "@/modules/hive/admin/pages/AiAdminPage"
+import { PromptsAdminPage } from "@/modules/hive/admin/pages/PromptsAdminPage"
+import { OverviewPage } from "@/modules/hive/OverviewPage"
+import { PlaceholderPage } from "@/modules/hive/PlaceholderPage"
 
+/**
+ * Cada página embrulha a si mesma em `AtlasAdminTemplate` — DESIGN.md §3.
+ * overview intacto; `ai` e `settings` passam a abrigar as telas administrativas do Hive.
+ */
 export default function App() {
   const [activeView, setActiveView] = useState<DashboardViewId>("overview")
 
-  return (
-    <AtlasAdminLayout
-      title={VIEW_LABELS[activeView]}
-      activeView={activeView}
-      onSelectView={setActiveView}
-    >
-      {activeView === "overview" ? (
-        <HiveOverviewView />
-      ) : (
-        <PlaceholderView view={activeView} onBack={() => setActiveView("overview")} />
-      )}
-    </AtlasAdminLayout>
-  )
+  if (activeView === "overview") {
+    return <OverviewPage onSelectView={setActiveView} />
+  }
+  if (activeView === "ai") {
+    return <AiAdminPage onSelectView={setActiveView} />
+  }
+  if (activeView === "settings") {
+    return <PromptsAdminPage onSelectView={setActiveView} />
+  }
+  return <PlaceholderPage view={activeView} onSelectView={setActiveView} />
 }

@@ -1,6 +1,33 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import App from './App'
+
+const mocks = vi.hoisted(() => ({
+  listCredentials: vi.fn(),
+  getLlmConfig: vi.fn(),
+  promptList: vi.fn(),
+}))
+
+vi.mock('@/services/agent-admin.service', () => ({
+  agentAdminService: {
+    listCredentials: mocks.listCredentials,
+    getLlmConfig: mocks.getLlmConfig,
+    validate: vi.fn(),
+    upsertCredential: vi.fn(),
+    deleteCredential: vi.fn(),
+    saveLlmConfig: vi.fn(),
+    listProviderModels: vi.fn(),
+  },
+}))
+
+vi.mock('@/services/prompt.service', () => ({
+  promptService: {
+    list: mocks.promptList,
+    getById: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+  },
+}))
 
 const MODULES = [
   'tenant',
@@ -57,17 +84,45 @@ describe('App', () => {
   it('navega para uma view rotulada e retorna à visão geral', () => {
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Atlas AI Copilot/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Quadro Kanban/ }))
 
     expect(screen.queryByRole('heading', { level: 1, name: 'Visão geral do Hive' })).toBeNull()
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Atlas AI Copilot' })
+      screen.getByRole('heading', { level: 1, name: 'Quadro Kanban' })
     ).toBeTruthy()
     expect(screen.getByText('Em preparação')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Voltar à visão geral' }))
 
     expect(overviewHeading()).toBeTruthy()
+  })
+
+  it('entrega as telas de provedores e LLM no id ai', async () => {
+    mocks.listCredentials.mockResolvedValue([])
+    mocks.getLlmConfig.mockResolvedValue(null)
+    render(<App />)
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Atlas AI Copilot/ })[0])
+
+    expect(screen.getByRole('tab', { name: /Credenciais/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /Provedor e modelo/ })).toBeTruthy()
+    expect(await screen.findByTestId('credentials-loading')).toBeTruthy()
+  })
+
+  it('entrega as telas de prompts no id settings', () => {
+    mocks.promptList.mockResolvedValue({
+      content: [],
+      totalElements: 0,
+      totalPages: 1,
+      number: 0,
+      size: 20,
+    })
+    render(<App />)
+
+    fireEvent.click(screen.getAllByRole('link', { name: /Configurações/ })[0])
+
+    expect(screen.getByRole('tab', { name: /Templates/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /Editor/ })).toBeTruthy()
   })
 
   it('navega pela barra inferior móvel e mantém o shell acessível', () => {
