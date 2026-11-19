@@ -4,6 +4,7 @@ import { CredentialsContainer } from './credentials/CredentialsContainer'
 import { LlmConfigContainer } from './llm/LlmConfigContainer'
 import { PromptsContainer } from './prompts/PromptsContainer'
 import { PromptEditorContainer } from './prompts/PromptEditorContainer'
+import { ApiError } from '@/services/api'
 
 const mocks = vi.hoisted(() => ({
   listCredentials: vi.fn(),
@@ -218,5 +219,61 @@ describe('containers admin', () => {
 
     await waitFor(() => expect(mocks.promptCreate).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
+  })
+
+  it('erro 500 mantém editor montado com retry e não aciona onLoadError', async () => {
+    const onLoadError = vi.fn()
+    // ApiError é o que apiRequest produz a partir de response.status (500).
+    mocks.promptGetById.mockRejectedValueOnce(new ApiError('Erro interno no servidor.', 500))
+    render(
+      <PromptEditorContainer
+        promptId={promptFixture.id}
+        onSaved={vi.fn()}
+        onBack={vi.fn()}
+        onLoadError={onLoadError}
+      />
+    )
+
+    await waitFor(() => expect(screen.getByTestId('editor-error')).toBeTruthy())
+    expect(screen.getByTestId('input-name')).toBeTruthy()
+    expect(onLoadError).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /tentar novamente/i }))
+    await waitFor(() => expect(mocks.promptGetById).toHaveBeenCalledTimes(2))
+    await waitFor(() =>
+      expect((screen.getByTestId('input-name') as HTMLInputElement).value).toBe('Saudação')
+    )
+  })
+
+  it('erro de rede sem status mantém editor montado, sem onLoadError', async () => {
+    const onLoadError = vi.fn()
+    mocks.promptGetById.mockRejectedValueOnce(new Error('rede indisponível'))
+    render(
+      <PromptEditorContainer
+        promptId={promptFixture.id}
+        onSaved={vi.fn()}
+        onBack={vi.fn()}
+        onLoadError={onLoadError}
+      />
+    )
+
+    await waitFor(() => expect(screen.getByTestId('editor-error')).toBeTruthy())
+    expect(screen.getByTestId('input-name')).toBeTruthy()
+    expect(onLoadError).not.toHaveBeenCalled()
+  })
+
+  it('erro 404 aciona onLoadError para o card de id inválido', async () => {
+    const onLoadError = vi.fn()
+    mocks.promptGetById.mockRejectedValueOnce(new ApiError('Não encontrado', 404))
+    render(
+      <PromptEditorContainer
+        promptId={promptFixture.id}
+        onSaved={vi.fn()}
+        onBack={vi.fn()}
+        onLoadError={onLoadError}
+      />
+    )
+
+    await waitFor(() => expect(onLoadError).toHaveBeenCalledTimes(1))
   })
 })

@@ -173,6 +173,11 @@ const ptBR = {
   "admin.tab.models": "Provedor e modelo",
   "admin.tab.templates": "Templates",
   "admin.tab.editor": "Editor",
+
+  "admin.document.title": "{view} · {tab}",
+  "admin.editor.invalidId":
+    "Não foi possível abrir este prompt. O link pode estar inválido ou o prompt não existe.",
+  "admin.editor.backToTemplates": "Voltar aos templates",
 } as const
 
 export type AdminMessageKey = keyof typeof ptBR
@@ -342,6 +347,11 @@ const enUS: Record<AdminMessageKey, string> = {
   "admin.tab.models": "Provider and model",
   "admin.tab.templates": "Templates",
   "admin.tab.editor": "Editor",
+
+  "admin.document.title": "{view} · {tab}",
+  "admin.editor.invalidId":
+    "Could not open this prompt. The link may be invalid or the prompt may not exist.",
+  "admin.editor.backToTemplates": "Back to templates",
 }
 
 const dictionaries: Record<AdminLocale, Record<AdminMessageKey, string>> = {

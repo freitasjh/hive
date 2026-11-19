@@ -1,11 +1,13 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { ApiError } from '@/services/api'
 
 const mocks = vi.hoisted(() => ({
   listCredentials: vi.fn(),
   getLlmConfig: vi.fn(),
   promptList: vi.fn(),
+  getPromptById: vi.fn(),
 }))
 
 vi.mock('@/services/agent-admin.service', () => ({
@@ -23,7 +25,7 @@ vi.mock('@/services/agent-admin.service', () => ({
 vi.mock('@/services/prompt.service', () => ({
   promptService: {
     list: mocks.promptList,
-    getById: vi.fn(),
+    getById: mocks.getPromptById,
     create: vi.fn(),
     update: vi.fn(),
   },
@@ -314,5 +316,124 @@ describe('App', () => {
     setHash('#/login')
     render(<App />)
     expect(overviewHeading()).toBeTruthy()
+  })
+
+  it('deep-link: #agents/models abre models e mantém breadcrumb só da view', () => {
+    mocks.getLlmConfig.mockResolvedValue(null)
+    setHash('#agents/models')
+    render(<App />)
+
+    expect(breadcrumbPage('Agentes (LLM)')).toBeTruthy()
+    expect(tabSelected(/Provedor e modelo/)).toBe(true)
+    expect(document.title).toBe('Agentes (LLM) · Provedor e modelo')
+    expect(screen.getAllByRole('link', { current: 'page' })).toHaveLength(1)
+  })
+
+  it('deep-link: #prompts/editor/new abre editor vazio com id new', () => {
+    setHash('#prompts/editor/new')
+    render(<App />)
+
+    expect(tabSelected(/Editor/)).toBe(true)
+    expect(screen.getByTestId('input-name')).toBeTruthy()
+    expect(breadcrumbPage('Prompts')).toBeTruthy()
+    expect(screen.getAllByRole('link', { current: 'page' })).toHaveLength(1)
+    expect(document.title).toBe('Prompts · Editor')
+  })
+
+  it('deep-link: #prompts/editor/<uuid> abre editor com o prompt', async () => {
+    mocks.getPromptById.mockResolvedValue({
+      id: '11111111-1111-1111-1111-111111111111',
+      name: 'Saudação',
+      code: 'greeting-v1',
+      description: '',
+      tags: [],
+      template: 'Olá {{nome}}',
+      status: 'DRAFT',
+    })
+    setHash('#prompts/editor/11111111-1111-1111-1111-111111111111')
+    render(<App />)
+
+    expect(await screen.findByTestId('input-name')).toBeTruthy()
+    expect((screen.getByTestId('input-code') as HTMLInputElement).disabled).toBe(true)
+    expect((screen.getByTestId('input-name') as HTMLInputElement).value).toBe('Saudação')
+  })
+
+  it('deep-link: #ai/models canonicaliza para #providers/models', () => {
+    mocks.listCredentials.mockReturnValue(new Promise(() => {}))
+    setHash('#ai/models')
+    render(<App />)
+
+    expect(window.location.hash).toBe('#providers/models')
+    expect(breadcrumbPage('Provedores de IA')).toBeTruthy()
+    expect(tabSelected(/Provedor e modelo/)).toBe(true)
+  })
+
+  it('tab desconhecida cai em templates da view prompts, nunca overview', () => {
+    mocks.promptList.mockResolvedValue(EMPTY_PAGE)
+    setHash('#prompts/foo')
+    render(<App />)
+
+    expect(tabSelected(/Templates/)).toBe(true)
+    expect(breadcrumbPage('Prompts')).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1, name: 'Visão geral do Hive' })).toBeNull()
+  })
+
+  it('view desconhecida cai em overview', () => {
+    setHash('#foo/bar')
+    render(<App />)
+
+    expect(overviewHeading()).toBeTruthy()
+    expect(document.title).toBe('Visão geral')
+  })
+
+  it('clique em aba substitui a URL sem empilhar historico', async () => {
+    mocks.promptList.mockResolvedValue(EMPTY_PAGE)
+    setHash('#prompts')
+    const handler = vi.fn()
+    window.addEventListener('hashchange', handler)
+    try {
+      render(<App />)
+      handler.mockClear()
+
+      // Radix Tabs ativa no mousedown; um clique real sempre o emite.
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Editor/ }))
+
+      await waitFor(() => expect(window.location.hash).toBe('#prompts/editor/new'))
+      expect(tabSelected(/Editor/)).toBe(true)
+      expect(handler).not.toHaveBeenCalled()
+    } finally {
+      window.removeEventListener('hashchange', handler)
+    }
+  })
+
+  it('voltar do editor retorna a #prompts/templates de forma deterministica', async () => {
+    setHash('#prompts/editor/new')
+    render(<App />)
+
+    fireEvent.click(screen.getByTestId('back-btn'))
+
+    await waitFor(() => expect(window.location.hash).toBe('#prompts/templates'))
+    expect(tabSelected(/Templates/)).toBe(true)
+  })
+
+  it('id de prompt invalido mostra erro orientado com CTA e aria-live', () => {
+    setHash('#prompts/editor/invalid-id')
+    render(<App />)
+
+    const alert = screen.getByText(/não foi possível abrir este prompt/i)
+    expect(alert).toBeTruthy()
+    expect(alert.closest('[aria-live]')?.getAttribute('aria-live')).toBe('assertive')
+    expect(screen.getByRole('button', { name: /voltar aos templates/i })).toBeTruthy()
+    expect(screen.queryByTestId('input-name')).toBeNull()
+  })
+
+  it('id inexistente (uuid sem prompt) mostra erro orientado, nunca editor vazio', async () => {
+    mocks.getPromptById.mockRejectedValue(new ApiError('Não encontrado', 404))
+    setHash('#prompts/editor/22222222-2222-2222-2222-222222222222')
+    render(<App />)
+
+    expect(await screen.findByText(/não foi possível abrir este prompt/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /voltar aos templates/i })).toBeTruthy()
+    expect(screen.queryByTestId('input-name')).toBeNull()
   })
 })

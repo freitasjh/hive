@@ -1,13 +1,14 @@
 {
   "_note": "Estado pendente (substitui snapshots anteriores). workflow-state.json na raiz é gravável apenas por delegação a papel de implementação — permissão nativa do orchestrator nega root. Não contornar via bash.",
-  "type": "bugfix",
-  "current_feature": "dev-datasource-5433",
+  "type": "feature",
+  "current_feature": "deep-link-abas-admin",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
-    "backend": "backend/",
-    "config": "backend/bootstrap/src/main/resources/application-dev.properties"
+    "frontend": "frontend/",
+    "route": "frontend/src/hooks/use-hash-route.ts",
+    "pages": "frontend/src/modules/hive/admin/pages/"
   },
   "code_review_status": "passed",
   "code_review": {
@@ -15,11 +16,11 @@
     "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_session": "ses_e0b715797ffeG5JEH516eCwaVw",
-    "scope": "datasource dev alinhado ao compose PG16 na 5433"
+    "reviewer_session": "ses_e0b1fea4dffecrHTOTSEwM6pnG",
+    "scope": "deep-link de abas; 🟡 onLoadError limitado a 404 (retry preservado em 500/timeout) corrigido e testado"
   },
   "harness_status": "passed",
-  "harness_note": "Startup sem overrides provado: PostgreSQL 16.13, Flyway validate OK por modulo, Tomcat 8080 /hive, Started HiveApplication 8.507s; porta encerrada por PID. mvn test -q exit 0: 414 unitarios (53 reports) + 76 IT (11 reports), 0/0/0 — reviewer confirmou que ITs usam Testcontainers com @DynamicPropertySource, sem ler application-dev.properties. Doctor segue com WARN de brain fora do pin (G1) — nao bloqueante. Dividas: sub-rota de aba; reports/team sem id no sidebar.",
+  "harness_note": "Suíte frontend 128/128, build 0. Roteamento #view/tab[/id] com aliases canonicalizados, tab inválida → default da view, replaceState em cliques de aba (sem empilhar histórico), editor new/uuid, erro orientado com aria-live, breadcrumb só da view + document.title. H3 browser :5187 provou deep-links, no-push (hashchangeCount=0, history.length inalterado), back/forward, erro de id e console 0 WARN. Parecer ux-designer vinculante (ses_e0b3182fcffetRBYXvQnyWODHG). Dívida não-bloqueante: branches de alias mortas no App e ADMIN_VIEWS duplicado (limpeza de legibilidade). Doctor sem WARN desde o pin G1.",
   "gates": {
     "P1_P2": null,
     "P2_P3": null

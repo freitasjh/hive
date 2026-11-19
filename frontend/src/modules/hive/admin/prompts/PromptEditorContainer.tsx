@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ApiError } from '@/services/api'
 import { promptService } from '@/services/prompt.service'
 import type { PromptStatus } from '@/services/admin.types'
 import { apiErrorMessage } from '../error-message'
@@ -12,6 +13,8 @@ export interface PromptEditorContainerProps {
   promptId: string | null
   onSaved: () => void
   onBack: () => void
+  /** Avisa a página quando o id da URL não corresponde a um prompt. */
+  onLoadError?: () => void
 }
 
 function blankState(promptId: string | null): PromptEditorState {
@@ -35,9 +38,13 @@ function blankState(promptId: string | null): PromptEditorState {
   }
 }
 
-export function PromptEditorContainer({ promptId, onSaved, onBack }: PromptEditorContainerProps) {
+export function PromptEditorContainer({ promptId, onSaved, onBack, onLoadError }: PromptEditorContainerProps) {
   const { t } = useAdminI18n()
   const [state, setState] = useState<PromptEditorState>(() => blankState(promptId))
+  const onLoadErrorRef = useRef(onLoadError)
+  useEffect(() => {
+    onLoadErrorRef.current = onLoadError
+  }, [onLoadError])
 
   const load = useCallback(async () => {
     if (!promptId) {
@@ -71,6 +78,11 @@ export function PromptEditorContainer({ promptId, onSaved, onBack }: PromptEdito
         loading: false,
         error: apiErrorMessage(error, t('admin.editor.loadError')),
       }))
+      // Somente 404 significa id inexistente. 500/timeout/rede permanecem no
+      // editor com retry local (apiRequest converte response.status em ApiError.status).
+      if (error instanceof ApiError && error.status === 404) {
+        onLoadErrorRef.current?.()
+      }
     }
   }, [promptId, t])
 
