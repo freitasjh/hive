@@ -1,23 +1,19 @@
-/// <reference types="vitest/config" />
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+import { fileURLToPath, URL } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vitest/config'
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue()],
-  // @ts-ignore vitest test prop
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
+
+  plugins: [tailwindcss(), react()],
   test: {
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
   },
-  server: {
-    proxy: {
-      '/hive': {
-        target: process.env.HIVE_API_PROXY ?? 'http://localhost:8080/hive',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/hive/, '')
-      }
-    }
-  }
 })
