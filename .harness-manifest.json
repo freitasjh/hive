@@ -18,7 +18,7 @@
     ".agents/agents/security-engineer/AGENT.md": "c2c9968740af7cbba2536ac2e201cae9b233fd44a4fda0a1291f05cf5df92515",
     ".agents/agents/ux-designer/AGENT.md": "1d4d0688385a4b3bf72fa8e14587f17b06cc3ea86afa1f41dab7a208c7aa491f",
     ".agents/rules/always-on.md": "1d02011681e61a59b67ee49a2d9118f684fda464f818e70d3a02bc9031818d86",
-    ".agents/rules/brain-context.md": "5695474c737ba3265771e011b3bae3ac74603df34b9cb144729747859d81cfc9",
+    ".agents/rules/brain-context.md": "41085a91f3648d52c9bb93ccf9507ab8ea22f583f0ba0d02b6aa8a544bc81c1e",
     ".agents/rules/deepsearch.md": "08f52e0d97824c369d32fcd7488b905aae6001ace3db095cca4789b3226017ca",
     ".agents/rules/frontend-coding-standards.md": "da9d491ccdc4f813c4601419ea3751d4d22d3d52a5433c899d2fee98e607ab4d",
     ".agents/rules/frontend-react-coding-standards.md": "dcb79596c73c80a9244ae5441c5ebd7a92ee20a1a9b2290356da11a996e009b9",
@@ -283,7 +283,7 @@
     ".opencode/plugins/lib/refs/checks.mjs": "1dfff582458e5f0e83ec15ef854d5ccce4cc73ad4b1a3f241ed3fb8bce7d87ea",
     ".opencode/plugins/lib/seal.mjs": "b698703d3a27249d5f92e79050854de1645dc0124f12290c9d06904a89a595a6",
     "opencode.json": "409459155aa9934c5a7106c88a20624e67a3d4716c47d95c7f641418e72dbd8c",
-    "scripts/harness-sync.mjs": "10285290cd930f56070c41c076595ae47324d22922cacb304510a88b40d4e6e8",
+    "scripts/harness-sync.mjs": "4e6668c77ed865f710d04552cc9272ff6b4e5cbe53a1bec685464859c4cae483",
     "scripts/seal.mjs": "66a11b1bd7f55c10eaaf04439eced070c2d0045b8093c6ea37aac1c8a7716615"
   }
 }

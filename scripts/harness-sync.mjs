@@ -106,7 +106,7 @@ export const CONFIG_NAME = "harness.config.json";
 // divergence and never fails on it: the brain is a separate repo, and its
 // absence is a normal state of a fresh target.
 export const BRAIN_DIR_NAME = "brain";
-export const BRAIN_PIN = "8b965093a00d291195313fe457b3aa35bbff71f2";
+export const BRAIN_PIN = "71ba7f211252533d735fc25b406e0d483484cd53";
 
 // F7 — defaults gravados pelo `init`/`update` quando criam o config. São as
 // chaves que os gates e o harness leem: espelham `harness.config.json` deste
