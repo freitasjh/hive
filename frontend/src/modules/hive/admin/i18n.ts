@@ -61,6 +61,7 @@ const ptBR = {
   "admin.vendor.OPENAI_COMPATIBLE.keyPlaceholder": "chave do endpoint...",
 
   "admin.credentials.title": "Provedores de IA",
+  "admin.agents.title": "Agentes (LLM)",
   "admin.credentials.subtitle":
     "Gerencie as chaves de API por provedor. A chave nunca é exibida — apenas o status e os últimos 4 dígitos.",
   "admin.credentials.loading": "Carregando credenciais…",
@@ -229,6 +230,7 @@ const enUS: Record<AdminMessageKey, string> = {
   "admin.vendor.OPENAI_COMPATIBLE.keyPlaceholder": "endpoint key...",
 
   "admin.credentials.title": "AI providers",
+  "admin.agents.title": "Agents (LLM)",
   "admin.credentials.subtitle":
     "Manage API keys per provider. Keys are never shown — only status and the last 4 digits.",
   "admin.credentials.loading": "Loading credentials…",

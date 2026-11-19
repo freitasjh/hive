@@ -11,11 +11,12 @@ import {
   IconFolder,
   IconHelp,
   IconInnerShadowTop,
+  IconKey,
   IconLayoutKanban,
   IconListDetails,
   IconReport,
+  IconRobot,
   IconSearch,
-  IconSettings,
   IconShieldCheck,
   IconSparkles,
   IconUsers,
@@ -38,7 +39,7 @@ import {
   useSidebar,
 } from "@/components/shadcn/ui/sidebar"
 
-export type DashboardViewId = "overview" | "ai" | "kanban" | "scheduler" | "transactions" | "cards" | "checkout" | "pdv" | "accounts" | "files" | "backoffice" | "internal-admin" | "settings"
+export type DashboardViewId = "overview" | "ai" | "providers" | "agents" | "prompts" | "kanban" | "scheduler" | "transactions" | "cards" | "checkout" | "pdv" | "accounts" | "files" | "backoffice" | "internal-admin" | "settings"
 
 const data = {
   user: {
@@ -54,10 +55,17 @@ const data = {
       icon: IconDashboard,
     },
     {
-      id: "ai" as DashboardViewId,
-      title: "Atlas AI Copilot",
-      url: "#ai",
-      icon: IconSparkles,
+      id: "providers" as DashboardViewId,
+      title: "Provedores e credenciais",
+      url: "#providers",
+      icon: IconKey,
+      badge: "AI",
+    },
+    {
+      id: "agents" as DashboardViewId,
+      title: "Agentes (LLM)",
+      url: "#agents",
+      icon: IconRobot,
       badge: "AI",
     },
     {
@@ -144,10 +152,10 @@ const data = {
   ],
   navSecondary: [
     {
-      id: "settings" as DashboardViewId,
-      title: "Configurações",
-      url: "#settings",
-      icon: IconSettings,
+      id: "prompts" as DashboardViewId,
+      title: "Prompts",
+      url: "#prompts",
+      icon: IconSparkles,
     },
     {
       title: "Ajuda",

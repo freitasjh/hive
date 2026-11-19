@@ -2,8 +2,8 @@
 
 import type { DashboardViewId } from "@/components/shadcn/navigation"
 import { AtlasAdminTemplate } from "@/layouts"
-import { VIEW_LABELS } from "./overview.data"
-import { HiveOverviewView } from "./HiveOverviewView"
+import { HiveOverviewView } from "../components/HiveOverviewView"
+import { VIEW_LABELS } from "../data/overview.data"
 
 export interface ViewPageProps {
   onSelectView?: (view: DashboardViewId) => void

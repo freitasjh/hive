@@ -11,14 +11,27 @@ export interface AdminPageProps {
   onSelectView?: (view: DashboardViewId) => void
 }
 
-/** `ai` (app-sidebar.tsx:57-62) passa a abrigar credenciais + config LLM do tenant. */
-export function AiAdminPage({ onSelectView }: AdminPageProps) {
+export interface AiAdminPageProps extends AdminPageProps {
+  /** `credentials` para `providers`/`ai`; `models` para `agents`. */
+  initialTab?: "credentials" | "models"
+}
+
+/** Abriga credenciais + config LLM do tenant; alias `ai` mantém o comportamento legado. */
+export function AiAdminPage({ onSelectView, initialTab = "credentials" }: AiAdminPageProps) {
   const { t } = useAdminI18n()
+  const activeView: DashboardViewId = initialTab === "models" ? "agents" : "providers"
+  const title = activeView === "agents"
+    ? t("admin.agents.title")
+    : t("admin.credentials.title")
 
   return (
-    <AtlasAdminTemplate title={t("admin.credentials.title")} activeView="ai" onSelectView={onSelectView}>
+    <AtlasAdminTemplate
+      title={title}
+      activeView={activeView}
+      onSelectView={onSelectView}
+    >
       <div className="flex flex-col gap-6 px-4 lg:px-6">
-        <Tabs defaultValue="credentials">
+        <Tabs defaultValue={initialTab}>
           <TabsList>
             <TabsTrigger value="credentials">{t("admin.tab.credentials")}</TabsTrigger>
             <TabsTrigger value="models">{t("admin.tab.models")}</TabsTrigger>

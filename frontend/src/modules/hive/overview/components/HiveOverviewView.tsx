@@ -14,7 +14,7 @@ import {
   HIVE_METRICS,
   HIVE_OVERVIEW_COPY,
   HIVE_STACK,
-} from "./overview.data"
+} from "../data/overview.data"
 
 export function HiveOverviewView() {
   return (

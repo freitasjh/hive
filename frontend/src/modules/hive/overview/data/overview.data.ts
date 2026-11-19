@@ -12,6 +12,9 @@ import type { DashboardViewId } from "@/components/shadcn/navigation"
 export const VIEW_LABELS: Record<DashboardViewId, string> = {
   overview: "Visão geral",
   ai: "Atlas AI Copilot",
+  providers: "Provedores e credenciais",
+  agents: "Agentes (LLM)",
+  prompts: "Prompts",
   kanban: "Quadro Kanban",
   scheduler: "Agendamento",
   transactions: "Transações",

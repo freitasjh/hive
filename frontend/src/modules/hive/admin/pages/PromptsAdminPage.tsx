@@ -8,7 +8,7 @@ import { PromptEditorContainer } from "../prompts/PromptEditorContainer"
 import { PromptsContainer } from "../prompts/PromptsContainer"
 import type { AdminPageProps } from "./AiAdminPage"
 
-/** `settings` (app-sidebar.tsx:147-151) passa a abrigar templates e editor de prompts. */
+/** Abriga templates e editor de prompts; alias `settings` mantém o comportamento legado. */
 export function PromptsAdminPage({ onSelectView }: AdminPageProps) {
   const { t } = useAdminI18n()
   const [tab, setTab] = useState("templates")
@@ -20,7 +20,7 @@ export function PromptsAdminPage({ onSelectView }: AdminPageProps) {
   }
 
   return (
-    <AtlasAdminTemplate title={t("admin.prompts.title")} activeView="settings" onSelectView={onSelectView}>
+    <AtlasAdminTemplate title={t("admin.prompts.title")} activeView="prompts" onSelectView={onSelectView}>
       <div className="flex flex-col gap-6 px-4 lg:px-6">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>

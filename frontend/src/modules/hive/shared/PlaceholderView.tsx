@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/shadcn/ui/card"
-import { HIVE_OVERVIEW_COPY, VIEW_LABELS } from "./overview.data"
+import { HIVE_OVERVIEW_COPY, VIEW_LABELS } from "../overview"
 
 export interface PlaceholderViewProps {
   view: Exclude<DashboardViewId, "overview">

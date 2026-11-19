@@ -1,27 +1,42 @@
 "use client"
 
-import { useState } from "react"
-import type { DashboardViewId } from "@/components/shadcn/navigation"
-import { AiAdminPage } from "@/modules/hive/admin/pages/AiAdminPage"
-import { PromptsAdminPage } from "@/modules/hive/admin/pages/PromptsAdminPage"
-import { OverviewPage } from "@/modules/hive/OverviewPage"
-import { PlaceholderPage } from "@/modules/hive/PlaceholderPage"
+import { useHashRoute } from "@/hooks/use-hash-route"
+import {
+  AiAdminPage,
+  OverviewPage,
+  PlaceholderPage,
+  PromptsAdminPage,
+} from "@/modules/hive"
 
 /**
  * Cada página embrulha a si mesma em `AtlasAdminTemplate` — DESIGN.md §3.
- * overview intacto; `ai` e `settings` passam a abrigar as telas administrativas do Hive.
+ * overview e placeholders intactos. Ids canônicos: providers/agents/prompts;
+ * `ai` e `settings` permanecem como aliases legados para as mesmas páginas.
+ * `key` força remount ao trocar providers ↔ agents: `Tabs` é uncontrolled (defaultValue).
  */
 export default function App() {
-  const [activeView, setActiveView] = useState<DashboardViewId>("overview")
+  // location.hash é a única fonte de verdade; navigate escreve o hash.
+  const [activeView, navigate] = useHashRoute()
 
   if (activeView === "overview") {
-    return <OverviewPage onSelectView={setActiveView} />
+    return <OverviewPage onSelectView={navigate} />
   }
-  if (activeView === "ai") {
-    return <AiAdminPage onSelectView={setActiveView} />
+  if (activeView === "ai" || activeView === "providers") {
+    return (
+      <AiAdminPage
+        key="providers"
+        initialTab="credentials"
+        onSelectView={navigate}
+      />
+    )
   }
-  if (activeView === "settings") {
-    return <PromptsAdminPage onSelectView={setActiveView} />
+  if (activeView === "agents") {
+    return (
+      <AiAdminPage key="agents" initialTab="models" onSelectView={navigate} />
+    )
   }
-  return <PlaceholderPage view={activeView} onSelectView={setActiveView} />
+  if (activeView === "settings" || activeView === "prompts") {
+    return <PromptsAdminPage onSelectView={navigate} />
+  }
+  return <PlaceholderPage view={activeView} onSelectView={navigate} />
 }
