@@ -1,14 +1,13 @@
 {
   "_note": "Estado pendente (substitui snapshots anteriores). workflow-state.json na raiz é gravável apenas por delegação a papel de implementação — permissão nativa do orchestrator nega root. Não contornar via bash.",
-  "type": "feature",
-  "current_feature": "admin-nav-routing-modules",
+  "type": "bugfix",
+  "current_feature": "dev-datasource-5433",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
-    "frontend": "frontend/",
-    "hash_route": "frontend/src/hooks/use-hash-route.ts",
-    "modules_readme": "frontend/src/modules/README.md"
+    "backend": "backend/",
+    "config": "backend/bootstrap/src/main/resources/application-dev.properties"
   },
   "code_review_status": "passed",
   "code_review": {
@@ -16,11 +15,11 @@
     "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_session": "ses_e0b96273fffec97U2clMXO8H1n",
-    "scope": "features (b) menu, (c) roteamento hash, (a) padronização de modules; 🟡 documentais corrigidos"
+    "reviewer_session": "ses_e0b715797ffeG5JEH516eCwaVw",
+    "scope": "datasource dev alinhado ao compose PG16 na 5433"
   },
   "harness_status": "passed",
-  "harness_note": "Suíte frontend 103/103, build 0. Menu providers/agents/prompts com aliases ai/settings; roteamento nativo via location.hash + hashchange (MDN citado no hook, 2026-11-19), deep-link/back-forward provados em H3; módulos padronizados com barrels e README. H3 real com backend Java já provou integração das telas admin (batch anterior) — este batch é navegação/estrutura, sem backend envolvido. Dívidas declaradas: sub-rota de aba (#prompts/editor) fora de escopo; reports/team clicáveis sem id no sidebar (preexistente); config dev do backend quebrada (5432/PG9.4) — escopo separado.",
+  "harness_note": "Startup sem overrides provado: PostgreSQL 16.13, Flyway validate OK por modulo, Tomcat 8080 /hive, Started HiveApplication 8.507s; porta encerrada por PID. mvn test -q exit 0: 414 unitarios (53 reports) + 76 IT (11 reports), 0/0/0 — reviewer confirmou que ITs usam Testcontainers com @DynamicPropertySource, sem ler application-dev.properties. Doctor segue com WARN de brain fora do pin (G1) — nao bloqueante. Dividas: sub-rota de aba; reports/team sem id no sidebar.",
   "gates": {
     "P1_P2": null,
     "P2_P3": null
