@@ -1,14 +1,13 @@
 {
   "type": "feature",
-  "current_feature": "mfa-fase0-totp-lib",
+  "current_feature": "mfa-fase1-dominio",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
-    "backend": "backend/dependencies/pom.xml",
-    "module": "backend/security/impl/pom.xml",
-    "test": "backend/security/impl/src/test/java/br/com/systec/hive/security/impl/TotpLibrarySmokeTest.java",
-    "research": ".spec/backend/mfa/RESEARCH.md"
+    "backend": "backend/security/api/",
+    "migration": "backend/identity/dbupdate/src/main/resources/db/migration/identity_db/V4__create_table_user_mfa.sql",
+    "impl": "backend/security/impl/"
   },
   "code_review_status": "passed",
   "code_review": {
@@ -16,11 +15,14 @@
     "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_session": "ses_e077732ebffe61tRd9Obdl928R",
-    "scope": "Fase 0 MFA: validação da lib TOTP 1.7.1 no Java 25; sem domínio MFA ainda"
+    "reviewer_sessions": [
+      "ses_e0762acfdffeyOoo3xKNfq5HDp",
+      "ses_e075bcffaffemXWHZ0iamaq2Tp"
+    ],
+    "scope": "Fase 1 MFA: VOs/portas, migration V4, repositorio JPA, cache Redis e cifra AES-GCM; 🟡 isProd fail-closed corrigido"
   },
   "harness_status": "passed",
-  "harness_note": "Branch feature/login-tela-mfa. mvn -f backend/pom.xml test -q exit 0, 425 testes (423+2), 0 falhas. Lib dev.samstevens.totp:totp:1.7.1 com property centralizada; API real confirmada via javap: generate(String,long) com timeStep=floorDiv(getTime(),30) — README estava errado (generate(secret) nao existe). commons-net ausente na arvore (optional); commons-codec 1.21.0 via BOM mitiga advisory. 🔵 registrado para Fase 2: TotpAdapter deve fixar setTimePeriod/setAllowedTimePeriodDiscrepancy explicitamente em vez do default. Arquivos de outro agente (publicapi DTO, frontend/assets) seguem fora do commit.",
+  "harness_note": "Branch feature/login-tela-mfa. Backend 443 testes exit 0 (438+5 do fix isProd) + 80 ITs (incl. 4 MfaPersistenceIT). Sem cycle identity<->security, sem endpoints, sem mudanca no login/refresh/logout. Divergencia de escopo aprovada pelo orchestrator: application-dev.properties, application-test.properties, security/impl pom (deps test). 🟡 corrigido: isProd() usa acceptsProfiles(Profiles.of('prod')) cobrindo spring.profiles.default=prod, com TDD red. Dividas 🔵: TOCTOU cache (chave orfa expira 120s), contrato duplicado recovery codes (fixar autoridade Fase 2), teste MfaMasterKey sem isolar env, 5 arquivos nao-MFA no working tree (decisao de separacao antes do merge).",
   "gates": {
     "P1_P2": null,
     "P2_P3": null
