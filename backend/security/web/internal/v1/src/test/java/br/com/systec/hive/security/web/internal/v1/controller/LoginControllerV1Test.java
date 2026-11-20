@@ -1,6 +1,11 @@
 package br.com.systec.hive.security.web.internal.v1.controller;
 
+import br.com.systec.hive.security.api.domain.Login;
+import br.com.systec.hive.security.api.domain.LoginAuthenticate;
+import br.com.systec.hive.security.api.domain.LoginResult;
 import br.com.systec.hive.security.api.service.LoginService;
+import br.com.systec.hive.security.web.internal.v1.dto.LoginDTO;
+import br.com.systec.hive.security.web.internal.v1.dto.LoginResponseDTO;
 import br.com.systec.hive.security.web.internal.v1.mapper.LoginMapperDTO;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,8 +25,10 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +49,47 @@ class LoginControllerV1Test {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+    }
+
+    @Test
+    void when_loginWithoutMfa_then200WithUnchangedContractAndRefreshCookie() throws Exception {
+        UUID userId = UUID.randomUUID();
+        LoginDTO payload = new LoginDTO("user", "pass");
+        Login domain = new Login("user", "pass");
+        LoginAuthenticate authenticate = new LoginAuthenticate(userId, "access-token", "Bearer", "", "refresh-value");
+        when(mapper.toDomain(payload)).thenReturn(domain);
+        when(service.login(domain)).thenReturn(new LoginResult.Success(authenticate));
+        when(mapper.toLoginResponse(authenticate)).thenReturn(new LoginResponseDTO(userId, "access-token", "Bearer"));
+
+        mockMvc.perform(post("/v1/auth/login")
+                        .contentType("application/json")
+                        .content("{\"username\":\"user\",\"password\":\"pass\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
+                .andExpect(jsonPath("$.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.type").value("Bearer"))
+                .andExpect(jsonPath("$.mfaRequired").doesNotExist())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, allOf(
+                        containsString("refreshToken=refresh-value"), containsString("HttpOnly"))));
+    }
+
+    @Test
+    void when_loginWithMfa_then200WithChallengeAndNoTokenOrCookie() throws Exception {
+        UUID challengeId = UUID.randomUUID();
+        LoginDTO payload = new LoginDTO("user", "pass");
+        Login domain = new Login("user", "pass");
+        when(mapper.toDomain(payload)).thenReturn(domain);
+        when(service.login(domain)).thenReturn(new LoginResult.MfaChallengeRequired(challengeId, 120));
+
+        mockMvc.perform(post("/v1/auth/login")
+                        .contentType("application/json")
+                        .content("{\"username\":\"user\",\"password\":\"pass\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mfaRequired").value(true))
+                .andExpect(jsonPath("$.challengeId").value(challengeId.toString()))
+                .andExpect(jsonPath("$.expiresIn").value(120))
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
     }
 
     @Test

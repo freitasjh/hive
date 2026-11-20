@@ -1,5 +1,6 @@
 package br.com.systec.hive.security.api.service;
 
+import br.com.systec.hive.security.api.domain.LoginAuthenticate;
 import br.com.systec.hive.security.api.domain.MfaSetupResult;
 
 import java.util.UUID;
@@ -7,8 +8,8 @@ import java.util.UUID;
 /**
  * Boundary de gerenciamento MFA consumida por security/web/internal/v1.
  *
- * <p><strong>Fase 2:</strong> {@link #verify} e {@link #recovery} apenas validam e consomem o
- * challenge — <em>nenhum token é emitido</em>. A emissão entra na Fase 3, integrada ao login.
+ * <p><strong>Fase 3:</strong> {@link #verify} e {@link #recovery} validam e consomem o challenge
+ * e, somente após sucesso, emitem o mesmo par access/refresh do login.
  *
  * <p>Operações com escrita usam transação {@code REQUIRED} na implementação; a leitura pura
  * ({@code verify}) usa {@code SUPPORTS}.
@@ -24,9 +25,9 @@ public interface MfaServicePort {
     /** Exige senha válida e remove secret + recovery codes. */
     void disable(UUID userId, UUID tenantId, String password);
 
-    /** Valida o challenge; código inválido incrementa tentativas; sucesso consome o challenge. Sem token. */
-    void verify(UUID challengeId, UUID tenantId, String code);
+    /** Valida o código, consome o challenge e emite o token — nunca antes do código válido. */
+    LoginAuthenticate verify(UUID challengeId, UUID tenantId, String code);
 
-    /** Consome um recovery code (hash, uso único); sucesso consome o challenge. Sem token. */
-    void recovery(UUID challengeId, UUID tenantId, String recoveryCode);
+    /** Consome um recovery code de uso único, consome o challenge e emite o token. */
+    LoginAuthenticate recovery(UUID challengeId, UUID tenantId, String recoveryCode);
 }

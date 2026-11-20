@@ -5,10 +5,12 @@ import br.com.systec.hive.commons.api.tools.controller.RestPath;
 import br.com.systec.hive.commons.api.tools.exceptions.StandardError;
 import br.com.systec.hive.security.api.domain.Login;
 import br.com.systec.hive.security.api.domain.LoginAuthenticate;
+import br.com.systec.hive.security.api.domain.LoginResult;
 import br.com.systec.hive.security.api.exceptions.RefreshTokenNotFoundException;
 import br.com.systec.hive.security.api.service.LoginService;
 import br.com.systec.hive.security.web.internal.v1.dto.LoginDTO;
 import br.com.systec.hive.security.web.internal.v1.dto.LoginResponseDTO;
+import br.com.systec.hive.security.web.internal.v1.dto.MfaChallengeResponseDTO;
 import br.com.systec.hive.security.web.internal.v1.dto.RefreshTokenResponseDTO;
 import br.com.systec.hive.security.web.internal.v1.mapper.LoginMapperDTO;
 import br.com.systec.hive.security.web.internal.v1.util.CookieUtil;
@@ -55,10 +57,17 @@ public class LoginControllerV1 {
                     @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = StandardError.class))
             }),
     })
-    public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginDTO payload, HttpServletResponse response) {
+    public ResponseEntity<?> login(@RequestBody @Valid LoginDTO payload, HttpServletResponse response) {
         Login login = mapper.toDomain(payload);
 
-        LoginAuthenticate loginAuthenticate = service.login(login);
+        LoginResult result = service.login(login);
+        if (result instanceof LoginResult.MfaChallengeRequired challenge) {
+            // Nenhum token e nenhum cookie de refresh no ramo de desafio (SPEC §4).
+            return RestControllerTool.of().buildSuccessResponse(
+                    new MfaChallengeResponseDTO(true, challenge.challengeId(), challenge.expiresIn()));
+        }
+
+        LoginAuthenticate loginAuthenticate = ((LoginResult.Success) result).authenticate();
         response.addHeader(HttpHeaders.SET_COOKIE, CookieUtil.of().createRefreshToken(loginAuthenticate).toString());
 
         return RestControllerTool.of().buildSuccessResponse(mapper.toLoginResponse(loginAuthenticate));

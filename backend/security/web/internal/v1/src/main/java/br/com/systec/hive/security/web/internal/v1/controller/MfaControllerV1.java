@@ -3,19 +3,24 @@ package br.com.systec.hive.security.web.internal.v1.controller;
 import br.com.systec.hive.commons.api.tools.controller.RestControllerTool;
 import br.com.systec.hive.commons.api.tools.controller.RestPath;
 import br.com.systec.hive.identity.api.domain.User;
+import br.com.systec.hive.security.api.domain.LoginAuthenticate;
 import br.com.systec.hive.security.api.domain.MfaErrorCode;
 import br.com.systec.hive.security.api.domain.MfaSetupResult;
 import br.com.systec.hive.security.api.exceptions.MfaException;
 import br.com.systec.hive.security.api.service.MfaServicePort;
+import br.com.systec.hive.security.web.internal.v1.dto.LoginResponseDTO;
 import br.com.systec.hive.security.web.internal.v1.dto.MfaChallengeDTO;
 import br.com.systec.hive.security.web.internal.v1.dto.MfaCodeDTO;
 import br.com.systec.hive.security.web.internal.v1.dto.MfaErrorResponseDTO;
 import br.com.systec.hive.security.web.internal.v1.dto.MfaPasswordDTO;
 import br.com.systec.hive.security.web.internal.v1.dto.MfaRecoveryDTO;
 import br.com.systec.hive.security.web.internal.v1.dto.MfaSetupResponseDTO;
+import br.com.systec.hive.security.web.internal.v1.util.CookieUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -30,7 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 /**
- * Endpoints de gerenciamento MFA (Fase 2), sob o prefixo já {@code permitAll} {@code /v1/auth/**}.
+ * Endpoints de gerenciamento e segundo fator MFA, sob o prefixo já {@code permitAll} {@code /v1/auth/**}.
  *
  * <p><strong>Autenticação:</strong> {@code /setup}, {@code /enable} e {@code /disable} exigem
  * Bearer válido — userId/tenantId vêm do principal autenticado, nunca do corpo.
@@ -39,14 +44,14 @@ import java.util.UUID;
  * valida o Bearer antes do controller e rejeitaria um token expirado. Nestes, o tenant vem
  * de {@code X-Tenant-ID} com parsing seguro (igual ao logout).
  *
- * <p><strong>Contrato da Fase 2:</strong> verify/recovery devolvem 204 — nenhum access token
- * é emitido aqui. A emissão entra na Fase 3, integrada ao login.
+ * <p><strong>Contrato da Fase 3:</strong> verify/recovery devolvem 200 com o mesmo
+ * {@link LoginResponseDTO} do login e o cookie de refresh — somente após código/challenge válidos.
  *
  * <p><strong>Sem logs:</strong> nenhum segredo, código, senha ou token é escrito em log.
  */
 @RestController
 @RequestMapping(RestPath.V1 + "/auth/mfa")
-@Tag(name = "Identidade - MFA", description = "Configuração e desafio de MFA TOTP (Fase 2)")
+@Tag(name = "Identidade - MFA", description = "Configuração e segundo fator de MFA TOTP")
 public class MfaControllerV1 {
 
     private static final String TENANT_HEADER = "X-Tenant-ID";
@@ -82,20 +87,29 @@ public class MfaControllerV1 {
         return RestControllerTool.of().buildSuccessResponseNoContent();
     }
 
-    @PostMapping(value = "/verify", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(description = "Valida e consome o challenge. SEM Bearer (omitAuthorization). Fase 2: 204, sem token.")
-    public ResponseEntity<Void> verify(@RequestHeader(value = TENANT_HEADER, required = false) String tenantIdHeader,
-                                       @RequestBody @Valid MfaChallengeDTO payload) {
-        service.verify(payload.challengeId(), parseTenantId(tenantIdHeader), payload.code());
-        return RestControllerTool.of().buildSuccessResponseNoContent();
+    @PostMapping(value = "/verify", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(description = "Valida o código, consome o challenge e emite o token. SEM Bearer (omitAuthorization).")
+    public ResponseEntity<LoginResponseDTO> verify(@RequestHeader(value = TENANT_HEADER, required = false) String tenantIdHeader,
+                                                   @RequestBody @Valid MfaChallengeDTO payload,
+                                                   HttpServletResponse response) {
+        return issue(service.verify(payload.challengeId(), parseTenantId(tenantIdHeader), payload.code()), response);
     }
 
-    @PostMapping(value = "/recovery", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(description = "Consome recovery code de uso único. SEM Bearer (omitAuthorization). Fase 2: 204, sem token.")
-    public ResponseEntity<Void> recovery(@RequestHeader(value = TENANT_HEADER, required = false) String tenantIdHeader,
-                                         @RequestBody @Valid MfaRecoveryDTO payload) {
-        service.recovery(payload.challengeId(), parseTenantId(tenantIdHeader), payload.recoveryCode());
-        return RestControllerTool.of().buildSuccessResponseNoContent();
+    @PostMapping(value = "/recovery", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(description = "Consome recovery code de uso único e emite o token. SEM Bearer (omitAuthorization).")
+    public ResponseEntity<LoginResponseDTO> recovery(@RequestHeader(value = TENANT_HEADER, required = false) String tenantIdHeader,
+                                                     @RequestBody @Valid MfaRecoveryDTO payload,
+                                                     HttpServletResponse response) {
+        return issue(service.recovery(payload.challengeId(), parseTenantId(tenantIdHeader), payload.recoveryCode()), response);
+    }
+
+    /** Mesmo contrato do login: {userId, accessToken, type} + Set-Cookie refreshToken. */
+    private ResponseEntity<LoginResponseDTO> issue(LoginAuthenticate authenticate, HttpServletResponse response) {
+        response.addHeader(HttpHeaders.SET_COOKIE, CookieUtil.of().createRefreshToken(authenticate).toString());
+        return RestControllerTool.of().buildSuccessResponse(
+                new LoginResponseDTO(authenticate.getUserId(), authenticate.getAccessToken(), authenticate.getType()));
     }
 
     /** Erro semântico: status e nome vêm de {@link MfaErrorCode}; sem payload de credencial. */

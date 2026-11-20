@@ -18,4 +18,11 @@ public interface SecurityTokenService {
     void validateTokenRevoke(String tokenJWT) throws BaseException;
 
     UUID getTenantId(String token) throws SecurityException;
+
+    /**
+     * Extrai o JTI de um token apenas para blacklist no consume do desafio MFA.
+     *
+     * @return {@code null} quando o token está ausente/malformado — nunca falha o login.
+     */
+    String extractJti(String tokenJWT);
 }

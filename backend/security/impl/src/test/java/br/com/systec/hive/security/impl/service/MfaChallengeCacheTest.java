@@ -14,12 +14,20 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -74,6 +82,7 @@ class MfaChallengeCacheTest {
         assertEquals(challenge.userAgent(), found.get().userAgent());
         assertEquals(challenge.expiresAt().getEpochSecond(), found.get().expiresAt().getEpochSecond());
         assertEquals(0, found.get().attempts());
+        assertNotNull(found.get().consumeToken(), "nonce de consumo deve ser persistido");
     }
 
     @Test
@@ -125,5 +134,64 @@ class MfaChallengeCacheTest {
         assertEquals(-1, cache.incrementAttempts(tenantId, challenge.id()));
         assertFalse(Boolean.TRUE.equals(redisTemplate.hasKey(
                 "hive:auth:mfa:" + tenantId + ":" + challenge.id() + ":attempts")));
+    }
+
+    @Test
+    void when_deleteIfTokenMatches_thenOnlyHolderOfNonceConsumesChallenge() {
+        UUID tenantId = UUID.randomUUID();
+        MfaChallenge challenge = challenge(tenantId, UUID.randomUUID());
+        cache.save(challenge);
+        String nonce = cache.get(tenantId, challenge.id()).orElseThrow().consumeToken();
+
+        assertFalse(cache.deleteIfTokenMatches(tenantId, challenge.id(), "nonce-errado"));
+        assertTrue(cache.get(tenantId, challenge.id()).isPresent(), "nonce errado não pode consumir");
+
+        assertTrue(cache.deleteIfTokenMatches(tenantId, challenge.id(), nonce));
+        assertFalse(cache.deleteIfTokenMatches(tenantId, challenge.id(), nonce), "desafio não é reutilizável");
+        assertTrue(cache.get(tenantId, challenge.id()).isEmpty());
+    }
+
+    @Test
+    void when_twoConcurrentConsumersUseSameNonce_thenOnlyOneSucceeds() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        MfaChallenge challenge = challenge(tenantId, UUID.randomUUID());
+        cache.save(challenge);
+        String nonce = cache.get(tenantId, challenge.id()).orElseThrow().consumeToken();
+
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Callable<Boolean> consumer = () -> {
+                barrier.await(5, TimeUnit.SECONDS);
+                return cache.deleteIfTokenMatches(tenantId, challenge.id(), nonce);
+            };
+            List<Future<Boolean>> results = List.of(executor.submit(consumer), executor.submit(consumer));
+            int winners = 0;
+            for (Future<Boolean> result : results) {
+                if (Boolean.TRUE.equals(result.get(10, TimeUnit.SECONDS))) {
+                    winners++;
+                }
+            }
+            assertEquals(1, winners, "compare-and-delete deve eleger um único vencedor");
+        } catch (ExecutionException e) {
+            throw new AssertionError("falha no consumo concorrente", e);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void when_blockUser_thenBlockIsTenantScopedAndExpiresIn15Minutes() {
+        UUID tenantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        assertFalse(cache.isUserBlocked(tenantId, userId));
+        cache.blockUser(tenantId, userId);
+
+        assertTrue(cache.isUserBlocked(tenantId, userId));
+        assertFalse(cache.isUserBlocked(UUID.randomUUID(), userId));
+        Long ttl = redisTemplate.getExpire(
+                "hive:auth:mfa:block:" + tenantId + ":" + userId, TimeUnit.SECONDS);
+        assertTrue(ttl != null && ttl > 0 && ttl <= MfaChallengeCachePort.BLOCK_TTL_SECONDS, "ttl=" + ttl);
     }
 }

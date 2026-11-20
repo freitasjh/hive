@@ -276,6 +276,19 @@ public class SecurityTokenServiceImpl implements SecurityTokenService {
         }
     }
 
+    @Override
+    public String extractJti(String tokenJWT) {
+        if (tokenJWT == null || tokenJWT.isBlank()) {
+            return null;
+        }
+        try {
+            return JWT.decode(tokenJWT).getId();
+        } catch (RuntimeException e) {
+            // Token antigo/inválido não pode bloquear o login: simplesmente não há JTI a blacklistar.
+            return null;
+        }
+    }
+
     private String getRefreshToken() {
         String refreshToken = null;
         if (request.getCookies() != null) {

@@ -1,6 +1,7 @@
 package br.com.systec.hive.security.web.internal.v1.controller;
 
 import br.com.systec.hive.identity.api.domain.User;
+import br.com.systec.hive.security.api.domain.LoginAuthenticate;
 import br.com.systec.hive.security.api.domain.MfaErrorCode;
 import br.com.systec.hive.security.api.domain.MfaSetupResult;
 import br.com.systec.hive.security.api.exceptions.MfaException;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,6 +31,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,6 +49,8 @@ class MfaControllerV1Test {
     private static final String SECRET = "JBSWY3DPEHPK3PXP";
     private static final String QR = "data:image/png;base64,QUJD";
     private static final String CODE = "123456";
+    private static final String ACCESS_TOKEN = "new-access-token";
+    private static final String REFRESH_TOKEN = "new-refresh-token";
 
     @Mock
     MfaServicePort service;
@@ -126,23 +131,32 @@ class MfaControllerV1Test {
     // ---------- verify (sem Bearer) ----------
 
     @Test
-    void when_verifyWithTenantHeaderAndNoBearer_then204() throws Exception {
+    void when_verifyWithValidCode_then200WithLoginContractAndRefreshCookie() throws Exception {
+        when(service.verify(CHALLENGE_ID, TENANT_ID, CODE)).thenReturn(issuedToken());
+
         mockMvc.perform(post("/v1/auth/mfa/verify")
                         .header(TENANT_HEADER, TENANT_ID.toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"challengeId\":\"" + CHALLENGE_ID + "\",\"code\":\"" + CODE + "\"}"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.accessToken").value(ACCESS_TOKEN))
+                .andExpect(jsonPath("$.type").value("Bearer"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("refreshToken=" + REFRESH_TOKEN)));
 
         verify(service).verify(CHALLENGE_ID, TENANT_ID, CODE);
     }
 
     @Test
-    void when_verifyWithMalformedTenantHeader_then204WithoutBadRequest() throws Exception {
+    void when_verifyWithMalformedTenantHeader_then200WithoutBadRequest() throws Exception {
+        when(service.verify(CHALLENGE_ID, null, CODE)).thenReturn(issuedToken());
+
         mockMvc.perform(post("/v1/auth/mfa/verify")
                         .header(TENANT_HEADER, "not-a-uuid")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"challengeId\":\"" + CHALLENGE_ID + "\",\"code\":\"" + CODE + "\"}"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value(ACCESS_TOKEN));
 
         verify(service).verify(CHALLENGE_ID, null, CODE);
     }
@@ -203,13 +217,18 @@ class MfaControllerV1Test {
     // ---------- recovery (sem Bearer) ----------
 
     @Test
-    void when_recoveryWithTenantHeaderAndNoBearer_then204() throws Exception {
+    void when_recoveryWithValidCode_then200WithTokenAndRefreshCookie() throws Exception {
         String recoveryCode = "A1B2C3D4E5F60718";
+        when(service.recovery(CHALLENGE_ID, TENANT_ID, recoveryCode)).thenReturn(issuedToken());
+
         mockMvc.perform(post("/v1/auth/mfa/recovery")
                         .header(TENANT_HEADER, TENANT_ID.toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"challengeId\":\"" + CHALLENGE_ID + "\",\"recoveryCode\":\"" + recoveryCode + "\"}"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.accessToken").value(ACCESS_TOKEN))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("refreshToken=" + REFRESH_TOKEN)));
 
         verify(service).recovery(CHALLENGE_ID, TENANT_ID, recoveryCode);
     }
@@ -226,5 +245,9 @@ class MfaControllerV1Test {
                         .content("{\"challengeId\":\"" + CHALLENGE_ID + "\",\"recoveryCode\":\"" + recoveryCode + "\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("MFA_INVALID_RECOVERY"));
+    }
+
+    private static LoginAuthenticate issuedToken() {
+        return new LoginAuthenticate(USER_ID, ACCESS_TOKEN, "Bearer", "", REFRESH_TOKEN);
     }
 }

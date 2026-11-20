@@ -1,15 +1,14 @@
 {
   "_note": "Estado pendente (substitui snapshots anteriores). workflow-state.json na raiz é gravável apenas por delegação a papel de implementação — permissão nativa do orchestrator nega root. Não contornar via bash.",
   "type": "feature",
-  "current_feature": "mfa-fase2-servico-endpoints",
+  "current_feature": "mfa-fase3-integracao-login",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
     "backend": "backend/security/",
-    "adapter": "backend/security/impl/src/main/java/br/com/systec/hive/security/impl/security/TotpAdapter.java",
-    "service": "backend/security/impl/src/main/java/br/com/systec/hive/security/impl/service/MfaService.java",
-    "controller": "backend/security/web/internal/v1/src/main/java/br/com/systec/hive/security/web/internal/v1/controller/MfaControllerV1.java"
+    "result": "backend/security/api/src/main/java/br/com/systec/hive/security/api/domain/LoginResult.java",
+    "flow_it": "backend/integration-test/src/test/java/br/com/systec/hive/integrationtest/MfaLoginFlowIT.java"
   },
   "code_review_status": "passed",
   "code_review": {
@@ -17,11 +16,11 @@
     "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_sessions": ["ses_e0732e180ffe9R12skUR2Wa7f2", "ses_e07293dfaffeynXejmRQy16Z41"],
-    "scope": "Fase 2 MFA: TotpAdapter, MfaService, MfaControllerV1 (5 endpoints), autoridade unica de recovery codes; 🔴 atomicidade do recovery corrigido"
+    "reviewer_session": "ses_e06e32e36ffeFaTP1zjmdQli6X",
+    "scope": "Fase 3 MFA: desafio no login, emissao no verify/recovery, Lua CAS no Redis 7, binding IP/UA, blacklist JTI, bloqueio 15min"
   },
   "harness_status": "passed",
-  "harness_note": "Branch feature/login-tela-mfa. Backend 484 testes exit 0 (443+41), frontend 233. 5 endpoints /auth/mfa/{setup,enable,disable,verify,recovery}, verify/recovery devolvem 204 SEM JWT (Fase 3 emite). 🔴 corrigido: UPDATE condicional WHERE used_at IS NULL com checagem de linhas afetadas — uso unico de recovery code mesmo concorrente, teste CyclicBarrier prova. Dividas 🔵 para Fase 3: reautenticacao recente no setup, binding remoteIp/userAgent do challenge, consume atomico do challenge (compare-and-delete), bloqueio 15min por usuario, teste de tenant malformado enganoso, IT de concorrencia real no Postgres. Arquivos nao-MFA no working tree seguem fora do commit.",
+  "harness_note": "Branch feature/login-tela-mfa. Backend 498 testes exit 0 (484+14) + 84 ITs (4 MfaLoginFlowIT). LoginResult selado: Success | MfaChallengeRequired — token so apos codigo valido; login sem MFA intacto (teste de nao-regressao). CAS Lua GET+DEL contorna DELEX ausente no Redis 7 (1 vencedor concorrente real); JTI blacklistado antes da emissao (InOrder); binding IP/UA generico 401; bloqueio 900s apos 5 tentativas. Dividas: 🟡 premissa de proxy sobrescrever X-Forwarded-For (validar no gateway, fora do escopo backend); 🔵 OpenAPI do /login sem ramo de desafio, default save(challenge) com nonce divergente, extractJti via JWT.decode sem verify (seguro hoje pelo SecurityFilter). Divida antiga Mantida por decisao: reautenticacao recente no /setup.",
   "gates": {
     "P1_P2": null,
     "P2_P3": null
