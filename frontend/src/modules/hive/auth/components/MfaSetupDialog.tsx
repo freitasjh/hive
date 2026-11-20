@@ -142,7 +142,7 @@ export function MfaSetupDialog({ open, onOpenChange, onSuccess }: MfaSetupDialog
                 <p className="text-xs font-semibold text-foreground">{t("auth.mfa.setup.manual")}</p>
                 <p className="text-[11px] text-muted-foreground">{t("auth.mfa.setup.manualHint")}</p>
                 <div className="flex min-w-0 w-full items-center gap-2">
-                  <code className="min-w-0 flex-1 overflow-hidden truncate rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs select-all">
+                  <code className="min-w-0 flex-1 overflow-hidden break-all rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs select-all">
                     {data.secret}
                   </code>
                   <Button
