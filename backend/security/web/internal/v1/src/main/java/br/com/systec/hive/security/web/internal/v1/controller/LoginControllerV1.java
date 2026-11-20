@@ -64,7 +64,7 @@ public class LoginControllerV1 {
         if (result instanceof LoginResult.MfaChallengeRequired challenge) {
             // Nenhum token e nenhum cookie de refresh no ramo de desafio (SPEC §4).
             return RestControllerTool.of().buildSuccessResponse(
-                    new MfaChallengeResponseDTO(true, challenge.challengeId(), challenge.expiresIn()));
+                    new MfaChallengeResponseDTO(true, challenge.challengeId(), challenge.expiresIn(), challenge.tenantId()));
         }
 
         LoginAuthenticate loginAuthenticate = ((LoginResult.Success) result).authenticate();

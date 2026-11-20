@@ -6,11 +6,13 @@ import java.util.UUID;
  * Resposta do login quando o usuário possui MFA habilitado (SPEC §4).
  *
  * <p><strong>Nunca</strong> contém access token nem cookie de refresh — o cliente deve
- * submeter o código em {@code /v1/auth/mfa/verify} com este {@code challengeId}.
+ * submeter o código em {@code /v1/auth/mfa/verify} com este {@code challengeId} e com o
+ * {@code tenantId} do desafio (necessário em navegador fresco, sem tenant em localStorage).
  */
 public record MfaChallengeResponseDTO(
         boolean mfaRequired,
         UUID challengeId,
-        int expiresIn
+        int expiresIn,
+        UUID tenantId
 ) {
 }

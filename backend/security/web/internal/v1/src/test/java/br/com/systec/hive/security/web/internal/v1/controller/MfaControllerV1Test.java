@@ -142,6 +142,7 @@ class MfaControllerV1Test {
                 .andExpect(jsonPath("$.userId").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.accessToken").value(ACCESS_TOKEN))
                 .andExpect(jsonPath("$.type").value("Bearer"))
+                .andExpect(jsonPath("$.mfaSetupAvailable").doesNotExist())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("refreshToken=" + REFRESH_TOKEN)));
 
         verify(service).verify(CHALLENGE_ID, TENANT_ID, CODE);
@@ -228,6 +229,7 @@ class MfaControllerV1Test {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.accessToken").value(ACCESS_TOKEN))
+                .andExpect(jsonPath("$.mfaSetupAvailable").doesNotExist())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("refreshToken=" + REFRESH_TOKEN)));
 
         verify(service).recovery(CHALLENGE_ID, TENANT_ID, recoveryCode);

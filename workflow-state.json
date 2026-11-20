@@ -1,13 +1,13 @@
 {
   "type": "feature",
-  "current_feature": "mfa-fase3-integracao-login",
+  "current_feature": "mfa-onboarding-opcional",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
+    "frontend": "frontend/src/",
     "backend": "backend/security/",
-    "result": "backend/security/api/src/main/java/br/com/systec/hive/security/api/domain/LoginResult.java",
-    "flow_it": "backend/integration-test/src/test/java/br/com/systec/hive/integrationtest/MfaLoginFlowIT.java"
+    "invite": "frontend/src/modules/hive/auth/components/MfaSetupInvite.tsx"
   },
   "code_review_status": "passed",
   "code_review": {
@@ -15,11 +15,11 @@
     "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_session": "ses_e06e32e36ffeFaTP1zjmdQli6X",
-    "scope": "Fase 3 MFA: desafio no login, emissao no verify/recovery, Lua CAS no Redis 7, binding IP/UA, blacklist JTI, bloqueio 15min"
+    "reviewer_session": "ses_e05ee0175ffeODVnSfuo2FKOxS",
+    "scope": "Fase 4 MFA (tela verify + setup/disable), tenantId no desafio e onboarding opcional — 3 lots, todos APPROVED"
   },
   "harness_status": "passed",
-  "harness_note": "Branch feature/login-tela-mfa. Backend 498 testes exit 0 (484+14) + 84 ITs (4 MfaLoginFlowIT). LoginResult selado: Success | MfaChallengeRequired — token so apos codigo valido; login sem MFA intacto (teste de nao-regressao). CAS Lua GET+DEL contorna DELEX ausente no Redis 7 (1 vencedor concorrente real); JTI blacklistado antes da emissao (InOrder); binding IP/UA generico 401; bloqueio 900s apos 5 tentativas. Dividas: 🟡 premissa de proxy sobrescrever X-Forwarded-For (validar no gateway, fora do escopo backend); 🔵 OpenAPI do /login sem ramo de desafio, default save(challenge) com nonce divergente, extractJti via JWT.decode sem verify (seguro hoje pelo SecurityFilter). Divida antiga Mantida por decisao: reautenticacao recente no /setup.",
+  "harness_note": "Branch feature/login-tela-mfa. Backend 501 testes + IT MfaLoginFlowIT 4/4; frontend 280 testes + build 0. Login sem MFA devolve mfaSetupAvailable=true e UI mostra convite NAO-modal (MfaSetupInvite) com Configurar agora (abre MfaSetupDialog com QR) e Pular (sem persistencia). Login com MFA: desafio com tenantId, sem token/campo; verify/recovery com X-Tenant-ID do desafio. Dividas 🔵: tautologia em LoginServiceImpl:87, @JsonInclude classe-nivel em LoginResponseDTO, teto 50 prompts no seletor, X-Forwarded-For proxy, reautenticacao recente setup. H3 real nao executado por bloqueio de perfil chrome-devtools de outro agente. Arquivos publicapi/frontend de outro agente seguem fora do commit.",
   "gates": {
     "P1_P2": null,
     "P2_P3": null

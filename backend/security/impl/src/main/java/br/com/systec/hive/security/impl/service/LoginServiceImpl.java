@@ -34,6 +34,9 @@ import java.util.UUID;
  * <p>Ramo sem MFA permanece idêntico ao anterior: {@code generateTokenAndRefreshToken(authenticate)}.
  * Com MFA habilitado, a senha correta apenas cria o challenge no Redis e devolve
  * {@link LoginResult.MfaChallengeRequired} — <strong>nenhum access token é emitido</strong>.
+ *
+ * <p>No ramo sem desafio, o autenticador emitido recebe {@code mfaSetupAvailable}: sinal
+ * booleano de onboarding opcional derivado da mesma consulta MFA, sem expor segredo.
  */
 @Service
 public class LoginServiceImpl implements LoginService {
@@ -70,15 +73,23 @@ public class LoginServiceImpl implements LoginService {
 
             var authenticate = authenticationManager.authenticate(userAndPasswordToken);
 
+            // Conservador: sem consulta MFA possível, não anunciamos onboarding.
+            boolean mfaSetupAvailable = false;
             if (authenticate.getPrincipal() instanceof User user) {
+                // Única consulta MFA do login — reaproveitada para o sinal de onboarding.
                 Optional<MfaSecretData> mfa = mfaRepository.findByUserIdAndTenantId(
                         user.getId(), Objects.requireNonNull(user.getTenantId(), "tenantId do usuário"));
                 if (mfa.isPresent() && mfa.get().enabled()) {
                     return createChallenge(user);
                 }
+                // Ramo sem desafio: segredo ausente ou desabilitado => setup ainda disponível.
+                // Apenas o booleano é propagado; secret/confirmedAt nunca saem do domínio.
+                mfaSetupAvailable = mfa.isEmpty() || !mfa.get().enabled();
             }
 
-            return new LoginResult.Success(securityTokenService.generateTokenAndRefreshToken(authenticate));
+            LoginAuthenticate issued = securityTokenService.generateTokenAndRefreshToken(authenticate);
+            issued.setMfaSetupAvailable(mfaSetupAvailable);
+            return new LoginResult.Success(issued);
         } catch (AuthenticationException e) {
             log.warn("Falha de autenticação para o usuário: {}", login.getUsername());
             throw new InvalidCredentialsException(e);
@@ -100,7 +111,7 @@ public class LoginServiceImpl implements LoginService {
                 0, Instant.now().plusSeconds(MfaChallengeCachePort.TTL_SECONDS),
                 consumeToken, extractJtiFromRequest());
         challengeCache.save(challenge, consumeToken);
-        return new LoginResult.MfaChallengeRequired(challengeId, MfaChallengeCachePort.TTL_SECONDS);
+        return new LoginResult.MfaChallengeRequired(challengeId, MfaChallengeCachePort.TTL_SECONDS, challenge.tenantId());
     }
 
     /** JTI de um token antigo eventualmente enviado no login — blacklistado no verify. */

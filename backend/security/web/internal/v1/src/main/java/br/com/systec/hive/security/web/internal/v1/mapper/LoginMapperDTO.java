@@ -13,5 +13,6 @@ public interface LoginMapperDTO {
     Login toDomain(LoginDTO loginDTO);
 
     @Mapping(target = "type", constant = "Bearer")
+    @Mapping(target = "mfaSetupAvailable", source = "mfaSetupAvailable")
     LoginResponseDTO toLoginResponse(LoginAuthenticate loginAuthenticate);
 }

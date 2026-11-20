@@ -59,7 +59,7 @@ class LoginControllerV1Test {
         LoginAuthenticate authenticate = new LoginAuthenticate(userId, "access-token", "Bearer", "", "refresh-value");
         when(mapper.toDomain(payload)).thenReturn(domain);
         when(service.login(domain)).thenReturn(new LoginResult.Success(authenticate));
-        when(mapper.toLoginResponse(authenticate)).thenReturn(new LoginResponseDTO(userId, "access-token", "Bearer"));
+        when(mapper.toLoginResponse(authenticate)).thenReturn(new LoginResponseDTO(userId, "access-token", "Bearer", true));
 
         mockMvc.perform(post("/v1/auth/login")
                         .contentType("application/json")
@@ -68,18 +68,20 @@ class LoginControllerV1Test {
                 .andExpect(jsonPath("$.userId").value(userId.toString()))
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
                 .andExpect(jsonPath("$.type").value("Bearer"))
+                .andExpect(jsonPath("$.mfaSetupAvailable").value(true))
                 .andExpect(jsonPath("$.mfaRequired").doesNotExist())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, allOf(
                         containsString("refreshToken=refresh-value"), containsString("HttpOnly"))));
     }
 
     @Test
-    void when_loginWithMfa_then200WithChallengeAndNoTokenOrCookie() throws Exception {
+    void when_loginWithMfa_then200WithChallengeTenantAndNoTokenOrCookie() throws Exception {
         UUID challengeId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
         LoginDTO payload = new LoginDTO("user", "pass");
         Login domain = new Login("user", "pass");
         when(mapper.toDomain(payload)).thenReturn(domain);
-        when(service.login(domain)).thenReturn(new LoginResult.MfaChallengeRequired(challengeId, 120));
+        when(service.login(domain)).thenReturn(new LoginResult.MfaChallengeRequired(challengeId, 120, tenantId));
 
         mockMvc.perform(post("/v1/auth/login")
                         .contentType("application/json")
@@ -88,7 +90,9 @@ class LoginControllerV1Test {
                 .andExpect(jsonPath("$.mfaRequired").value(true))
                 .andExpect(jsonPath("$.challengeId").value(challengeId.toString()))
                 .andExpect(jsonPath("$.expiresIn").value(120))
+                .andExpect(jsonPath("$.tenantId").value(tenantId.toString()))
                 .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.mfaSetupAvailable").doesNotExist())
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
     }
 

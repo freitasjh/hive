@@ -14,6 +14,17 @@ public class LoginAuthenticate implements Serializable {
     private UUID userId;
     private final String refreshToken;
 
+    /**
+     * Sinal de onboarding MFA: {@code true} quando o login não encontrou segredo habilitado
+     * e o cliente pode convidar o usuário a configurar MFA. Não carrega segredo nem estado
+     * detalhado do desafio — apenas este booleano derivado no ponto de login.
+     *
+     * <p>Caminho mínimo de propagação: o serviço preenche este campo no autenticador já
+     * emitido e o mapper de web o copia para {@code LoginResponseDTO}. O ramo de desafio
+     * nunca produz {@code LoginAuthenticate}, portanto nunca expõe este sinal.
+     */
+    private boolean mfaSetupAvailable;
+
     public LoginAuthenticate(UUID userId, String accessToken, String bearer, String role, String refreshToken) {
         this.userId = userId;
         this.accessToken = accessToken;
@@ -56,5 +67,13 @@ public class LoginAuthenticate implements Serializable {
 
     public String getRefreshToken() {
         return refreshToken;
+    }
+
+    public boolean isMfaSetupAvailable() {
+        return mfaSetupAvailable;
+    }
+
+    public void setMfaSetupAvailable(boolean mfaSetupAvailable) {
+        this.mfaSetupAvailable = mfaSetupAvailable;
     }
 }

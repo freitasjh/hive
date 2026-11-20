@@ -49,6 +49,7 @@ class MfaLoginFlowIT extends WebIntegrationTest {
                 .andExpect(jsonPath("$.userId").isNotEmpty())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.type").value("Bearer"))
+                .andExpect(jsonPath("$.mfaSetupAvailable").value(true))
                 .andExpect(jsonPath("$.mfaRequired").doesNotExist())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE,
                         org.hamcrest.Matchers.containsString("refreshToken=")));
@@ -65,7 +66,9 @@ class MfaLoginFlowIT extends WebIntegrationTest {
                 .andExpect(jsonPath("$.mfaRequired").value(true))
                 .andExpect(jsonPath("$.expiresIn").value(120))
                 .andExpect(jsonPath("$.challengeId").isNotEmpty())
+                .andExpect(jsonPath("$.tenantId").value(tenantId.toString()))
                 .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.mfaSetupAvailable").doesNotExist())
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
                 .andReturn();
         String challengeId = JsonPath.read(challengeResult.getResponse().getContentAsString(), "$.challengeId");
@@ -76,6 +79,7 @@ class MfaLoginFlowIT extends WebIntegrationTest {
                 .andExpect(jsonPath("$.userId").isNotEmpty())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.type").value("Bearer"))
+                .andExpect(jsonPath("$.mfaSetupAvailable").doesNotExist())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE,
                         org.hamcrest.Matchers.containsString("refreshToken=")));
 
@@ -138,6 +142,7 @@ class MfaLoginFlowIT extends WebIntegrationTest {
                         }))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.mfaSetupAvailable").doesNotExist())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE,
                         org.hamcrest.Matchers.containsString("refreshToken=")));
 

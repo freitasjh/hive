@@ -81,6 +81,8 @@ class LoginServiceImplTest {
 
         assertNotNull(result);
         assertEquals(expected, assertInstanceOf(LoginResult.Success.class, result).authenticate());
+        // Segredo existe mas não está habilitado: onboarding permanece disponível (sem vazar o segredo).
+        assertThat(expected.isMfaSetupAvailable()).isTrue();
         verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
         verify(securityTokenService).generateTokenAndRefreshToken(authentication);
         verify(challengeCache, never()).save(any(), any());
@@ -98,7 +100,23 @@ class LoginServiceImplTest {
         LoginResult result = service.login(login);
 
         assertEquals(expected, assertInstanceOf(LoginResult.Success.class, result).authenticate());
+        assertThat(expected.isMfaSetupAvailable()).isTrue();
         verify(challengeCache, never()).save(any(), any());
+    }
+
+    @Test
+    void when_loginWithNonUserPrincipal_thenSuccessDoesNotAdvertiseMfaSetup() {
+        Login login = new Login("user", "pass");
+        Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn("service-account");
+        LoginAuthenticate expected = new LoginAuthenticate(USER_ID, "token", "Bearer", "", "refreshToken");
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
+        when(securityTokenService.generateTokenAndRefreshToken(authentication)).thenReturn(expected);
+
+        LoginResult result = service.login(login);
+
+        assertThat(assertInstanceOf(LoginResult.Success.class, result).authenticate().isMfaSetupAvailable()).isFalse();
+        verify(mfaRepository, never()).findByUserIdAndTenantId(any(), any());
     }
 
     @Test
@@ -118,6 +136,7 @@ class LoginServiceImplTest {
                 assertInstanceOf(LoginResult.MfaChallengeRequired.class, result);
         assertEquals(MfaChallengeCachePort.TTL_SECONDS, challengeResult.expiresIn());
         assertNotNull(challengeResult.challengeId());
+        assertEquals(TENANT_ID, challengeResult.tenantId());
 
         ArgumentCaptor<MfaChallenge> saved = ArgumentCaptor.forClass(MfaChallenge.class);
         ArgumentCaptor<String> nonce = ArgumentCaptor.forClass(String.class);

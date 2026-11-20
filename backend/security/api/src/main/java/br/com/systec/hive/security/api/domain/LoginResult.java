@@ -14,7 +14,12 @@ public sealed interface LoginResult permits LoginResult.Success, LoginResult.Mfa
     record Success(LoginAuthenticate authenticate) implements LoginResult {
     }
 
-    /** Senha válida, MFA habilitado: nenhum token foi emitido. */
-    record MfaChallengeRequired(UUID challengeId, int expiresIn) implements LoginResult {
+    /**
+     * Senha válida, MFA habilitado: nenhum token foi emitido.
+     *
+     * <p>{@code tenantId} acompanha o desafio para que um navegador fresco consiga submeter
+     * o código em {@code /v1/auth/mfa/verify} sem depender de tenant de sessão anterior.
+     */
+    record MfaChallengeRequired(UUID challengeId, int expiresIn, UUID tenantId) implements LoginResult {
     }
 }
