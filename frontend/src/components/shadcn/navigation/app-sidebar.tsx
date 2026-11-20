@@ -19,6 +19,7 @@ import {
   IconSearch,
   IconShieldCheck,
   IconSparkles,
+  IconMessage2Ai,
   IconUsers,
   IconReceiptTax,
   IconBuildingBank,
@@ -39,7 +40,7 @@ import {
   useSidebar,
 } from "@/components/shadcn/ui/sidebar"
 
-export type DashboardViewId = "overview" | "ai" | "providers" | "agents" | "prompts" | "kanban" | "scheduler" | "transactions" | "cards" | "checkout" | "pdv" | "accounts" | "files" | "backoffice" | "internal-admin" | "settings"
+export type DashboardViewId = "overview" | "ai" | "providers" | "agents" | "chat" | "prompts" | "kanban" | "scheduler" | "transactions" | "cards" | "checkout" | "pdv" | "accounts" | "files" | "backoffice" | "internal-admin" | "settings"
 
 const data = {
   user: {
@@ -66,6 +67,13 @@ const data = {
       title: "Agentes (LLM)",
       url: "#agents",
       icon: IconRobot,
+      badge: "AI",
+    },
+    {
+      id: "chat" as DashboardViewId,
+      title: "Assistant",
+      url: "#chat",
+      icon: IconMessage2Ai,
       badge: "AI",
     },
     {

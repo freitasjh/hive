@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getLlmConfig: vi.fn(),
   promptList: vi.fn(),
   getPromptById: vi.fn(),
+  sessionList: vi.fn(),
 }))
 
 vi.mock('@/services/agent-admin.service', () => ({
@@ -29,6 +30,21 @@ vi.mock('@/services/prompt.service', () => ({
     create: vi.fn(),
     update: vi.fn(),
   },
+}))
+
+vi.mock('@/services/session.service', () => ({
+  sessionService: {
+    listSessions: mocks.sessionList,
+    getMessages: vi.fn(),
+    getSession: vi.fn(),
+    createSession: vi.fn(),
+    deleteSession: vi.fn(),
+    updateSession: vi.fn(),
+  },
+}))
+
+vi.mock('@/services/chat.service', () => ({
+  chatService: { sendMessage: vi.fn() },
 }))
 
 const MODULES = [
@@ -79,6 +95,8 @@ function tabSelected(name: RegExp) {
 describe('App', () => {
   beforeEach(() => {
     setHash('')
+    mocks.promptList.mockResolvedValue(EMPTY_PAGE)
+    mocks.sessionList.mockResolvedValue(EMPTY_PAGE)
   })
 
   afterEach(() => {
@@ -245,6 +263,30 @@ describe('App', () => {
     expect(breadcrumbPage('Agentes (LLM)')).toBeTruthy()
     expect(tabSelected(/Provedor e modelo/)).toBe(true)
     expect(window.location.hash).toBe('#agents')
+  })
+
+  it('menu Assistant abre #chat com seletor de prompt e composer', async () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Assistant/ }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'Assistant' })).toBeTruthy()
+    })
+    expect(window.location.hash).toBe('#chat')
+    expect(screen.getByTestId('prompt-select')).toBeTruthy()
+    expect(screen.getByTestId('chat-form')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Conversas' })).toBeTruthy()
+  })
+
+  it('deep-link: /#chat abre Assistant sem tocar em Agentes (LLM)', () => {
+    setHash('#chat')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Assistant' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: /Provedor e modelo/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /Agentes \(LLM\)/ })).toBeTruthy()
+    expect(window.location.hash).toBe('#chat')
   })
 
   it('deep-link: /#prompts abre Prompts', () => {

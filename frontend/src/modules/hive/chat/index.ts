@@ -1,0 +1,10 @@
+/** API pública da feature chat — consumida só pelo App e pelo barrel de hive. */
+export { ChatPage, type ChatPageProps } from "./pages/ChatPage"
+export { ChatView, type ChatViewProps } from "./components/ChatView"
+export { PromptSelector, type PromptSelectorProps } from "./components/PromptSelector"
+export { ChatThread, type ChatThreadProps } from "./components/ChatThread"
+export { ChatComposer, type ChatComposerProps } from "./components/ChatComposer"
+export { SessionSidebar, type SessionSidebarProps } from "./components/SessionSidebar"
+export { useChatController, type ChatControllerState, type ChatControllerActions } from "./hooks/use-chat-controller"
+export { STARTER_PROMPTS, CHAT_VIEW_ID } from "./data/chat.data"
+export { useChatI18n, chatErrorKey, type ChatMessageKey } from "./i18n"

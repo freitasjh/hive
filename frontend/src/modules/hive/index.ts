@@ -11,6 +11,7 @@ export {
   type AdminPageProps,
   type AiAdminPageProps,
 } from "./admin";
+export { ChatPage, type ChatPageProps } from "./chat";
 export {
   PlaceholderPage,
   PlaceholderView,

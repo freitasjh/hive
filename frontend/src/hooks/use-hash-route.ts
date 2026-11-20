@@ -21,6 +21,7 @@ const VIEW_IDS = {
   overview: true,
   providers: true,
   agents: true,
+  chat: true,
   prompts: true,
   kanban: true,
   scheduler: true,

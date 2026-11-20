@@ -14,6 +14,7 @@ export const VIEW_LABELS: Record<DashboardViewId, string> = {
   ai: "Atlas AI Copilot",
   providers: "Provedores e credenciais",
   agents: "Agentes (LLM)",
+  chat: "Assistant",
   prompts: "Prompts",
   kanban: "Quadro Kanban",
   scheduler: "Agendamento",

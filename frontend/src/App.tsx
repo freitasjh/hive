@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { isTabbedView, useHashRoute, type RouteTab } from "@/hooks/use-hash-route"
 import {
   AiAdminPage,
+  ChatPage,
   OverviewPage,
   PlaceholderPage,
   PromptsAdminPage,
@@ -49,6 +50,9 @@ export default function App() {
         onSelectView={navigate}
       />
     )
+  }
+  if (view === "chat") {
+    return <ChatPage onSelectView={navigate} />
   }
   if (view === "prompts") {
     return (

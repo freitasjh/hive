@@ -1,13 +1,13 @@
 {
-  "type": "refactor",
-  "current_feature": "cleanup-isTabbedView",
+  "type": "feature",
+  "current_feature": "chat-assistant",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
     "frontend": "frontend/",
-    "app": "frontend/src/App.tsx",
-    "route": "frontend/src/hooks/use-hash-route.ts"
+    "chat": "frontend/src/modules/hive/chat/",
+    "services": "frontend/src/services/chat.service.ts"
   },
   "code_review_status": "passed",
   "code_review": {
@@ -15,11 +15,11 @@
     "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_session": "ses_e0b0e9441ffeYNoXKtWTBhbCUN",
-    "scope": "remoção de código morto e ADMIN_VIEWS duplicado; isTabbedView como fonte única"
+    "reviewer_session": "ses_e099dbc12ffed6GOFE4z1Hq404",
+    "scope": "chat Assistant; loop de correção (iteração 1) fechou 2 🔴 + 1 regra vinculante, re-review passed"
   },
   "harness_status": "passed",
-  "harness_note": "Suíte frontend 128/128, build 0. App sem ADMIN_VIEWS e sem ramos ai/settings; isTabbedView derivado de TABS_BY_VIEW é a única fonte de verdade. Cast em PlaceholderPage provado seguro pelo reviewer: todo setRoute passa por parseRoute que canonicaliza aliases. Doctor sem WARN (pin G1 fechado). Dívida observacional não-bloqueante: ordem de declaração de hasOwn em use-hash-route.ts:59-63 (segura em runtime).",
+  "harness_note": "Suíte 176/176 (14 arquivos), build 0. Decisão canônica scope-assistant-sem-rag respeitada: prompt selecionável, sem agente/RAG. Regra do primeiro turno e unwrapPage nas duas listagens testadas. H3 com backend Java real: listagens 200; POST /v1/chat real 502 por provider mimo-v2.5 deprecado (ambiente), turno LLM com fixture declarada; console JS 0 ERROR/WARN; portas 8080/5173 encerradas por PID. Dívidas declaradas: teto 50 prompts sem busca (ux-assistant-fluxo-revisavel §1, fora do PICCO); aresta newChat→selectSession com getSession falho (🔵); createSession sem consumidor. Efeito colateral: 2 sessões de teste criadas no Postgres dev (dado, não diff).",
   "gates": {
     "P1_P2": null,
     "P2_P3": null
