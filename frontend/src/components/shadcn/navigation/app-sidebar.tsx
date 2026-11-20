@@ -40,7 +40,7 @@ import {
   useSidebar,
 } from "@/components/shadcn/ui/sidebar"
 
-export type DashboardViewId = "overview" | "login" | "ai" | "providers" | "agents" | "chat" | "prompts" | "kanban" | "scheduler" | "transactions" | "cards" | "checkout" | "pdv" | "accounts" | "files" | "backoffice" | "internal-admin" | "settings"
+export type DashboardViewId = "overview" | "login" | "ai" | "providers" | "agents" | "chat" | "prompts" | "kanban" | "scheduler" | "transactions" | "cards" | "checkout" | "pdv" | "accounts" | "files" | "backoffice" | "internal-admin" | "reports" | "team" | "settings"
 
 const data = {
   user: {
@@ -146,15 +146,15 @@ const data = {
       badge: "6",
     },
     {
-      id: "reports",
+      id: "reports" as DashboardViewId,
       title: "Relatórios",
-      url: "#",
+      url: "#reports",
       icon: IconReport,
     },
     {
-      id: "team",
+      id: "team" as DashboardViewId,
       title: "Equipe",
-      url: "#",
+      url: "#team",
       icon: IconUsers,
     },
   ],

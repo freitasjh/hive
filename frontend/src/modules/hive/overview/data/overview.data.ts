@@ -27,6 +27,8 @@ export const VIEW_LABELS: Record<DashboardViewId, string> = {
   files: "Arquivos",
   backoffice: "Backoffice",
   "internal-admin": "SaaS Admin",
+  reports: "Relatórios",
+  team: "Equipe",
   settings: "Configurações",
 }
 

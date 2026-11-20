@@ -1,14 +1,13 @@
 {
-  "type": "feature",
-  "current_feature": "login-ui-401-hash",
+  "type": "bugfix",
+  "current_feature": "reports-team-nav-ids",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
     "frontend": "frontend/",
-    "auth": "frontend/src/services/auth.service.ts",
-    "storage": "frontend/src/services/token.storage.ts",
-    "login": "frontend/src/pages/LoginPage.tsx"
+    "sidebar": "frontend/src/components/shadcn/navigation/app-sidebar.tsx",
+    "route": "frontend/src/hooks/use-hash-route.ts"
   },
   "code_review_status": "passed",
   "code_review": {
@@ -16,11 +15,11 @@
     "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_session": "ses_e0986abdcffeJKV3IaJjDwcFyB",
-    "scope": "login React + chave hive_token unica + guard 401 sem loop; deep-link com token valido coberto; returnTo apos 401 fora do PICCO"
+    "reviewer_session": "ses_e097afa06ffeH87l4O4tGW84Lf",
+    "scope": "reports/team viram views válidas com rótulo e URL; sem telas novas"
   },
   "harness_status": "passed",
-  "harness_note": "Suite 196/196 (17 arquivos), build 0. H3 com backend Java real (qa-engineer ses_e098ab83effeNiyKzygBFo3DAU): POST /auth/login 200, token hive_token (unica chave), navegacao overview, 401 real limpa token e leva a #login sem 404/loop, console 0 ERROR/WARN JS, screenshots 375/1280, portas 8080/5189 encerradas por PID. Dividas 🔵 fora do PICCO: returnTo (401 em #agents/models -> login -> volta a rota alvo); dupla semantica isLoginHash vs VIEW_IDS; auto-redirect com push em vez de replace. Signup/refresh-token fora do escopo.",
+  "harness_note": "Suíte 199/199 (17 arquivos), build 0. reports/team registrados nos 4 pontos (union, VIEW_IDS, VIEW_LABELS, itens do menu), com url #reports/#team; caem em PlaceholderPage rotulado, nunca undefined. TDD: 3 testes falhavam antes do fix. Dívidas 🔵 fora do PICCO: cast 'as DashboardViewId' repetido (endurecer com satisfies); teste de hash composto #reports/foo.",
   "gates": {
     "P1_P2": null,
     "P2_P3": null

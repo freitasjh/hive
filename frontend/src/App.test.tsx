@@ -311,6 +311,45 @@ describe('App', () => {
     expect(window.location.hash).toBe('#providers')
   })
 
+  it('deep-link: /#reports abre placeholder rotulado, sem undefined e com item ativo', () => {
+    setHash('#reports')
+    render(<App />)
+
+    expect(breadcrumbPage('Relatórios')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Relatórios' })).toBeTruthy()
+    expect(document.title).toBe('Relatórios')
+    expect(document.title).not.toBe('undefined')
+    expect(window.location.hash).toBe('#reports')
+    expect(screen.getByRole('button', { name: /Relatórios/ }).getAttribute('data-active')).toBe('true')
+  })
+
+  it('deep-link: /#team abre placeholder rotulado, sem undefined e com item ativo', () => {
+    setHash('#team')
+    render(<App />)
+
+    expect(breadcrumbPage('Equipe')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Equipe' })).toBeTruthy()
+    expect(document.title).toBe('Equipe')
+    expect(document.title).not.toBe('undefined')
+    expect(window.location.hash).toBe('#team')
+    expect(screen.getByRole('button', { name: /Equipe/ }).getAttribute('data-active')).toBe('true')
+  })
+
+  it('clique em Relatórios e Equipe no menu atualiza URL e título', async () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Relatórios/ }))
+    await waitFor(() => expect(breadcrumbPage('Relatórios')).toBeTruthy())
+    expect(window.location.hash).toBe('#reports')
+    expect(document.title).not.toBe('undefined')
+
+    fireEvent.click(screen.getByRole('button', { name: /Equipe/ }))
+    await waitFor(() => expect(breadcrumbPage('Equipe')).toBeTruthy())
+    expect(window.location.hash).toBe('#team')
+    expect(document.title).not.toBe('undefined')
+    expect(screen.getByRole('button', { name: /Equipe/ }).getAttribute('data-active')).toBe('true')
+  })
+
   it('volta/avança do browser troca a tela via hashchange', async () => {
     mocks.getLlmConfig.mockResolvedValue(null)
     mocks.promptList.mockResolvedValue(EMPTY_PAGE)

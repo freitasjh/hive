@@ -34,6 +34,8 @@ const VIEW_IDS = {
   files: true,
   backoffice: true,
   "internal-admin": true,
+  reports: true,
+  team: true,
   ai: true,
   settings: true,
 } satisfies Record<DashboardViewId, true>
