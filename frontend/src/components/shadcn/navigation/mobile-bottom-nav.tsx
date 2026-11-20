@@ -2,9 +2,9 @@
 
 import {
   IconDashboard,
-  IconListDetails,
-  IconCreditCard,
-  IconBuildingBank,
+  IconKey,
+  IconRobot,
+  IconMessage2Ai,
   IconDots,
 } from "@tabler/icons-react"
 import { useSidebar } from "@/components/shadcn/ui/sidebar"
@@ -22,6 +22,7 @@ export function MobileBottomNav({
 }: MobileBottomNavProps) {
   const { toggleSidebar } = useSidebar()
 
+  /** Espelho compacto do menu: só telas existentes (Prompts fica na gaveta "Mais"). */
   const primaryItems = [
     {
       id: "overview" as DashboardViewId,
@@ -29,19 +30,19 @@ export function MobileBottomNav({
       icon: IconDashboard,
     },
     {
-      id: "transactions" as DashboardViewId,
-      label: "Transações",
-      icon: IconListDetails,
+      id: "chat" as DashboardViewId,
+      label: "Assistant",
+      icon: IconMessage2Ai,
     },
     {
-      id: "cards" as DashboardViewId,
-      label: "Cartões",
-      icon: IconCreditCard,
+      id: "providers" as DashboardViewId,
+      label: "Provedores",
+      icon: IconKey,
     },
     {
-      id: "accounts" as DashboardViewId,
-      label: "Contas",
-      icon: IconBuildingBank,
+      id: "agents" as DashboardViewId,
+      label: "Config LLM",
+      icon: IconRobot,
     },
   ]
 

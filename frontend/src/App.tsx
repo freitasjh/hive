@@ -10,7 +10,6 @@ import {
   PlaceholderPage,
   PromptsAdminPage,
   VIEW_LABELS,
-  type PlaceholderPageProps,
 } from "@/modules/hive"
 
 /**
@@ -74,6 +73,6 @@ export default function App() {
       />
     )
   }
-  // parseRoute canonicaliza aliases: view nunca é "ai"/"settings" em runtime.
-  return <PlaceholderPage view={view as PlaceholderPageProps["view"]} onSelectView={navigate} />
+  // Exaustivo: após os 6 ids acima, `view` é `never` — placeholder inalcançável.
+  return <PlaceholderPage view={view} onSelectView={navigate} />
 }

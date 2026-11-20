@@ -5,7 +5,7 @@ const meta = {
   title: "Hive/PlaceholderView",
   component: PlaceholderView,
   args: {
-    view: "kanban",
+    view: "chat",
     onBack: () => {},
   },
   parameters: { layout: "fullscreen" },

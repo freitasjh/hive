@@ -14,7 +14,7 @@ export interface Route {
 }
 
 /**
- * Ids canônicos + aliases legados. Tipar como `Record<DashboardViewId, true>`
+ * Ids canônicos — apenas telas existentes. Tipar como `Record<DashboardViewId, true>`
  * obriga o compilador a acusar qualquer id do union que ficar de fora.
  */
 const VIEW_IDS = {
@@ -24,26 +24,7 @@ const VIEW_IDS = {
   agents: true,
   chat: true,
   prompts: true,
-  kanban: true,
-  scheduler: true,
-  transactions: true,
-  cards: true,
-  checkout: true,
-  pdv: true,
-  accounts: true,
-  files: true,
-  backoffice: true,
-  "internal-admin": true,
-  reports: true,
-  team: true,
-  ai: true,
-  settings: true,
 } satisfies Record<DashboardViewId, true>
-
-const ALIASES: Partial<Record<DashboardViewId, DashboardViewId>> = {
-  ai: "providers",
-  settings: "prompts",
-}
 
 /** Abas válidas por view. View sem aba (overview, placeholders) não entra no mapa. */
 const TABS_BY_VIEW: Partial<Record<DashboardViewId, readonly RouteTab[]>> = {
@@ -74,18 +55,16 @@ function segmentsOf(hash: string): string[] {
 /**
  * Converte o fragmento da URL em uma rota. Pura e sem dependência de browser.
  * Formato: `#<view>/<tab>[/<id>]` (`Location.hash` já vem com `#` — MDN).
- * Aliases de view são normalizados no 1º segmento; aba desconhecida cai na
- * default da view; view desconhecida cai em overview. `#prompts/editor` sem id
- * cai em templates — editor nunca aparece vazio.
+ * Aba desconhecida cai na default da view; view desconhecida (inclusive os
+ * aliases legados #ai/#settings, removidos) cai em overview. `#prompts/editor`
+ * sem id cai em templates — editor nunca aparece vazio.
  */
 export function parseRoute(hash: string): Route {
   const segments = segmentsOf(hash)
   const first = segments[0] ?? ""
 
   let view: DashboardViewId
-  if (hasOwn.call(ALIASES, first)) {
-    view = ALIASES[first as DashboardViewId]!
-  } else if (hasOwn.call(VIEW_IDS, first)) {
+  if (hasOwn.call(VIEW_IDS, first)) {
     view = first as DashboardViewId
   } else {
     return { view: "overview" }
@@ -124,6 +103,8 @@ export function buildHash(view: DashboardViewId, tab?: RouteTab, id?: string): s
  * Roteamento nativo por hash: o hash é a única fonte de verdade. `navigate`
  * escreve `location.hash` (push); `replaceRoute` usa `history.replaceState`
  * (sem push e sem `hashchange`, MDN) e atualiza o estado local explicitamente.
+ * Views desconhecidas são resolvidas como overview por `parseRoute` — o hash
+ * legado permanece intacto (sem canonicalização de aliases).
  *
  * Fonte: MDN Window.hashchange
  * (https://developer.mozilla.org/en-US/docs/Web/API/Window/hashchange_event,
@@ -135,22 +116,10 @@ export function useHashRoute(): [Route, (view: DashboardViewId, tab?: RouteTab, 
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash))
 
   useEffect(() => {
-    // Alias no 1º segmento é canonicalizado via replaceState (sem push e sem
-    // hashchange), no mount e também em mudanças de hash. Estado local é
-    // sincronizado na mão porque replaceState não dispara o evento.
+    // Hash é a única fonte de verdade: qualquer conteúdo é interpretado por parseRoute,
+    // que devolve overview para views desconhecidas. Nenhum alias é reescrito.
     const syncFromHash = () => {
-      const segments = segmentsOf(window.location.hash)
-      const first = segments[0] ?? ""
-      let hash = window.location.hash
-      if (hasOwn.call(ALIASES, first)) {
-        const canonical = ALIASES[first as DashboardViewId]!
-        const rest = segments.slice(1).join("/")
-        hash = `#${canonical}${rest ? `/${rest}` : ""}`
-        if (window.location.hash !== hash) {
-          window.history.replaceState(null, "", hash)
-        }
-      }
-      setRoute(parseRoute(hash))
+      setRoute(parseRoute(window.location.hash))
     }
 
     window.addEventListener("hashchange", syncFromHash)

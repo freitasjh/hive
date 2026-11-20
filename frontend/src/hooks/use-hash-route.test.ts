@@ -8,22 +8,14 @@ function setHash(hash: string) {
   window.history.replaceState(null, '', `/${hash}`)
 }
 
+/** Únicos ids sobreviventes: o Hive não tem telas para os ids de template removidos. */
 const CANONICAL_IDS: DashboardViewId[] = [
   'overview',
   'login',
   'providers',
   'agents',
+  'chat',
   'prompts',
-  'kanban',
-  'scheduler',
-  'transactions',
-  'cards',
-  'checkout',
-  'pdv',
-  'accounts',
-  'files',
-  'backoffice',
-  'internal-admin',
 ]
 
 const UUID = '11111111-1111-1111-1111-111111111111'
@@ -33,18 +25,19 @@ describe('parseHash (compat: retorna só a view)', () => {
     expect(parseHash(`#${id}`)).toBe(id)
   })
 
-  it('normaliza alias #ai -> providers', () => {
-    expect(parseHash('#ai')).toBe('providers')
+  it('alias legado #ai cai em overview (quebra intencional de deep-link)', () => {
+    expect(parseHash('#ai')).toBe('overview')
+    expect(parseHash('#ai/models')).toBe('overview')
   })
 
-  it('normaliza alias #settings -> prompts', () => {
-    expect(parseHash('#settings')).toBe('prompts')
+  it('alias legado #settings cai em overview (quebra intencional de deep-link)', () => {
+    expect(parseHash('#settings')).toBe('overview')
+    expect(parseHash('#settings/editor/new')).toBe('overview')
   })
 
   it('lê a view mesmo quando a URL traz sub-rota de aba', () => {
     expect(parseHash('#agents/models')).toBe('agents')
     expect(parseHash('#prompts/editor/new')).toBe('prompts')
-    expect(parseHash('#ai/models')).toBe('providers')
   })
 
   it.each(['', '#', '#/shadcn', '#desconhecido', '#foo/bar'])(
@@ -92,13 +85,9 @@ describe('parseRoute', () => {
     })
   })
 
-  it('canonicaliza aliases no primeiro segmento preservando aba e id', () => {
-    expect(parseRoute('#ai/models')).toEqual({ view: 'providers', tab: 'models' })
-    expect(parseRoute('#settings/editor/new')).toEqual({
-      view: 'prompts',
-      tab: 'editor',
-      id: 'new',
-    })
+  it('aliases legados não são reconhecidos e caem em overview', () => {
+    expect(parseRoute('#ai/models')).toEqual({ view: 'overview' })
+    expect(parseRoute('#settings/editor/new')).toEqual({ view: 'overview' })
   })
 
   it('tab desconhecida cai na tab default da view', () => {
@@ -168,13 +157,13 @@ describe('useHashRoute', () => {
     const { result } = renderHook(() => useHashRoute())
 
     act(() => {
-      result.current[1]('kanban')
+      result.current[1]('chat')
     })
-    expect(window.location.hash).toBe('#kanban')
+    expect(window.location.hash).toBe('#chat')
     // navigate não chama setState direto: a rota só muda quando o evento chega.
     expect(result.current[0]).toEqual({ view: 'overview' })
 
-    await waitFor(() => expect(result.current[0]).toEqual({ view: 'kanban' }))
+    await waitFor(() => expect(result.current[0]).toEqual({ view: 'chat' }))
   })
 
   it('navigate escreve view/aba/id', async () => {
@@ -213,29 +202,25 @@ describe('useHashRoute', () => {
     }
   })
 
-  it('canonicaliza alias no mount via replaceState', () => {
+  it('não canonicaliza alias no mount: hash legado permanece e a view cai em overview', () => {
     setHash('#ai/models')
     const replaceSpy = vi.spyOn(window.history, 'replaceState')
     const { result } = renderHook(() => useHashRoute())
 
-    expect(window.location.hash).toBe('#providers/models')
-    expect(result.current[0]).toEqual({ view: 'providers', tab: 'models' })
-    expect(replaceSpy).toHaveBeenCalled()
+    expect(window.location.hash).toBe('#ai/models')
+    expect(result.current[0]).toEqual({ view: 'overview' })
+    expect(replaceSpy).not.toHaveBeenCalled()
   })
 
-  it('canonicaliza alias também em hashchange', () => {
+  it('não canonicaliza alias em hashchange: cai em overview', () => {
     const { result } = renderHook(() => useHashRoute())
     setHash('#settings/editor/new')
     act(() => {
       window.dispatchEvent(new Event('hashchange'))
     })
 
-    expect(window.location.hash).toBe('#prompts/editor/new')
-    expect(result.current[0]).toEqual({
-      view: 'prompts',
-      tab: 'editor',
-      id: 'new',
-    })
+    expect(window.location.hash).toBe('#settings/editor/new')
+    expect(result.current[0]).toEqual({ view: 'overview' })
   })
 
   it('não gera loop de hashchange (spy no handler)', async () => {

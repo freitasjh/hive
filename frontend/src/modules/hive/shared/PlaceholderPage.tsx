@@ -6,10 +6,11 @@ import { VIEW_LABELS, type ViewPageProps } from "../overview"
 import { PlaceholderView } from "./PlaceholderView"
 
 export interface PlaceholderPageProps extends ViewPageProps {
-  view: Exclude<DashboardViewId, "overview" | "login" | "ai" | "settings" | "providers" | "agents" | "chat" | "prompts">
+  /** Todas as telas do union têm página própria; o Exclude resulta em `never`. */
+  view: Exclude<DashboardViewId, "overview" | "login" | "providers" | "agents" | "chat" | "prompts">
 }
 
-/** Demais ids do DashboardViewId continuam como placeholders — telas admin têm ids próprios. */
+/** Contrato de placeholder remanescente: nenhuma view do union o alcança. */
 export function PlaceholderPage({ view, onSelectView }: PlaceholderPageProps) {
   return (
     <AtlasAdminTemplate title={VIEW_LABELS[view]} activeView={view} onSelectView={onSelectView}>

@@ -2,30 +2,14 @@
 
 import * as React from "react"
 import {
-  IconCalendarEvent,
-  IconCreditCard,
-  IconBuildingSkyscraper,
   IconDashboard,
-  IconFileDescription,
-  IconFileWord,
-  IconFolder,
-  IconHelp,
   IconInnerShadowTop,
   IconKey,
-  IconLayoutKanban,
-  IconListDetails,
-  IconReport,
   IconRobot,
-  IconSearch,
-  IconShieldCheck,
   IconSparkles,
   IconMessage2Ai,
-  IconUsers,
-  IconReceiptTax,
-  IconBuildingBank,
 } from "@tabler/icons-react"
 
-import { NavDocuments } from "@/components/shadcn/navigation/nav-documents"
 import { NavMain } from "@/components/shadcn/navigation/nav-main"
 import { NavSecondary } from "@/components/shadcn/navigation/nav-secondary"
 import { NavUser } from "@/components/shadcn/navigation/nav-user"
@@ -40,7 +24,8 @@ import {
   useSidebar,
 } from "@/components/shadcn/ui/sidebar"
 
-export type DashboardViewId = "overview" | "login" | "ai" | "providers" | "agents" | "chat" | "prompts" | "kanban" | "scheduler" | "transactions" | "cards" | "checkout" | "pdv" | "accounts" | "files" | "backoffice" | "internal-admin" | "reports" | "team" | "settings"
+/** Apenas telas que existem no Hive. Ids de template e aliases legados foram removidos. */
+export type DashboardViewId = "overview" | "login" | "providers" | "agents" | "chat" | "prompts"
 
 const data = {
   user: {
@@ -64,7 +49,7 @@ const data = {
     },
     {
       id: "agents" as DashboardViewId,
-      title: "Agentes (LLM)",
+      title: "Config LLM",
       url: "#agents",
       icon: IconRobot,
       badge: "AI",
@@ -76,121 +61,17 @@ const data = {
       icon: IconMessage2Ai,
       badge: "AI",
     },
-    {
-      id: "internal-admin" as DashboardViewId,
-      title: "SaaS Admin",
-      url: "#internal-admin",
-      icon: IconBuildingSkyscraper,
-      badge: "148",
-    },
-    {
-      id: "backoffice" as DashboardViewId,
-      title: "Backoffice",
-      url: "#backoffice",
-      icon: IconShieldCheck,
-      badge: "28",
-    },
-    {
-      id: "files" as DashboardViewId,
-      title: "Arquivos",
-      url: "#files",
-      icon: IconFolder,
-      badge: "8",
-    },
-    {
-      id: "kanban" as DashboardViewId,
-      title: "Quadro Kanban",
-      url: "#kanban",
-      icon: IconLayoutKanban,
-      badge: "6",
-    },
-    {
-      id: "scheduler" as DashboardViewId,
-      title: "Agendamento",
-      url: "#scheduler",
-      icon: IconCalendarEvent,
-      badge: "4",
-    },
-    {
-      id: "transactions" as DashboardViewId,
-      title: "Transações",
-      url: "#transactions",
-      icon: IconListDetails,
-      badge: "10",
-    },
-    {
-      id: "cards" as DashboardViewId,
-      title: "Cartões & Faturas",
-      url: "#cards",
-      icon: IconCreditCard,
-      badge: "3",
-    },
-    {
-      id: "pdv" as DashboardViewId,
-      title: "PDV Frente de Caixa",
-      url: "#pdv",
-      icon: IconReceiptTax,
-      badge: "NFC-e",
-    },
-    {
-      id: "checkout" as DashboardViewId,
-      title: "Checkout",
-      url: "#checkout",
-      icon: IconCreditCard,
-    },
-    {
-      id: "accounts" as DashboardViewId,
-      title: "Contas Bancárias",
-      url: "#accounts",
-      icon: IconBuildingBank,
-      badge: "6",
-    },
-    {
-      id: "reports" as DashboardViewId,
-      title: "Relatórios",
-      url: "#reports",
-      icon: IconReport,
-    },
-    {
-      id: "team" as DashboardViewId,
-      title: "Equipe",
-      url: "#team",
-      icon: IconUsers,
-    },
   ],
+  /**
+   * Ajuda/Busca (url "#", sem id) e o grupo Documentos (Faturas/Contratos/
+   * Integrações) foram removidos: não navegam e não existem no Hive.
+   */
   navSecondary: [
     {
       id: "prompts" as DashboardViewId,
       title: "Prompts",
       url: "#prompts",
       icon: IconSparkles,
-    },
-    {
-      title: "Ajuda",
-      url: "#",
-      icon: IconHelp,
-    },
-    {
-      title: "Busca",
-      url: "#",
-      icon: IconSearch,
-    },
-  ],
-  documents: [
-    {
-      name: "Faturas",
-      url: "#",
-      icon: IconFileDescription,
-    },
-    {
-      name: "Contratos",
-      url: "#",
-      icon: IconFileWord,
-    },
-    {
-      name: "Integrações",
-      url: "#",
-      icon: IconFolder,
     },
   ],
 }
@@ -254,9 +135,8 @@ export function AppSidebar({
       <SidebarContent>
         <NavMain
           items={navMainItems}
-          onNewEntry={onNewEntry ?? (() => onSelectView?.("transactions"))}
+          onNewEntry={onNewEntry ?? (() => onSelectView?.("overview"))}
         />
-        <NavDocuments items={data.documents} />
         <NavSecondary
           items={data.navSecondary.map((item) => ({
             ...item,

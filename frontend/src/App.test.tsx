@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { ApiError } from '@/services/api'
@@ -92,6 +92,11 @@ function tabSelected(name: RegExp) {
   return screen.getByRole('tab', { name }).getAttribute('aria-selected') === 'true'
 }
 
+/** Sidebar e barra móvel repetem os rótulos; o primeiro é o item do menu lateral. */
+function menuButton(name: RegExp) {
+  return screen.getAllByRole('button', { name })[0]
+}
+
 describe('App', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -131,23 +136,22 @@ describe('App', () => {
     }
   })
 
-  it('navega para uma view rotulada, atualiza a URL e retorna à visão geral', async () => {
+  it('navega para Config LLM pelo menu, atualiza a URL e retorna à visão geral', async () => {
+    mocks.getLlmConfig.mockResolvedValue(null)
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Quadro Kanban/ }))
+    fireEvent.click(menuButton(/Config LLM/))
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { level: 1, name: 'Quadro Kanban' })
-      ).toBeTruthy()
-    })
-    expect(window.location.hash).toBe('#kanban')
+    await waitFor(() => expect(breadcrumbPage('Config LLM')).toBeTruthy())
+    expect(window.location.hash).toBe('#agents')
     expect(
       screen.queryByRole('heading', { level: 1, name: 'Visão geral do Hive' })
     ).toBeNull()
-    expect(screen.getByText('Em preparação')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Voltar à visão geral' }))
+    setHash('#overview')
+    act(() => {
+      window.dispatchEvent(new Event('hashchange'))
+    })
 
     await waitFor(() => expect(overviewHeading()).toBeTruthy())
     expect(window.location.hash).toBe('#overview')
@@ -170,29 +174,29 @@ describe('App', () => {
     expect(await screen.findByTestId('credentials-loading')).toBeTruthy()
   })
 
-  it('abre Agentes (LLM) (id agents) na aba Provedor e modelo', async () => {
+  it('abre Config LLM (id agents) na aba Provedor e modelo', async () => {
     mocks.getLlmConfig.mockResolvedValue(null)
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Agentes \(LLM\)/ }))
+    fireEvent.click(menuButton(/Config LLM/))
 
-    await waitFor(() => expect(breadcrumbPage('Agentes (LLM)')).toBeTruthy())
+    await waitFor(() => expect(breadcrumbPage('Config LLM')).toBeTruthy())
     expect(window.location.hash).toBe('#agents')
     expect(tabSelected(/Provedor e modelo/)).toBe(true)
     expect(tabSelected(/Credenciais/)).toBe(false)
     expect(screen.queryByTestId('credentials-loading')).toBeNull()
   })
 
-  it('usa o titulo en-US para Agentes (LLM) quando o idioma e en', async () => {
+  it('usa o titulo en-US da página Config LLM quando o idioma e en', async () => {
     mocks.getLlmConfig.mockResolvedValue(null)
     const originalLang = document.documentElement.lang
     document.documentElement.lang = 'en'
     try {
       render(<App />)
 
-      fireEvent.click(screen.getByRole('button', { name: /Agentes \(LLM\)/ }))
+      fireEvent.click(menuButton(/Config LLM/))
 
-      await waitFor(() => expect(breadcrumbPage('Agents (LLM)')).toBeTruthy())
+      await waitFor(() => expect(breadcrumbPage('LLM Config')).toBeTruthy())
       expect(tabSelected(/Provider and model/)).toBe(true)
       expect(window.location.hash).toBe('#agents')
     } finally {
@@ -209,9 +213,9 @@ describe('App', () => {
     expect(await screen.findByTestId('credentials-loading')).toBeTruthy()
     expect(window.location.hash).toBe('#providers')
 
-    fireEvent.click(screen.getByRole('button', { name: /Agentes \(LLM\)/ }))
+    fireEvent.click(menuButton(/Config LLM/))
 
-    await waitFor(() => expect(breadcrumbPage('Agentes (LLM)')).toBeTruthy())
+    await waitFor(() => expect(breadcrumbPage('Config LLM')).toBeTruthy())
     expect(window.location.hash).toBe('#agents')
     expect(tabSelected(/Provedor e modelo/)).toBe(true)
     expect(screen.queryByTestId('credentials-loading')).toBeNull()
@@ -230,11 +234,48 @@ describe('App', () => {
     expect(tabSelected(/Templates/)).toBe(true)
   })
 
-  it('nao exibe rotulos antigos enganosos no menu', () => {
+  it('menu mostra apenas as telas existentes, sem ids de template', () => {
     render(<App />)
 
-    expect(screen.queryByRole('button', { name: /Atlas AI Copilot/ })).toBeNull()
-    expect(screen.queryByRole('link', { name: /Configurações/ })).toBeNull()
+    const menuLabel = (label: string) => {
+      const pattern = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      return (
+        screen.queryAllByRole('button', { name: pattern })[0] ??
+        screen.queryAllByRole('link', { name: pattern })[0]
+      )
+    }
+
+    for (const removed of [
+      'Atlas AI Copilot',
+      'Configurações',
+      'SaaS Admin',
+      'Backoffice',
+      'Arquivos',
+      'Quadro Kanban',
+      'Agendamento',
+      'Transações',
+      'Cartões & Faturas',
+      'PDV Frente de Caixa',
+      'Checkout',
+      'Contas Bancárias',
+      'Relatórios',
+      'Equipe',
+      'Ajuda',
+      'Busca',
+      'Documentos',
+    ]) {
+      expect(menuLabel(removed)).toBeUndefined()
+    }
+
+    for (const present of [
+      'Visão geral',
+      'Provedores e credenciais',
+      'Config LLM',
+      'Assistant',
+      'Prompts',
+    ]) {
+      expect(menuLabel(present)).toBeTruthy()
+    }
   })
 
   it('navega pela barra inferior móvel e mantém o shell acessível', async () => {
@@ -243,16 +284,15 @@ describe('App', () => {
     const mobileNav = screen.getByRole('navigation', {
       name: 'Navegação móvel inferior',
     })
-    const transactions = screen.getAllByRole('button', { name: /Transações/i })
 
-    fireEvent.click(transactions[transactions.length - 1])
+    fireEvent.click(within(mobileNav).getByRole('button', { name: /Assistant/ }))
 
     await waitFor(() => {
       expect(
-        screen.getByRole('heading', { level: 1, name: 'Transações' })
+        screen.getByRole('heading', { level: 1, name: 'Assistant' })
       ).toBeTruthy()
     })
-    expect(window.location.hash).toBe('#transactions')
+    expect(window.location.hash).toBe('#chat')
     expect(mobileNav).toBeTruthy()
   })
 
@@ -261,7 +301,7 @@ describe('App', () => {
     setHash('#agents')
     render(<App />)
 
-    expect(breadcrumbPage('Agentes (LLM)')).toBeTruthy()
+    expect(breadcrumbPage('Config LLM')).toBeTruthy()
     expect(tabSelected(/Provedor e modelo/)).toBe(true)
     expect(window.location.hash).toBe('#agents')
   })
@@ -269,7 +309,7 @@ describe('App', () => {
   it('menu Assistant abre #chat com seletor de prompt e composer', async () => {
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Assistant/ }))
+    fireEvent.click(menuButton(/Assistant/))
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 1, name: 'Assistant' })).toBeTruthy()
@@ -280,13 +320,13 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Conversas' })).toBeTruthy()
   })
 
-  it('deep-link: /#chat abre Assistant sem tocar em Agentes (LLM)', () => {
+  it('deep-link: /#chat abre Assistant sem abrir Config LLM', () => {
     setHash('#chat')
     render(<App />)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Assistant' })).toBeTruthy()
     expect(screen.queryByRole('tab', { name: /Provedor e modelo/ })).toBeNull()
-    expect(screen.getByRole('button', { name: /Agentes \(LLM\)/ })).toBeTruthy()
+    expect(menuButton(/Config LLM/)).toBeTruthy()
     expect(window.location.hash).toBe('#chat')
   })
 
@@ -311,51 +351,12 @@ describe('App', () => {
     expect(window.location.hash).toBe('#providers')
   })
 
-  it('deep-link: /#reports abre placeholder rotulado, sem undefined e com item ativo', () => {
-    setHash('#reports')
-    render(<App />)
-
-    expect(breadcrumbPage('Relatórios')).toBeTruthy()
-    expect(screen.getByRole('heading', { level: 1, name: 'Relatórios' })).toBeTruthy()
-    expect(document.title).toBe('Relatórios')
-    expect(document.title).not.toBe('undefined')
-    expect(window.location.hash).toBe('#reports')
-    expect(screen.getByRole('button', { name: /Relatórios/ }).getAttribute('data-active')).toBe('true')
-  })
-
-  it('deep-link: /#team abre placeholder rotulado, sem undefined e com item ativo', () => {
-    setHash('#team')
-    render(<App />)
-
-    expect(breadcrumbPage('Equipe')).toBeTruthy()
-    expect(screen.getByRole('heading', { level: 1, name: 'Equipe' })).toBeTruthy()
-    expect(document.title).toBe('Equipe')
-    expect(document.title).not.toBe('undefined')
-    expect(window.location.hash).toBe('#team')
-    expect(screen.getByRole('button', { name: /Equipe/ }).getAttribute('data-active')).toBe('true')
-  })
-
-  it('clique em Relatórios e Equipe no menu atualiza URL e título', async () => {
-    render(<App />)
-
-    fireEvent.click(screen.getByRole('button', { name: /Relatórios/ }))
-    await waitFor(() => expect(breadcrumbPage('Relatórios')).toBeTruthy())
-    expect(window.location.hash).toBe('#reports')
-    expect(document.title).not.toBe('undefined')
-
-    fireEvent.click(screen.getByRole('button', { name: /Equipe/ }))
-    await waitFor(() => expect(breadcrumbPage('Equipe')).toBeTruthy())
-    expect(window.location.hash).toBe('#team')
-    expect(document.title).not.toBe('undefined')
-    expect(screen.getByRole('button', { name: /Equipe/ }).getAttribute('data-active')).toBe('true')
-  })
-
   it('volta/avança do browser troca a tela via hashchange', async () => {
     mocks.getLlmConfig.mockResolvedValue(null)
     mocks.promptList.mockResolvedValue(EMPTY_PAGE)
     setHash('#agents')
     render(<App />)
-    expect(breadcrumbPage('Agentes (LLM)')).toBeTruthy()
+    expect(breadcrumbPage('Config LLM')).toBeTruthy()
 
     // avançar para Prompts (hash muda e o browser dispara hashchange)
     setHash('#prompts')
@@ -369,24 +370,22 @@ describe('App', () => {
     act(() => {
       window.dispatchEvent(new Event('hashchange'))
     })
-    await waitFor(() => expect(breadcrumbPage('Agentes (LLM)')).toBeTruthy())
+    await waitFor(() => expect(breadcrumbPage('Config LLM')).toBeTruthy())
   })
 
-  it('alias #ai cai em Provedores e #settings cai em Prompts', async () => {
-    mocks.listCredentials.mockResolvedValue([])
-    mocks.getLlmConfig.mockResolvedValue(null)
-    mocks.promptList.mockResolvedValue(EMPTY_PAGE)
-
+  it('alias legado #ai e #settings caem em overview e não são canonicalizados', () => {
     setHash('#ai')
     const first = render(<App />)
-    expect(breadcrumbPage('Provedores de IA')).toBeTruthy()
-    expect(tabSelected(/Credenciais/)).toBe(true)
+    expect(overviewHeading()).toBeTruthy()
+    expect(window.location.hash).toBe('#ai')
+    expect(document.title).toBe('Visão geral')
     first.unmount()
 
     setHash('#settings')
     render(<App />)
-    expect(breadcrumbPage('Prompts')).toBeTruthy()
-    expect(tabSelected(/Templates/)).toBe(true)
+    expect(overviewHeading()).toBeTruthy()
+    expect(window.location.hash).toBe('#settings')
+    expect(document.title).toBe('Visão geral')
   })
 
   it('hash vazio ou desconhecido cai em overview', () => {
@@ -450,9 +449,9 @@ describe('App', () => {
     setHash('#agents/models')
     render(<App />)
 
-    expect(breadcrumbPage('Agentes (LLM)')).toBeTruthy()
+    expect(breadcrumbPage('Config LLM')).toBeTruthy()
     expect(tabSelected(/Provedor e modelo/)).toBe(true)
-    expect(document.title).toBe('Agentes (LLM) · Provedor e modelo')
+    expect(document.title).toBe('Config LLM · Provedor e modelo')
     expect(screen.getAllByRole('link', { current: 'page' })).toHaveLength(1)
   })
 
@@ -485,14 +484,13 @@ describe('App', () => {
     expect((screen.getByTestId('input-name') as HTMLInputElement).value).toBe('Saudação')
   })
 
-  it('deep-link: #ai/models canonicaliza para #providers/models', () => {
-    mocks.listCredentials.mockReturnValue(new Promise(() => {}))
+  it('deep-link: #ai/models cai em overview, sem canonicalizar (quebra intencional)', () => {
     setHash('#ai/models')
     render(<App />)
 
-    expect(window.location.hash).toBe('#providers/models')
-    expect(breadcrumbPage('Provedores de IA')).toBeTruthy()
-    expect(tabSelected(/Provedor e modelo/)).toBe(true)
+    expect(window.location.hash).toBe('#ai/models')
+    expect(overviewHeading()).toBeTruthy()
+    expect(document.title).toBe('Visão geral')
   })
 
   it('tab desconhecida cai em templates da view prompts, nunca overview', () => {
