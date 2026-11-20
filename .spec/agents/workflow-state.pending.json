@@ -1,14 +1,15 @@
 {
   "_note": "Estado pendente (substitui snapshots anteriores). workflow-state.json na raiz é gravável apenas por delegação a papel de implementação — permissão nativa do orchestrator nega root. Não contornar via bash.",
   "type": "feature",
-  "current_feature": "guard-logout-ponta-a-ponta",
+  "current_feature": "mfa-fase0-totp-lib",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
-    "frontend": "frontend/src/App.tsx",
-    "auth": "frontend/src/services/auth.service.ts",
-    "backend": "backend/security/web/internal/v1/src/main/java/br/com/systec/hive/security/web/internal/v1/controller/LoginControllerV1.java"
+    "backend": "backend/dependencies/pom.xml",
+    "module": "backend/security/impl/pom.xml",
+    "test": "backend/security/impl/src/test/java/br/com/systec/hive/security/impl/TotpLibrarySmokeTest.java",
+    "research": ".spec/backend/mfa/RESEARCH.md"
   },
   "code_review_status": "passed",
   "code_review": {
@@ -16,16 +17,16 @@
     "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_sessions": ["ses_e092ada9fffeU5Q7iO7W8VEo2Y", "ses_e092adaa0ffeLKwQoBBmO8FrZt"],
-    "scope": "guard de rota + logout frontend e backend; 🟡 de ambos fechados (parse seguro do header, WCAG Label in Name, contrato 204 idempotente)"
+    "reviewer_session": "ses_e077732ebffe61tRd9Obdl928R",
+    "scope": "Fase 0 MFA: validação da lib TOTP 1.7.1 no Java 25; sem domínio MFA ainda"
   },
   "harness_status": "passed",
-  "harness_note": "Frontend 233/233 (20 arquivos), backend 423 testes exit 0 (54 reports). Guard: sem token #overview/#chat/#providers -> #login sem montar shell. Logout: POST /auth/logout com credentials:include + X-Tenant-ID + omitAuthorization:true, backend revoga refresh no Redis via revokeRefreshToken(tenantId, token) e expira cookie, 204 idempotente em todos os ramos (header ausente/malformado -> parse seguro). HITL do operador: origem do tenant = header X-Tenant-ID; completar revogacao no batch. Dividas 🔵 fora do PICCO: access nao blacklistado no logout (~15min), SecurityFilter valida Bearer em permitAll (cliente ja omite), CookieUtil.secure=false preexistente.",
+  "harness_note": "Branch feature/login-tela-mfa. mvn -f backend/pom.xml test -q exit 0, 425 testes (423+2), 0 falhas. Lib dev.samstevens.totp:totp:1.7.1 com property centralizada; API real confirmada via javap: generate(String,long) com timeStep=floorDiv(getTime(),30) — README estava errado (generate(secret) nao existe). commons-net ausente na arvore (optional); commons-codec 1.21.0 via BOM mitiga advisory. 🔵 registrado para Fase 2: TotpAdapter deve fixar setTimePeriod/setAllowedTimePeriodDiscrepancy explicitamente em vez do default. Arquivos de outro agente (publicapi DTO, frontend/assets) seguem fora do commit.",
   "gates": {
     "P1_P2": null,
     "P2_P3": null
   },
   "overrides": [],
   "prompt_assumptions": [],
-  "last_update": "2026-11-19T00:00:00Z"
+  "last_update": "2026-11-20T00:00:00Z"
 }

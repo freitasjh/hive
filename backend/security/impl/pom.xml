@@ -68,6 +68,12 @@
             <groupId>com.auth0</groupId>
             <artifactId>java-jwt</artifactId>
         </dependency>
+        <!-- Fase 0 MFA: validacao de build; versao gerenciada em hive-dependencies. -->
+        <dependency>
+            <groupId>dev.samstevens.totp</groupId>
+            <artifactId>totp</artifactId>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
