@@ -3,7 +3,9 @@ package br.com.systec.hive.security.impl.service;
 import br.com.systec.hive.security.api.domain.Login;
 import br.com.systec.hive.security.api.domain.LoginAuthenticate;
 import br.com.systec.hive.security.api.exceptions.InvalidCredentialsException;
+import br.com.systec.hive.security.api.exceptions.SecurityException;
 import br.com.systec.hive.security.api.service.SecurityTokenService;
+import br.com.systec.hive.security.api.service.TokenCacheService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -15,6 +17,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,6 +35,9 @@ class LoginServiceImplTest {
 
     @Mock
     private SecurityTokenService securityTokenService;
+
+    @Mock
+    private TokenCacheService tokenCacheService;
 
     @InjectMocks
     private LoginServiceImpl service;
@@ -89,5 +96,30 @@ class LoginServiceImplTest {
         assertNotNull(result);
         assertEquals(expected, result);
         verify(securityTokenService).generateNewAccessTokenByRefreshToken();
+    }
+
+    @Test
+    void when_logout_with_tenantAndToken_then_revokeRefreshToken() {
+        UUID tenantId = UUID.randomUUID();
+
+        service.logout(tenantId, "refresh-abc");
+
+        verify(tokenCacheService).revokeRefreshToken(tenantId, "refresh-abc");
+    }
+
+    @Test
+    void when_logout_with_nullTenant_then_throwSecurityException_withoutRevoke() {
+        assertThatThrownBy(() -> service.logout(null, "refresh-abc"))
+                .isInstanceOf(SecurityException.class);
+
+        verify(tokenCacheService, never()).revokeRefreshToken(any(), any());
+    }
+
+    @Test
+    void when_logout_with_blankToken_then_throwSecurityException_withoutRevoke() {
+        assertThatThrownBy(() -> service.logout(UUID.randomUUID(), "   "))
+                .isInstanceOf(SecurityException.class);
+
+        verify(tokenCacheService, never()).revokeRefreshToken(any(), any());
     }
 }

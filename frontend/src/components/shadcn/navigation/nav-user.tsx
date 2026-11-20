@@ -1,5 +1,6 @@
 "use client"
 
+import { useCallback, useState } from "react"
 import {
   IconCreditCard,
   IconDotsVertical,
@@ -29,17 +30,33 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/shadcn/ui/sidebar"
+import { useAuthI18n } from "@/modules/hive/auth/i18n"
+import { logout as logoutService } from "@/services/auth.service"
 
-export function NavUser({
-  user,
-}: {
+interface NavUserProps {
   user: {
     name: string
     email: string
     avatar: string
   }
-}) {
+  /** Injetável em testes/stories; em produção usa o logout com revogação no backend. */
+  onLogout?: () => Promise<void>
+}
+
+export function NavUser({ user, onLogout }: NavUserProps) {
   const { isMobile } = useSidebar()
+  const { t } = useAuthI18n()
+  const [isPending, setIsPending] = useState(false)
+
+  const handleLogout = useCallback(async () => {
+    if (isPending) return
+    setIsPending(true)
+    try {
+      await (onLogout ?? logoutService)()
+    } finally {
+      setIsPending(false)
+    }
+  }, [isPending, onLogout])
 
   return (
     <SidebarMenu>
@@ -116,9 +133,18 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={isPending}
+              aria-busy={isPending}
+              onSelect={(event) => {
+                // Mantém o menu aberto para expor o estado pendente (aria-busy +
+                // disabled); o redirect do logout desmonta o shell logo em seguida.
+                event.preventDefault()
+                void handleLogout()
+              }}
+            >
               <IconLogout />
-              Sair
+              {isPending ? t("auth.nav.loggingOut") : t("auth.nav.logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

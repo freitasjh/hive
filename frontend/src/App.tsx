@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from "react"
 import { isTabbedView, useHashRoute, type RouteTab } from "@/hooks/use-hash-route"
+import { getToken } from "@/services/auth.service"
 import { LoginPage } from "@/pages/LoginPage"
 import {
   AiAdminPage,
@@ -21,6 +22,8 @@ export default function App() {
   const [route, navigate, replaceRoute] = useHashRoute()
   const { view, tab, id } = route
   const handleAuthenticated = useCallback(() => navigate("overview"), [navigate])
+  // Token é lido a cada render: logout/401 mudam o hash e forçam nova leitura.
+  const authenticated = Boolean(getToken())
 
   // Páginas admin definem "<View> · <Aba>"; demais views exibem só o rótulo da view.
   useEffect(() => {
@@ -28,6 +31,15 @@ export default function App() {
       document.title = VIEW_LABELS[view]
     }
   }, [view])
+
+  // Guard: rota protegida sem sessão volta para #login ANTES de qualquer shell
+  // Atlas montar. `useLoginController` mantém o redirect inverso (token em
+  // #login → overview). Todos os hooks estão acima do early return.
+  useEffect(() => {
+    if (!authenticated && view !== "login") navigate("login")
+  }, [authenticated, view, navigate])
+
+  if (!authenticated && view !== "login") return null
 
   // Login vive fora do shell Atlas: nenhuma sidebar/header é montada antes dele.
   if (view === "login") {

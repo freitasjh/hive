@@ -39,3 +39,13 @@ export const Dark: Story = {
   ],
 }
 
+/** Estado default da ação Sair: rótulo pt-BR, logout injetado. */
+export const LogoutDefault: Story = {
+  args: { onLogout: async () => undefined },
+}
+
+/** Loading/disabled: ao ativar "Sair", o item fica `aria-busy` + `data-disabled`. */
+export const LogoutPending: Story = {
+  args: { onLogout: () => new Promise<void>(() => undefined) },
+}
+

@@ -11,6 +11,9 @@
  * - RestControllerTool.java:22-24 — `ResponseEntity.ok(object)`: resposta crua,
  *   sem envelope `{ data }`.
  *
+ * - Logout: `POST /auth/logout` com cookie `refreshToken` (`credentials:
+ *   'include'`) e header `X-Tenant-ID` — mesmo par de posse do refresh, usado
+ *   pelo backend para revogar no Redis. Resposta 204, sem envelope.
  * - Refresh: `POST /auth/refresh-token` (LoginControllerV1.java:63-80) exige
  *   header `X-Tenant-ID` (SecurityTokenServiceImpl.java:66-71) e o cookie
  *   HttpOnly `refreshToken` (CookieUtil.java:15-22). A resposta é crua
@@ -24,7 +27,7 @@
 
 import { ApiError, apiRequest, refreshAccess } from "./api"
 import { decodeTenantId } from "./jwt"
-import { clearSession, hasToken, setToken } from "./token.storage"
+import { clearSession, getTenantId, hasToken, setToken } from "./token.storage"
 
 export {
   TENANT_STORAGE_KEY,
@@ -47,6 +50,39 @@ export function refresh(): Promise<string> {
 }
 
 export const refreshService = { refresh }
+
+const LOGIN_HASH = "#login"
+
+/**
+ * Encerra a sessão. Tenta revogar o refresh token no backend (`POST
+ * /auth/logout`, cookie HttpOnly via `credentials: 'include'` + header
+ * `X-Tenant-ID` com a chave `hive_tenant_id`) — `/auth/*` nunca dispara
+ * refresh/redirect em `api.ts`, então não há loop. Sem tenant salvo a chamada
+ * ainda é feita (backend responde 204 idempotente). A falha do servidor é
+ * engolida sem log de segredo: o `finally` garante limpeza local e redirect
+ * mesmo assim, para que o cliente nunca fique com uma sessão local órfã.
+ *
+ * `omitAuthorization` é mandatório: o logout autentica-se por OUTRA posse
+ * (cookie + X-Tenant-ID). Enviar o Bearer faria o SecurityFilter validá-lo em
+ * `/v1/**` e devolver 401 antes do controller, sem revogar o refresh no Redis
+ * — mesmo motivo do refresh (api.ts, `performRefresh`).
+ */
+export async function logout(): Promise<void> {
+  try {
+    const tenantId = getTenantId()
+    await apiRequest<void>("/auth/logout", {
+      method: "POST",
+      credentials: "include",
+      omitAuthorization: true,
+      ...(tenantId ? { headers: { "X-Tenant-ID": tenantId } } : {}),
+    })
+  } catch {
+    /* revogação indisponível: a sessão local ainda é encerrada no finally. */
+  } finally {
+    clearSession()
+    window.location.hash = LOGIN_HASH
+  }
+}
 
 export interface LoginCredentials {
   username: string
@@ -115,5 +151,5 @@ export const loginService = {
   },
 
   isAuthenticated: hasToken,
-  logout: clearSession,
+  logout,
 }

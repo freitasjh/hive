@@ -2,6 +2,21 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { ApiError } from '@/services/api'
+import { setToken, TENANT_STORAGE_KEY, TOKEN_STORAGE_KEY } from '@/services/auth.service'
+
+const AUTH_TOKEN = 'jwt-opaco-de-teste'
+const AUTH_TENANT = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+
+/** Shell exige sessão; quase todo teste renderiza rotas protegidas. */
+function authenticate() {
+  setToken(AUTH_TOKEN, AUTH_TENANT)
+}
+
+/** Testes de login/guard precisam do estado anônimo real. */
+function anonymize() {
+  localStorage.removeItem(TOKEN_STORAGE_KEY)
+  localStorage.removeItem(TENANT_STORAGE_KEY)
+}
 
 const mocks = vi.hoisted(() => ({
   listCredentials: vi.fn(),
@@ -100,6 +115,7 @@ function menuButton(name: RegExp) {
 describe('App', () => {
   beforeEach(() => {
     localStorage.clear()
+    authenticate()
     setHash('')
     mocks.promptList.mockResolvedValue(EMPTY_PAGE)
     mocks.sessionList.mockResolvedValue(EMPTY_PAGE)
@@ -107,6 +123,49 @@ describe('App', () => {
 
   afterEach(() => {
     setHash('')
+  })
+
+  describe('guard de rota — sessão anônima', () => {
+    it.each(['#overview', '#chat', '#providers'])(
+      'rota protegida %s sem token redireciona para #login sem montar shell',
+      async (hash) => {
+        anonymize()
+        setHash(hash)
+        render(<App />)
+
+        await waitFor(() => expect(window.location.hash).toBe('#login'))
+        expect(screen.getByRole('heading', { level: 1, name: 'Entrar na sua conta' })).toBeTruthy()
+        expect(screen.queryByRole('banner')).toBeNull()
+        expect(
+          screen.queryByRole('navigation', { name: 'Navegação móvel inferior' })
+        ).toBeNull()
+        expect(screen.queryByText('Visão geral do Hive')).toBeNull()
+      }
+    )
+
+    it('com token, #login redireciona para overview', async () => {
+      setHash('#login')
+      render(<App />)
+
+      await waitFor(() => expect(window.location.hash).toBe('#overview'))
+      expect(overviewHeading()).toBeTruthy()
+    })
+
+    it('após remover o token, rota protegida deixa de ser acessível', async () => {
+      setHash('#overview')
+      const view = render(<App />)
+      expect(overviewHeading()).toBeTruthy()
+
+      anonymize()
+      setHash('#chat')
+      act(() => {
+        window.dispatchEvent(new Event('hashchange'))
+      })
+
+      await waitFor(() => expect(window.location.hash).toBe('#login'))
+      expect(screen.queryByRole('banner')).toBeNull()
+      view.unmount()
+    })
   })
 
   it('monta o shell admin com visão inicial overview', () => {
@@ -400,6 +459,7 @@ describe('App', () => {
   })
 
   it('rota #login renderiza o formulário antes do shell Atlas', () => {
+    anonymize()
     setHash('#login')
     render(<App />)
 
@@ -417,12 +477,17 @@ describe('App', () => {
 
   it('após autenticação bem-sucedida navega para overview', async () => {
     const { loginService } = await import('@/services/auth.service')
-    const loginSpy = vi.spyOn(loginService, 'login').mockResolvedValue({
-      userId: '11111111-1111-1111-1111-111111111111',
-      accessToken: 'jwt-opaco',
-      type: 'Bearer',
+    const loginSpy = vi.spyOn(loginService, 'login').mockImplementation(async () => {
+      // O serviço real persiste a sessão; o spy deve reproduzir esse efeito para o guard.
+      authenticate()
+      return {
+        userId: '11111111-1111-1111-1111-111111111111',
+        accessToken: AUTH_TOKEN,
+        type: 'Bearer',
+      }
     })
     try {
+      anonymize()
       setHash('#login')
       render(<App />)
 

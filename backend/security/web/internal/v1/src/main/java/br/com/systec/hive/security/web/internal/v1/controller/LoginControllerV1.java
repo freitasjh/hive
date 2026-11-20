@@ -24,10 +24,14 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping(RestPath.V1 + "/auth")
@@ -80,5 +84,32 @@ public class LoginControllerV1 {
         return RestControllerTool.of().buildSuccessResponse(new RefreshTokenResponseDTO(loginAuthenticateVO.getAccessToken()));
     }
 
+    @PostMapping(value = "/logout", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(description = "Encerra a sessão revogando o refresh token e expirando o cookie")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Logout realizado"),
+    })
+    public ResponseEntity<Void> logout(@RequestHeader(value = "X-Tenant-ID", required = false) String tenantIdHeader,
+                                       @CookieValue(name = "refreshToken", required = false) String refreshToken,
+                                       HttpServletResponse response) {
+        UUID tenantId = parseTenantId(tenantIdHeader);
+        if (tenantId != null && refreshToken != null && !refreshToken.isBlank()) {
+            service.logout(tenantId, refreshToken);
+        }
+
+        response.addHeader(HttpHeaders.SET_COOKIE, CookieUtil.of().revokeRefreshToken().toString());
+        return RestControllerTool.of().buildSuccessResponseNoContent();
+    }
+
+    private static UUID parseTenantId(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw.trim());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
 
 }

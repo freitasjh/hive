@@ -7,6 +7,7 @@ import br.com.systec.hive.security.api.exceptions.InvalidCredentialsException;
 import br.com.systec.hive.security.api.exceptions.SecurityException;
 import br.com.systec.hive.security.api.service.LoginService;
 import br.com.systec.hive.security.api.service.SecurityTokenService;
+import br.com.systec.hive.security.api.service.TokenCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,16 +16,21 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Service
 public class LoginServiceImpl implements LoginService {
     private static final Logger log = LoggerFactory.getLogger(LoginServiceImpl.class);
 
     private final AuthenticationManager authenticationManager;
     private final SecurityTokenService securityTokenService;
+    private final TokenCacheService tokenCacheService;
 
-    public LoginServiceImpl(AuthenticationManager authenticationManager, SecurityTokenService securityTokenService) {
+    public LoginServiceImpl(AuthenticationManager authenticationManager, SecurityTokenService securityTokenService,
+                            TokenCacheService tokenCacheService) {
         this.authenticationManager = authenticationManager;
         this.securityTokenService = securityTokenService;
+        this.tokenCacheService = tokenCacheService;
     }
 
     @Override
@@ -54,7 +60,11 @@ public class LoginServiceImpl implements LoginService {
     }
 
     @Override
-    public void logout(String refreshToken) throws SecurityException {
+    public void logout(UUID tenantId, String refreshToken) throws SecurityException {
+        if (tenantId == null || refreshToken == null || refreshToken.isBlank()) {
+            throw new SecurityException("Dados de logout inválidos");
+        }
 
+        tokenCacheService.revokeRefreshToken(tenantId, refreshToken);
     }
 }

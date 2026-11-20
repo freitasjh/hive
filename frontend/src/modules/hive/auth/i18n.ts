@@ -18,10 +18,16 @@ const ptBR = {
   "auth.login.submit": "Entrar",
   "auth.login.submitting": "Entrando…",
   "auth.login.brand": "Atlas",
+  "auth.login.hero.alt": "Rede hexagonal de agentes autônomos conectados representando a orquestração multi-agente do Hive",
+  "auth.login.hero.eyebrow": "HIVE AI",
+  "auth.login.hero.title": "Orquestração de sistemas multi-agentes autônomos",
+  "auth.login.hero.description": "Conecte provedores de LLM, prompts e agentes especializados em uma arquitetura modular.",
   "auth.login.error.invalid": "Usuário ou senha incorretos. Confira e tente novamente.",
   "auth.login.error.unavailable": "Não foi possível entrar agora. Tente novamente em instantes.",
   "auth.login.error.network": "Sem conexão com o servidor. Verifique sua rede e tente novamente.",
   "auth.login.error.unknown": "Não foi possível entrar. Tente novamente.",
+  "auth.nav.logout": "Sair",
+  "auth.nav.loggingOut": "Saindo…",
 } as const
 
 export type AuthMessageKey = keyof typeof ptBR
@@ -36,10 +42,16 @@ const enUS: Record<AuthMessageKey, string> = {
   "auth.login.submit": "Sign in",
   "auth.login.submitting": "Signing in…",
   "auth.login.brand": "Atlas",
+  "auth.login.hero.alt": "Hexagonal network of connected autonomous agents representing Hive multi-agent orchestration",
+  "auth.login.hero.eyebrow": "HIVE AI",
+  "auth.login.hero.title": "Orchestration of autonomous multi-agent systems",
+  "auth.login.hero.description": "Connect LLM providers, prompts, and specialized agents in a modular architecture.",
   "auth.login.error.invalid": "Incorrect username or password. Check and try again.",
   "auth.login.error.unavailable": "Could not sign in right now. Try again shortly.",
   "auth.login.error.network": "No connection to the server. Check your network and try again.",
   "auth.login.error.unknown": "Could not sign in. Try again.",
+  "auth.nav.logout": "Log out",
+  "auth.nav.loggingOut": "Logging out…",
 }
 
 const dictionaries: Record<AuthLocale, Record<AuthMessageKey, string>> = {

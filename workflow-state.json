@@ -1,14 +1,13 @@
 {
   "type": "feature",
-  "current_feature": "refresh-token-frontend",
+  "current_feature": "guard-logout-ponta-a-ponta",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
-    "frontend": "frontend/",
-    "api": "frontend/src/services/api.ts",
-    "jwt": "frontend/src/services/jwt.ts",
-    "storage": "frontend/src/services/token.storage.ts"
+    "frontend": "frontend/src/App.tsx",
+    "auth": "frontend/src/services/auth.service.ts",
+    "backend": "backend/security/web/internal/v1/src/main/java/br/com/systec/hive/security/web/internal/v1/controller/LoginControllerV1.java"
   },
   "code_review_status": "passed",
   "code_review": {
@@ -16,11 +15,14 @@
     "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_session": "ses_e0946f2f6ffejmJW24xsZm0qf1",
-    "scope": "refresh frontend com single-flight; 2 🟡 + 3 🔵 do 1o review fechados, re-review APPROVED"
+    "reviewer_sessions": [
+      "ses_e092ada9fffeU5Q7iO7W8VEo2Y",
+      "ses_e092adaa0ffeLKwQoBBmO8FrZt"
+    ],
+    "scope": "guard de rota + logout frontend e backend; 🟡 de ambos fechados (parse seguro do header, WCAG Label in Name, contrato 204 idempotente)"
   },
   "harness_status": "passed",
-  "harness_note": "Suíte 220/220 (19 arquivos), build 0. Branch feature/login-tela-mfa. tenant-id extraído do JWT (jwt.ts, claim SecurityTokenServiceImpl.java:42,189) salvo em hive_tenant_id; refresh POST /auth/refresh-token com credentials:include + X-Tenant-ID + omitAuthorization:true (correção H3: Bearer revogado dava 401 no SecurityFilter antes do controller), single-flight, retry 401, limpeza de ambas as chaves. H3 backend real: login UI, rotacao forçada, 401→refresh 200→retry 200, 3x401→1 refresh, console 0 ERROR/WARN JS; porta 8080 da IDE nao foi morta. DTOs .java de outro batch preservados fora do commit.",
+  "harness_note": "Frontend 233/233 (20 arquivos), backend 423 testes exit 0 (54 reports). Guard: sem token #overview/#chat/#providers -> #login sem montar shell. Logout: POST /auth/logout com credentials:include + X-Tenant-ID + omitAuthorization:true, backend revoga refresh no Redis via revokeRefreshToken(tenantId, token) e expira cookie, 204 idempotente em todos os ramos (header ausente/malformado -> parse seguro). HITL do operador: origem do tenant = header X-Tenant-ID; completar revogacao no batch. Dividas 🔵 fora do PICCO: access nao blacklistado no logout (~15min), SecurityFilter valida Bearer em permitAll (cliente ja omite), CookieUtil.secure=false preexistente.",
   "gates": {
     "P1_P2": null,
     "P2_P3": null

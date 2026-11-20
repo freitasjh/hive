@@ -8,6 +8,7 @@ import {
   getTenantId,
   getToken,
   loginService,
+  logout,
   setToken,
 } from './auth.service'
 
@@ -98,16 +99,113 @@ describe('loginService.login — POST /hive/v1/auth/login', () => {
     expect(getTenantId()).toBeNull()
   })
 
-  it('logout limpa accessToken e tenantId', async () => {
-    setToken(makeAccessToken(), TENANT)
-    expect(getToken()).not.toBeNull()
-    expect(getTenantId()).toBe(TENANT)
+  describe('logout — POST /hive/v1/auth/logout', () => {
+    it('tenta revogar no backend com cookie, limpa as duas chaves e redireciona', async () => {
+      const accessToken = makeAccessToken()
+      setToken(accessToken, TENANT)
+      const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+      vi.stubGlobal('fetch', fetchMock)
 
-    loginService.logout()
+      await logout()
 
-    expect(getToken()).toBeNull()
-    expect(getTenantId()).toBeNull()
-    expect(storedKeys()).toEqual([])
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('/hive/v1/auth/logout')
+      expect(url).not.toContain(accessToken)
+      expect(init.method).toBe('POST')
+      expect(init.credentials).toBe('include')
+      const headers = init.headers as Record<string, string>
+      expect(
+        Object.entries(headers).find(([name]) => name.toLowerCase() === 'x-tenant-id')?.[1]
+      ).toBe(TENANT)
+      expect(
+        Object.keys(headers).some((name) => name.toLowerCase() === 'authorization')
+      ).toBe(false)
+      expect(JSON.stringify(headers)).not.toContain(accessToken)
+      expect(getToken()).toBeNull()
+      expect(getTenantId()).toBeNull()
+      expect(storedKeys()).toEqual([])
+      expect(window.location.hash).toBe('#login')
+    })
+
+    it('sem tenant salvo: POST ainda é feito e sessão local limpa mesmo com 204 (contrato idempotente)', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+      vi.stubGlobal('fetch', fetchMock)
+
+      await logout()
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('/hive/v1/auth/logout')
+      expect(init.credentials).toBe('include')
+      const headers = init.headers as Record<string, string>
+      expect(
+        Object.keys(headers).some((name) => name.toLowerCase() === 'x-tenant-id')
+      ).toBe(false)
+      expect(
+        Object.keys(headers).some((name) => name.toLowerCase() === 'authorization')
+      ).toBe(false)
+      expect(getToken()).toBeNull()
+      expect(window.location.hash).toBe('#login')
+    })
+
+    it('sem tenant salvo e backend 500: erro é engolido, sessão limpa e redirect mantidos', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 500 }, 500)))
+
+      await expect(logout()).resolves.toBeUndefined()
+
+      expect(getToken()).toBeNull()
+      expect(getTenantId()).toBeNull()
+      expect(window.location.hash).toBe('#login')
+    })
+
+    it('limpa e redireciona mesmo se o backend responder 500', async () => {
+      setToken(makeAccessToken(), TENANT)
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 500 }, 500)))
+
+      await expect(logout()).resolves.toBeUndefined()
+
+      expect(getToken()).toBeNull()
+      expect(getTenantId()).toBeNull()
+      expect(window.location.hash).toBe('#login')
+    })
+
+    it('limpa e redireciona mesmo em falha de rede', async () => {
+      setToken(makeAccessToken(), TENANT)
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+
+      await expect(logout()).resolves.toBeUndefined()
+
+      expect(getToken()).toBeNull()
+      expect(getTenantId()).toBeNull()
+      expect(window.location.hash).toBe('#login')
+    })
+
+    it('não imprime token/tenant no console nem em URL', async () => {
+      const spies = [
+        vi.spyOn(console, 'log').mockImplementation(() => {}),
+        vi.spyOn(console, 'info').mockImplementation(() => {}),
+        vi.spyOn(console, 'warn').mockImplementation(() => {}),
+        vi.spyOn(console, 'error').mockImplementation(() => {}),
+      ]
+      const accessToken = makeAccessToken()
+      setToken(accessToken, TENANT)
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error(`Bearer ${accessToken}`)))
+
+      await logout()
+
+      for (const spy of spies) expect(spy).not.toHaveBeenCalled()
+      expect(window.location.hash).not.toContain(accessToken)
+    })
+
+    it('loginService.logout aponta para o mesmo logout com revogação', async () => {
+      setToken(makeAccessToken(), TENANT)
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
+
+      await loginService.logout()
+
+      expect(getToken()).toBeNull()
+      expect(window.location.hash).toBe('#login')
+    })
   })
 
   it('401 vira erro semântico sem payload de credencial e não redireciona', async () => {
