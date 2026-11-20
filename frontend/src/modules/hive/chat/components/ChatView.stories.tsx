@@ -53,6 +53,15 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
+export const Mobile: Story = {
+  decorators: [(Story) => <div className="mx-auto w-[375px]"><Story /></div>],
+}
+export const Desktop: Story = {
+  decorators: [(Story) => <div className="mx-auto w-[1280px]"><Story /></div>],
+}
+export const Compact: Story = {
+  decorators: [(Story) => <div className="mx-auto w-[996px]"><Story /></div>],
+}
 export const Empty: Story = {}
 export const Default: Story = {
   args: {

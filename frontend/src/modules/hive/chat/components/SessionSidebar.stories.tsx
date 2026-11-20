@@ -16,6 +16,7 @@ const meta = {
   component: SessionSidebar,
   parameters: { layout: "padded", a11y: { test: "error" } },
   tags: ["autodocs"],
+  decorators: [(Story) => <div className="h-[26rem] w-72"><Story /></div>],
   args: {
     sessions: [],
     selectedId: null,

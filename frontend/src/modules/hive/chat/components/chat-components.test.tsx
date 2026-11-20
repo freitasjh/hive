@@ -50,6 +50,20 @@ describe('PromptSelector', () => {
     expect(onChange).toHaveBeenCalledWith(P)
   })
 
+  it('rótulo é associado ao select (clique no rótulo ativa o controle)', () => {
+    const { container } = render(<PromptSelector prompts={[prompt]} value={null} onChange={vi.fn()} />)
+    const label = container.querySelector('label[for="chat-prompt"]') as HTMLLabelElement
+    const select = screen.getByTestId('prompt-select') as HTMLSelectElement
+    expect(label).toBeTruthy()
+    expect(label.textContent).toContain('Prompt')
+    expect(label.htmlFor).toBe('chat-prompt')
+    expect(label.control).toBe(select)
+    const onClick = vi.fn()
+    select.addEventListener('click', onClick)
+    label.click()
+    expect(onClick).toHaveBeenCalled()
+  })
+
   it('trava o seletor quando há sessão (prompt da sessão é autoritativo)', () => {
     render(<PromptSelector prompts={[prompt]} value={P} locked onChange={vi.fn()} />)
     const select = screen.getByTestId('prompt-select') as HTMLSelectElement
@@ -96,6 +110,13 @@ describe('ChatComposer', () => {
 
     rerender(<ChatComposer value="oi" onChange={vi.fn()} onSend={onSend} warning="Escolha um prompt antes de enviar." />)
     expect(screen.getByRole('alert').textContent).toMatch(/escolha um prompt/i)
+  })
+
+  it('disclaimer de risco não é truncado em uma linha e expõe title', () => {
+    render(<ChatComposer value="" onChange={vi.fn()} onSend={vi.fn()} />)
+    const disclaimer = screen.getByText(/o assistente pode cometer erros/i)
+    expect(disclaimer.className).toContain('line-clamp-2')
+    expect(disclaimer.getAttribute('title')).toMatch(/o assistente pode cometer erros/i)
   })
 
   it('textarea é controlada e não envia com texto vazio', () => {
@@ -153,6 +174,75 @@ describe('ChatThread', () => {
     )
     expect(screen.getByText('pergunta')).toBeTruthy()
     expect(screen.getByText('resposta')).toBeTruthy()
+  })
+
+  it('usa avatar e bolha por papel e mantém o container de rolagem interno', () => {
+    const { container } = render(
+      <ChatThread
+        messages={[message('a', 'USER', 'pergunta'), message('b', 'ASSISTANT', 'resposta')]}
+        onStarter={vi.fn()}
+        onLoadOlder={vi.fn()}
+        onRetry={vi.fn()}
+      />
+    )
+    expect(container.querySelector('[data-slot="scroll-area-viewport"]')).toBeTruthy()
+    expect(container.querySelectorAll('[data-slot="avatar-fallback"]')).toHaveLength(2)
+    const userRow = screen.getByLabelText('Você')
+    const assistantRow = screen.getByLabelText('Assistente')
+    expect(userRow.querySelector('[data-chat-bubble="USER"]')?.textContent).toContain('pergunta')
+    expect(assistantRow.querySelector('[data-chat-bubble="ASSISTANT"]')?.textContent).toContain('resposta')
+  })
+
+  it('rola para o fim já na montagem quando o histórico vem preenchido', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollHeight')
+    Object.defineProperty(Element.prototype, 'scrollHeight', { configurable: true, get: () => 200 })
+    try {
+      const { container } = render(
+        <ChatThread
+          messages={[message('a', 'USER', 'oi'), message('b', 'ASSISTANT', 'resposta')]}
+          onStarter={vi.fn()}
+          onLoadOlder={vi.fn()}
+          onRetry={vi.fn()}
+        />
+      )
+      const viewport = container.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement
+      expect(viewport.scrollTop).toBe(200)
+    } finally {
+      if (descriptor) Object.defineProperty(Element.prototype, 'scrollHeight', descriptor)
+      else Reflect.deleteProperty(Element.prototype, 'scrollHeight')
+    }
+  })
+
+  it('rola para o fim só quando o usuário já estava no fim', () => {
+    const first = message('a', 'USER', 'oi')
+    const second = message('b', 'ASSISTANT', 'resposta')
+    const third = message('c', 'USER', 'mais uma')
+    const { container, rerender } = render(
+      <ChatThread messages={[first]} onStarter={vi.fn()} onLoadOlder={vi.fn()} onRetry={vi.fn()} />
+    )
+    const viewport = container.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement
+    expect(viewport).toBeTruthy()
+
+    const metrics = (scrollHeight: number, clientHeight: number) => {
+      Object.defineProperty(viewport, 'scrollHeight', { configurable: true, value: scrollHeight })
+      Object.defineProperty(viewport, 'clientHeight', { configurable: true, value: clientHeight })
+    }
+    metrics(1000, 200)
+
+    viewport.scrollTop = 600
+    fireEvent.scroll(viewport) // usuário subiu: não gruda mais
+    rerender(
+      <ChatThread messages={[first, second]} onStarter={vi.fn()} onLoadOlder={vi.fn()} onRetry={vi.fn()} />
+    )
+    expect(viewport.scrollTop).toBe(600)
+
+    viewport.scrollTop = 800
+    fireEvent.scroll(viewport) // voltou ao fim: volta a grudar
+    metrics(1200, 200)
+    rerender(
+      <ChatThread messages={[first, second, third]} onStarter={vi.fn()} onLoadOlder={vi.fn()} onRetry={vi.fn()} />
+    )
+    expect(viewport.scrollTop).toBe(1200)
   })
 
   it('erro SYSTEM tem rótulo próprio — nunca máscara de assistente', () => {
@@ -313,5 +403,37 @@ describe('ChatView', () => {
   it('trava o seletor depois do primeiro turno', () => {
     render(<ChatView state={{ ...baseState, sessionId: S }} actions={baseActions} />)
     expect((screen.getByTestId('prompt-select') as HTMLSelectElement).disabled).toBe(true)
+  })
+
+  it('ordena conversa antes da sidebar em mobile e preserva grid 18rem|1fr no desktop', () => {
+    const { container } = render(<ChatView state={baseState} actions={baseActions} />)
+    const conversation = container.querySelector('[data-chat-pane="conversation"]') as HTMLElement
+    const sidebar = container.querySelector('[data-chat-pane="sidebar"]') as HTMLElement
+    const grid = conversation.parentElement as HTMLElement
+
+    expect(conversation.className).toContain('order-1')
+    expect(conversation.className).toContain('lg:col-start-2')
+    expect(sidebar.className).toContain('order-2')
+    expect(sidebar.className).toContain('lg:col-start-1')
+    expect(grid.className).toContain('grid-rows-[minmax(0,1fr)_auto]')
+    expect(grid.className).toContain('lg:grid-cols-[18rem_minmax(0,1fr)]')
+
+    expect(screen.getByTestId('chat-thread').className).toContain('min-h-0')
+    expect(container.querySelector('[data-slot="scroll-area-viewport"]')).toBeTruthy()
+    expect(screen.getByTestId('chat-form')).toBeTruthy()
+  })
+
+  it('cap mobile da sidebar acomoda lista e paginador quando totalPages > 1', () => {
+    const { container } = render(
+      <ChatView
+        state={{ ...baseState, sessions: [session, { ...session, id: S + '-2', title: 'Conversa 2' }], sessionsTotalPages: 3 }}
+        actions={baseActions}
+      />
+    )
+    const sidebar = container.querySelector('[data-chat-pane="sidebar"]') as HTMLElement
+    expect(sidebar.className).toContain('max-h-40')
+    expect(sidebar.querySelector('[data-slot="scroll-area-viewport"]')).toBeTruthy()
+    expect(screen.getByText('Conversa')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /próximas conversas/i })).toBeTruthy()
   })
 })
