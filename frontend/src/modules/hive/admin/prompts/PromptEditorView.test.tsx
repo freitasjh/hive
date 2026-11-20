@@ -59,9 +59,48 @@ describe('PromptEditorView', () => {
     const actions = makeActions()
     render(<PromptEditorView state={makeState({ validationError: 'Preencha nome, code e template' })} actions={actions} />)
 
-    expect(screen.getByTestId('editor-validation-error')).toBeTruthy()
+    expect(screen.getByTestId('editor-validation')).toBeTruthy()
     fireEvent.click(screen.getByTestId('save-btn'))
     expect(actions.onSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('mostra a validação no topo do editor, visível sem rolagem e sem duplicata no rodapé', () => {
+    const message = 'Preencha nome, code e template'
+    render(<PromptEditorView state={makeState({ validationError: message })} actions={makeActions()} />)
+
+    const banner = screen.getByTestId('editor-validation')
+    expect(banner.getAttribute('role')).toBe('alert')
+    expect(banner.textContent).toContain(message)
+    // banner vem antes dos campos obrigatórios no DOM (topo, sem rolagem)
+    expect(banner.compareDocumentPosition(screen.getByTestId('input-name')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // mensagem não se repete no rodapé
+    expect(screen.queryByTestId('editor-validation-error')).toBeNull()
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+  })
+
+  it('não oferece retry para erro de validação', () => {
+    render(
+      <PromptEditorView
+        state={makeState({ validationError: 'Preencha nome, code e template' })}
+        actions={makeActions()}
+      />
+    )
+    expect(screen.queryByRole('button', { name: /tentar novamente/i })).toBeNull()
+  })
+
+  it('dá prioridade ao erro de API no banner do topo e mantém retry', () => {
+    const actions = makeActions()
+    render(
+      <PromptEditorView
+        state={makeState({ error: 'Conflito ao salvar (409)', validationError: 'Preencha nome, code e template' })}
+        actions={actions}
+      />
+    )
+    const banner = screen.getByTestId('editor-error')
+    expect(banner.textContent).toContain('Conflito ao salvar (409)')
+    expect(banner.textContent).not.toContain('Preencha nome, code e template')
+    fireEvent.click(screen.getByRole('button', { name: /tentar novamente/i }))
+    expect(actions.onRetry).toHaveBeenCalledTimes(1)
   })
 
   it('desabilita code quando editando e mostra tags com remoção', () => {

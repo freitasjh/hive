@@ -59,6 +59,9 @@ export function PromptEditorView({ state, actions }: PromptEditorViewProps) {
   const [previewValues, setPreviewValues] = useState<Record<string, string>>({})
   const variables = useMemo(() => extractVars(state.template), [state.template])
   const rendered = useMemo(() => renderPreview(state.template, previewValues), [state.template, previewValues])
+  // Erro de API tem prioridade; validação usa o mesmo banner do topo, sem retry.
+  const topError = state.error ?? state.validationError
+  const isApiError = Boolean(state.error)
 
   async function copyPreview() {
     try {
@@ -87,7 +90,13 @@ export function PromptEditorView({ state, actions }: PromptEditorViewProps) {
         </h1>
       </div>
 
-      {state.error ? <ErrorBanner message={state.error} onRetry={actions.onRetry} testId="editor-error" /> : null}
+      {topError ? (
+        <ErrorBanner
+          message={topError}
+          onRetry={isApiError ? actions.onRetry : undefined}
+          testId={isApiError ? "editor-error" : "editor-validation"}
+        />
+      ) : null}
       {state.loading ? <LoadingBlock testId="editor-loading" rows={6} /> : null}
 
       {!state.loading ? (
@@ -224,14 +233,6 @@ export function PromptEditorView({ state, actions }: PromptEditorViewProps) {
                     ))}
                   </div>
                 </div>
-
-                {state.validationError ? (
-                  <NoticeBanner
-                    message={state.validationError}
-                    tone="warn"
-                    testId="editor-validation-error"
-                  />
-                ) : null}
 
                 <div className="flex justify-end gap-3">
                   <Button type="button" variant="ghost" onClick={actions.onBack}>

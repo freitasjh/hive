@@ -61,6 +61,18 @@ export const Active: Story = {
 export const Success: Story = {
   args: { state: { ...state, validationError: null }, actions },
 }
+export const Validation: Story = {
+  args: {
+    state: {
+      ...state,
+      name: "",
+      code: "",
+      template: "",
+      validationError: "Preencha nome, code e template",
+    },
+    actions,
+  },
+}
 export const Hover: Story = {
   ...Default,
   decorators: [(Story) => <div className="hover:bg-accent"><Story /></div>],
