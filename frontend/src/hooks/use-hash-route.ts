@@ -22,7 +22,6 @@ const VIEW_IDS = {
   login: true,
   mfa: true,
   providers: true,
-  agents: true,
   chat: true,
   prompts: true,
 } satisfies Record<DashboardViewId, true>
@@ -30,14 +29,12 @@ const VIEW_IDS = {
 /** Abas válidas por view. View sem aba (overview, placeholders) não entra no mapa. */
 const TABS_BY_VIEW: Partial<Record<DashboardViewId, readonly RouteTab[]>> = {
   providers: ["credentials", "models"],
-  agents: ["credentials", "models"],
   prompts: ["templates", "editor"],
 }
 
-/** Default preserva o comportamento anterior: agents abre em models. */
+/** Default: #providers abre em credentials; #providers/models abre models. */
 const DEFAULT_TAB: Partial<Record<DashboardViewId, RouteTab>> = {
   providers: "credentials",
-  agents: "models",
   prompts: "templates",
 }
 
@@ -57,8 +54,9 @@ function segmentsOf(hash: string): string[] {
  * Converte o fragmento da URL em uma rota. Pura e sem dependência de browser.
  * Formato: `#<view>/<tab>[/<id>]` (`Location.hash` já vem com `#` — MDN).
  * Aba desconhecida cai na default da view; view desconhecida (inclusive os
- * aliases legados #ai/#settings, removidos) cai em overview. `#prompts/editor`
- * sem id cai em templates — editor nunca aparece vazio.
+ * aliases legados #ai/#settings e o antigo #agents, removidos) cai em overview
+ * — quebra intencional de deep-link. `#prompts/editor` sem id cai em templates
+ * — editor nunca aparece vazio.
  */
 export function parseRoute(hash: string): Route {
   const segments = segmentsOf(hash)

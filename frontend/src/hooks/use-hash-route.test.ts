@@ -14,7 +14,6 @@ const CANONICAL_IDS: DashboardViewId[] = [
   'login',
   'mfa',
   'providers',
-  'agents',
   'chat',
   'prompts',
 ]
@@ -37,8 +36,13 @@ describe('parseHash (compat: retorna só a view)', () => {
   })
 
   it('lê a view mesmo quando a URL traz sub-rota de aba', () => {
-    expect(parseHash('#agents/models')).toBe('agents')
+    expect(parseHash('#providers/models')).toBe('providers')
     expect(parseHash('#prompts/editor/new')).toBe('prompts')
+  })
+
+  it('deep-link legado #agents cai em overview (quebra intencional de link)', () => {
+    expect(parseHash('#agents')).toBe('overview')
+    expect(parseHash('#agents/models')).toBe('overview')
   })
 
   it.each(['', '#', '#/shadcn', '#desconhecido', '#foo/bar'])(
@@ -68,7 +72,10 @@ describe('parseRoute', () => {
   })
 
   it('deep-link de aba nas views admin', () => {
-    expect(parseRoute('#agents/models')).toEqual({ view: 'agents', tab: 'models' })
+    expect(parseRoute('#providers/models')).toEqual({
+      view: 'providers',
+      tab: 'models',
+    })
     expect(parseRoute('#providers/credentials')).toEqual({
       view: 'providers',
       tab: 'credentials',
@@ -97,9 +104,15 @@ describe('parseRoute', () => {
     expect(parseRoute('#settings/editor/new')).toEqual({ view: 'overview' })
   })
 
+  it('view agents removida cai em overview, inclusive com sub-rota', () => {
+    expect(parseRoute('#agents')).toEqual({ view: 'overview' })
+    expect(parseRoute('#agents/models')).toEqual({ view: 'overview' })
+    expect(parseRoute('#agents/credentials')).toEqual({ view: 'overview' })
+    expect(isTabbedView('providers')).toBe(true)
+  })
+
   it('tab desconhecida cai na tab default da view', () => {
     expect(parseRoute('#prompts/foo')).toEqual({ view: 'prompts', tab: 'templates' })
-    expect(parseRoute('#agents/foo')).toEqual({ view: 'agents', tab: 'models' })
     expect(parseRoute('#providers/foo')).toEqual({
       view: 'providers',
       tab: 'credentials',
@@ -138,9 +151,9 @@ describe('useHashRoute', () => {
   })
 
   it('deep-link: lê a rota completa no mount', () => {
-    setHash('#agents/models')
+    setHash('#providers/models')
     const { result } = renderHook(() => useHashRoute())
-    expect(result.current[0]).toEqual({ view: 'agents', tab: 'models' })
+    expect(result.current[0]).toEqual({ view: 'providers', tab: 'models' })
   })
 
   it('reage a hashchange — volta/avanco troca a tela', () => {
@@ -153,11 +166,11 @@ describe('useHashRoute', () => {
     })
     expect(result.current[0]).toEqual({ view: 'prompts', tab: 'templates' })
 
-    setHash('#agents')
+    setHash('#providers/models')
     act(() => {
       window.dispatchEvent(new Event('hashchange'))
     })
-    expect(result.current[0]).toEqual({ view: 'agents', tab: 'models' })
+    expect(result.current[0]).toEqual({ view: 'providers', tab: 'models' })
   })
 
   it('navega escrevendo o hash e atualiza a rota somente no hashchange (fonte única)', async () => {
@@ -237,9 +250,9 @@ describe('useHashRoute', () => {
       const { result } = renderHook(() => useHashRoute())
 
       act(() => {
-        result.current[1]('agents')
+        result.current[1]('providers')
       })
-      await waitFor(() => expect(result.current[0]).toEqual({ view: 'agents', tab: 'models' }))
+      await waitFor(() => expect(result.current[0]).toEqual({ view: 'providers', tab: 'credentials' }))
       await new Promise((resolve) => setTimeout(resolve, 25))
 
       const hashchangeCalls = handler.mock.calls.filter(

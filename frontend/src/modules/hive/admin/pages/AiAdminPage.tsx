@@ -15,8 +15,6 @@ export interface AdminPageProps {
 type AiTab = "credentials" | "models"
 
 export interface AiAdminPageProps extends AdminPageProps {
-  /** View da URL — controla breadcrumb/título, independente da aba. */
-  view?: "providers" | "agents"
   /** Aba controlada pela URL. */
   tab?: AiTab
   /** @deprecated use `tab`. Mantido para chamadas legadas. */
@@ -29,29 +27,31 @@ const TAB_KEY: Record<AiTab, AdminMessageKey> = {
   models: "admin.tab.models",
 }
 
-/** Abriga credenciais + config LLM do tenant; alias `ai` mantém o comportamento legado. */
+/** Abriga credenciais + configuração de credencial/modelo do tenant da view providers. */
 export function AiAdminPage({
   onSelectView,
-  view,
   tab,
   initialTab,
   onTabChange,
 }: AiAdminPageProps) {
   const { t } = useAdminI18n()
   const activeTab: AiTab = tab ?? initialTab ?? "credentials"
-  const activeView: DashboardViewId = view ?? (activeTab === "models" ? "agents" : "providers")
-  const title = activeView === "agents"
-    ? t("admin.agents.title")
+  // A aba models é Config LLM: título vem da aba, não de uma view "agents" separada.
+  const title = activeTab === "models"
+    ? t("admin.tab.models")
     : t("admin.credentials.title")
 
   useEffect(() => {
-    document.title = t("admin.document.title", { view: title, tab: t(TAB_KEY[activeTab]) })
-  }, [t, title, activeTab])
+    document.title = t("admin.document.title", {
+      view: t("admin.credentials.title"),
+      tab: t(TAB_KEY[activeTab]),
+    })
+  }, [t, activeTab])
 
   return (
     <AtlasAdminTemplate
       title={title}
-      activeView={activeView}
+      activeView="providers"
       onSelectView={onSelectView}
     >
       <div className="flex flex-col gap-6 px-4 lg:px-6">

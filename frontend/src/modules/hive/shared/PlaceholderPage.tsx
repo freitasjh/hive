@@ -7,7 +7,7 @@ import { PlaceholderView } from "./PlaceholderView"
 
 export interface PlaceholderPageProps extends ViewPageProps {
   /** Todas as telas do union têm página própria; o Exclude resulta em `never`. */
-  view: Exclude<DashboardViewId, "overview" | "login" | "providers" | "agents" | "chat" | "prompts">
+  view: Exclude<DashboardViewId, "overview" | "login" | "providers" | "chat" | "prompts">
 }
 
 /** Contrato de placeholder remanescente: nenhuma view do union o alcança. */

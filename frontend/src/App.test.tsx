@@ -201,14 +201,14 @@ describe('App', () => {
     }
   })
 
-  it('navega para Config LLM pelo menu, atualiza a URL e retorna à visão geral', async () => {
-    mocks.getLlmConfig.mockResolvedValue(null)
+  it('navega para Provedores e credenciais pelo menu, atualiza a URL e retorna à visão geral', async () => {
+    mocks.listCredentials.mockReturnValue(new Promise(() => {}))
     render(<App />)
 
-    fireEvent.click(menuButton(/Config LLM/))
+    fireEvent.click(menuButton(/Provedores e credenciais/))
 
-    await waitFor(() => expect(breadcrumbPage('Config LLM')).toBeTruthy())
-    expect(window.location.hash).toBe('#agents')
+    await waitFor(() => expect(breadcrumbPage('Provedores de IA')).toBeTruthy())
+    expect(window.location.hash).toBe('#providers')
     expect(
       screen.queryByRole('heading', { level: 1, name: 'Visão geral do Hive' })
     ).toBeNull()
@@ -239,37 +239,38 @@ describe('App', () => {
     expect(await screen.findByTestId('credentials-loading')).toBeTruthy()
   })
 
-  it('abre Config LLM (id agents) na aba Provedor e modelo', async () => {
+  it('#providers/models abre a aba Provedor e modelo sem item de menu separado', () => {
     mocks.getLlmConfig.mockResolvedValue(null)
+    setHash('#providers/models')
     render(<App />)
 
-    fireEvent.click(menuButton(/Config LLM/))
-
-    await waitFor(() => expect(breadcrumbPage('Config LLM')).toBeTruthy())
-    expect(window.location.hash).toBe('#agents')
+    expect(breadcrumbPage('Provedor e modelo')).toBeTruthy()
+    expect(window.location.hash).toBe('#providers/models')
     expect(tabSelected(/Provedor e modelo/)).toBe(true)
     expect(tabSelected(/Credenciais/)).toBe(false)
     expect(screen.queryByTestId('credentials-loading')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Config LLM/ })).toBeNull()
+    expect(document.title).toBe('Provedores de IA · Provedor e modelo')
   })
 
-  it('usa o titulo en-US da página Config LLM quando o idioma e en', async () => {
+  it('usa o titulo en-US da aba Provedor e modelo quando o idioma e en', () => {
     mocks.getLlmConfig.mockResolvedValue(null)
     const originalLang = document.documentElement.lang
     document.documentElement.lang = 'en'
     try {
+      setHash('#providers/models')
       render(<App />)
 
-      fireEvent.click(menuButton(/Config LLM/))
-
-      await waitFor(() => expect(breadcrumbPage('LLM Config')).toBeTruthy())
+      expect(breadcrumbPage('Provider and model')).toBeTruthy()
       expect(tabSelected(/Provider and model/)).toBe(true)
-      expect(window.location.hash).toBe('#agents')
+      expect(screen.queryByRole('button', { name: /Config LLM/ })).toBeNull()
+      expect(document.title).toBe('AI providers · Provider and model')
     } finally {
       document.documentElement.lang = originalLang
     }
   })
 
-  it('troca a aba ativa ao navegar de providers para agents', async () => {
+  it('troca a aba ativa de Credenciais para Provedor e modelo via PillToggle', async () => {
     mocks.listCredentials.mockReturnValue(new Promise(() => {}))
     mocks.getLlmConfig.mockResolvedValue(null)
     render(<App />)
@@ -277,13 +278,13 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /Provedores e credenciais/ }))
     expect(await screen.findByTestId('credentials-loading')).toBeTruthy()
     expect(window.location.hash).toBe('#providers')
+    expect(tabSelected(/Credenciais/)).toBe(true)
 
-    fireEvent.click(menuButton(/Config LLM/))
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /Provedor e modelo/ }))
 
-    await waitFor(() => expect(breadcrumbPage('Config LLM')).toBeTruthy())
-    expect(window.location.hash).toBe('#agents')
+    await waitFor(() => expect(window.location.hash).toBe('#providers/models'))
     expect(tabSelected(/Provedor e modelo/)).toBe(true)
-    expect(screen.queryByTestId('credentials-loading')).toBeNull()
+    expect(breadcrumbPage('Provedor e modelo')).toBeTruthy()
   })
 
   it('abre Prompts (id prompts) com breadcrumb e aba Templates ativa', async () => {
@@ -328,6 +329,7 @@ describe('App', () => {
       'Ajuda',
       'Busca',
       'Documentos',
+      'Config LLM',
     ]) {
       expect(menuLabel(removed)).toBeUndefined()
     }
@@ -335,7 +337,6 @@ describe('App', () => {
     for (const present of [
       'Visão geral',
       'Provedores e credenciais',
-      'Config LLM',
       'Assistant',
       'Prompts',
     ]) {
@@ -361,15 +362,19 @@ describe('App', () => {
     expect(mobileNav).toBeTruthy()
   })
 
-  it('deep-link: /#agents abre Agentes na aba Provedor e modelo', () => {
-    mocks.getLlmConfig.mockResolvedValue(null)
-    setHash('#agents')
-    render(<App />)
+  it.each(['#agents', '#agents/models', '#agents/credentials'])(
+    'deep-link legado %s cai em overview (quebra intencional de link)',
+    (hash) => {
+      setHash(hash)
+      render(<App />)
 
-    expect(breadcrumbPage('Config LLM')).toBeTruthy()
-    expect(tabSelected(/Provedor e modelo/)).toBe(true)
-    expect(window.location.hash).toBe('#agents')
-  })
+      expect(overviewHeading()).toBeTruthy()
+      expect(breadcrumbPage('Visão geral')).toBeTruthy()
+      expect(document.title).toBe('Visão geral')
+      expect(window.location.hash).toBe(hash)
+      expect(screen.queryByRole('tab', { name: /Provedor e modelo/ })).toBeNull()
+    }
+  )
 
   it('menu Assistant abre #chat com seletor de prompt e composer', async () => {
     render(<App />)
@@ -385,13 +390,13 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Conversas' })).toBeTruthy()
   })
 
-  it('deep-link: /#chat abre Assistant sem abrir Config LLM', () => {
+  it('deep-link: /#chat abre Assistant sem abrir Provedores e credenciais', () => {
     setHash('#chat')
     render(<App />)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Assistant' })).toBeTruthy()
     expect(screen.queryByRole('tab', { name: /Provedor e modelo/ })).toBeNull()
-    expect(menuButton(/Config LLM/)).toBeTruthy()
+    expect(menuButton(/Provedores e credenciais/)).toBeTruthy()
     expect(window.location.hash).toBe('#chat')
   })
 
@@ -419,9 +424,9 @@ describe('App', () => {
   it('volta/avança do browser troca a tela via hashchange', async () => {
     mocks.getLlmConfig.mockResolvedValue(null)
     mocks.promptList.mockResolvedValue(EMPTY_PAGE)
-    setHash('#agents')
+    setHash('#providers/models')
     render(<App />)
-    expect(breadcrumbPage('Config LLM')).toBeTruthy()
+    expect(breadcrumbPage('Provedor e modelo')).toBeTruthy()
 
     // avançar para Prompts (hash muda e o browser dispara hashchange)
     setHash('#prompts')
@@ -430,12 +435,12 @@ describe('App', () => {
     })
     await waitFor(() => expect(breadcrumbPage('Prompts')).toBeTruthy())
 
-    // voltar para Agentes
-    setHash('#agents')
+    // voltar para Provedor e modelo
+    setHash('#providers/models')
     act(() => {
       window.dispatchEvent(new Event('hashchange'))
     })
-    await waitFor(() => expect(breadcrumbPage('Config LLM')).toBeTruthy())
+    await waitFor(() => expect(breadcrumbPage('Provedor e modelo')).toBeTruthy())
   })
 
   it('alias legado #ai e #settings caem em overview e não são canonicalizados', () => {
@@ -517,14 +522,14 @@ describe('App', () => {
     }
   })
 
-  it('deep-link: #agents/models abre models e mantém breadcrumb só da view', () => {
+  it('deep-link: #providers/models abre models com breadcrumb e título coerentes', () => {
     mocks.getLlmConfig.mockResolvedValue(null)
-    setHash('#agents/models')
+    setHash('#providers/models')
     render(<App />)
 
-    expect(breadcrumbPage('Config LLM')).toBeTruthy()
+    expect(breadcrumbPage('Provedor e modelo')).toBeTruthy()
     expect(tabSelected(/Provedor e modelo/)).toBe(true)
-    expect(document.title).toBe('Config LLM · Provedor e modelo')
+    expect(document.title).toBe('Provedores de IA · Provedor e modelo')
     expect(screen.getAllByRole('link', { current: 'page' })).toHaveLength(1)
   })
 
@@ -768,6 +773,7 @@ describe('App', () => {
 
     it('login com mfaSetupAvailable=true mostra convite sobre overview sem bloquear a navegação', async () => {
       mocks.getLlmConfig.mockResolvedValue(null)
+      mocks.listCredentials.mockReturnValue(new Promise(() => {}))
       const loginSpy = await loginWith(true)
       try {
         expect(overviewHeading()).toBeTruthy()
@@ -778,8 +784,8 @@ describe('App', () => {
         expect(document.body.style.pointerEvents).not.toBe('none')
 
         // Overview continua interativo enquanto o convite está visível.
-        fireEvent.click(menuButton(/Config LLM/))
-        await waitFor(() => expect(window.location.hash).toBe('#agents'))
+        fireEvent.click(menuButton(/Provedores e credenciais/))
+        await waitFor(() => expect(window.location.hash).toBe('#providers'))
         expect(screen.getByTestId('mfa-setup-invite')).toBeTruthy()
         expect(loginSpy).toHaveBeenCalledTimes(1)
       } finally {

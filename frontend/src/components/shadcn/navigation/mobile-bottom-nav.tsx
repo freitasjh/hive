@@ -3,7 +3,6 @@
 import {
   IconDashboard,
   IconKey,
-  IconRobot,
   IconMessage2Ai,
   IconDots,
 } from "@tabler/icons-react"
@@ -38,11 +37,6 @@ export function MobileBottomNav({
       id: "providers" as DashboardViewId,
       label: "Provedores",
       icon: IconKey,
-    },
-    {
-      id: "agents" as DashboardViewId,
-      label: "Config LLM",
-      icon: IconRobot,
     },
   ]
 

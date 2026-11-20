@@ -14,7 +14,6 @@ export const VIEW_LABELS: Record<DashboardViewId, string> = {
   login: "Entrar",
   mfa: "Verificação",
   providers: "Provedores e credenciais",
-  agents: "Config LLM",
   chat: "Assistant",
   prompts: "Prompts",
 }

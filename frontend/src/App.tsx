@@ -107,18 +107,8 @@ export default function App() {
   } else if (view === "providers") {
     shell = (
       <AiAdminPage
-        view="providers"
         tab={tab === "models" ? "models" : "credentials"}
         onTabChange={(next: RouteTab) => replaceRoute("providers", next === "models" ? "models" : "credentials")}
-        onSelectView={navigate}
-      />
-    )
-  } else if (view === "agents") {
-    shell = (
-      <AiAdminPage
-        view="agents"
-        tab={tab === "credentials" ? "credentials" : "models"}
-        onTabChange={(next: RouteTab) => replaceRoute("agents", next === "credentials" ? "credentials" : "models")}
         onSelectView={navigate}
       />
     )
@@ -138,7 +128,7 @@ export default function App() {
       />
     )
   } else {
-    // Exaustivo: após login/mfa + overview/providers/agents/chat/prompts, `view`
+    // Exaustivo: após login/mfa + overview/providers/chat/prompts, `view`
     // é `never` — placeholder inalcançável.
     shell = <PlaceholderPage view={view} onSelectView={navigate} />
   }
