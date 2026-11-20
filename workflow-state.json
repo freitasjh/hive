@@ -1,25 +1,26 @@
 {
-  "type": "refactor",
-  "current_feature": "menu-dominio-hive",
+  "type": "feature",
+  "current_feature": "refresh-token-frontend",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
     "frontend": "frontend/",
-    "sidebar": "frontend/src/components/shadcn/navigation/app-sidebar.tsx",
-    "route": "frontend/src/hooks/use-hash-route.ts"
+    "api": "frontend/src/services/api.ts",
+    "jwt": "frontend/src/services/jwt.ts",
+    "storage": "frontend/src/services/token.storage.ts"
   },
   "code_review_status": "passed",
   "code_review": {
     "last_status": "passed",
-    "approval_status": "PASSED",
+    "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_session": "ses_e09682fa6ffezjQ7mBw3yGP38b",
-    "scope": "menu reduzido ao domínio Hive (6 ids) + rename Config LLM; 2 🟡 do 1o review fechados"
+    "reviewer_session": "ses_e0946f2f6ffejmJW24xsZm0qf1",
+    "scope": "refresh frontend com single-flight; 2 🟡 + 3 🔵 do 1o review fechados, re-review APPROVED"
   },
   "harness_status": "passed",
-  "harness_note": "Suite 187/187 (17 arquivos), build 0. Menu com 6 ids (overview, login rota, providers, agents=Config LLM, chat, prompts); 12 views de template removidas dos 4 pontos de registro; aliases ai/settings eliminados (#ai/#settings caem em overview). Breadcrumb/título/document.title alinhados em Config LLM/LLM Config (pt/en). TDD: 14 testes falharam antes do fix. 2 DTOs .java sujos de outro batch preservados fora do commit (pathspec frontend/src/). Dívida 🔵 fora do PICCO: ids de template em components/shadcn legados (settings-types, data-table).",
+  "harness_note": "Suíte 220/220 (19 arquivos), build 0. Branch feature/login-tela-mfa. tenant-id extraído do JWT (jwt.ts, claim SecurityTokenServiceImpl.java:42,189) salvo em hive_tenant_id; refresh POST /auth/refresh-token com credentials:include + X-Tenant-ID + omitAuthorization:true (correção H3: Bearer revogado dava 401 no SecurityFilter antes do controller), single-flight, retry 401, limpeza de ambas as chaves. H3 backend real: login UI, rotacao forçada, 401→refresh 200→retry 200, 3x401→1 refresh, console 0 ERROR/WARN JS; porta 8080 da IDE nao foi morta. DTOs .java de outro batch preservados fora do commit.",
   "gates": {
     "P1_P2": null,
     "P2_P3": null

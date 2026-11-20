@@ -11,15 +11,42 @@
  * - RestControllerTool.java:22-24 — `ResponseEntity.ok(object)`: resposta crua,
  *   sem envelope `{ data }`.
  *
+ * - Refresh: `POST /auth/refresh-token` (LoginControllerV1.java:63-80) exige
+ *   header `X-Tenant-ID` (SecurityTokenServiceImpl.java:66-71) e o cookie
+ *   HttpOnly `refreshToken` (CookieUtil.java:15-22). A resposta é crua
+ *   `{accessToken}` (RefreshTokenResponseDTO.java:3). O engine de refresh com
+ *   single-flight vive em `api.ts` para evitar dependência circular; aqui só
+ *   é reexportado.
+ *
  * Segurança: body com senha trafega apenas no POST; nunca é logado, persistido
- * ou colocado em URL. Nada de refresh-token automático (cookie HttpOnly, fora
- * do PICCO desta entrega).
+ * ou colocado em URL. Tenant é extraído do claim `tenant-id` do access token.
  */
 
-import { ApiError, apiRequest } from "./api"
-import { clearToken, hasToken, setToken } from "./token.storage"
+import { ApiError, apiRequest, refreshAccess } from "./api"
+import { decodeTenantId } from "./jwt"
+import { clearSession, hasToken, setToken } from "./token.storage"
 
-export { TOKEN_STORAGE_KEY, clearToken, getToken, hasToken, setToken } from "./token.storage"
+export {
+  TENANT_STORAGE_KEY,
+  TOKEN_STORAGE_KEY,
+  clearSession,
+  clearTenantId,
+  clearToken,
+  getTenantId,
+  getToken,
+  hasToken,
+  setTenantId,
+  setToken,
+} from "./token.storage"
+export { decodeTenantId } from "./jwt"
+export { refreshAccess } from "./api"
+
+/** Renova o access token (delega ao single-flight em `api.ts`). */
+export function refresh(): Promise<string> {
+  return refreshAccess()
+}
+
+export const refreshService = { refresh }
 
 export interface LoginCredentials {
   username: string
@@ -52,7 +79,7 @@ export class LoginError extends Error {
 }
 
 export const loginService = {
-  /** Autentica e persiste somente o accessToken em `hive_token`. */
+  /** Autentica e persiste accessToken + tenantId extraído do JWT. */
   async login(credentials: LoginCredentials): Promise<LoginResult> {
     let payload: RawLoginResponse
     try {
@@ -75,7 +102,11 @@ export const loginService = {
     }
 
     const accessToken = payload.accessToken
-    setToken(accessToken)
+    // Tenant é mandatório no refresh (SecurityTokenServiceImpl.java:69-71).
+    const tenantId = decodeTenantId(accessToken)
+    if (!tenantId) throw new LoginError("UNAVAILABLE")
+
+    setToken(accessToken, tenantId)
     return {
       userId: typeof payload.userId === "string" ? payload.userId : "",
       accessToken,
@@ -84,5 +115,5 @@ export const loginService = {
   },
 
   isAuthenticated: hasToken,
-  logout: clearToken,
+  logout: clearSession,
 }
