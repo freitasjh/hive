@@ -6,7 +6,8 @@
  *   e `RestPath.V1` em
  *   backend/commons/api-tools/src/main/java/br/com/systec/hive/commons/api/tools/controller/RestPath.java:6
  * - Bearer de `localStorage['hive_token']` — bkp/front_bkp/src/stores/auth.store.ts:5,12
- * - 401 => logout + `/login` — bkp/front_bkp/src/services/api.ts:16-25
+ * - 401 FORA de `/auth/login` => limpa token + hash `#login` (sem reload) —
+ *   app é hash-router; `window.location.assign('/login')` gerava 404.
  * - corpo de erro `StandardError` com `status`/`code`/`detail`/`title` —
  *   backend/commons/api-tools/.../exceptions/ControllerExceptionHandler.java:36-45
  *
@@ -17,9 +18,13 @@
  * `detail` recebido do servidor passa por redação antes de virar mensagem de UI.
  */
 
+import { clearToken, getToken } from "./token.storage"
+
+export { TOKEN_STORAGE_KEY, clearToken, getToken } from "./token.storage"
+
 export const API_BASE = "/hive/v1"
-export const TOKEN_STORAGE_KEY = "hive_token"
 const DEFAULT_TIMEOUT_MS = 15_000
+const LOGIN_HASH = "#login"
 
 export class ApiError extends Error {
   readonly status?: number
@@ -43,20 +48,21 @@ export interface ApiRequestOptions {
   signal?: AbortSignal
 }
 
-export function getToken(): string | null {
-  try {
-    return localStorage.getItem(TOKEN_STORAGE_KEY)
-  } catch {
-    return null
-  }
+/** Chamadas da própria rota de autenticação nunca disparam redirect (evita loop). */
+export function isAuthRequest(path: string): boolean {
+  return /\/auth\/(?:login|refresh-token)(?:\?|$)/.test(path)
 }
 
-export function clearToken(): void {
-  try {
-    localStorage.removeItem(TOKEN_STORAGE_KEY)
-  } catch {
-    /* armazenamento bloqueado: nada a limpar */
-  }
+/** `#login` e a forma legada `#/login` apontam para a mesma rota do hash-router. */
+export function isLoginHash(hash: string = window.location.hash): boolean {
+  const current = typeof hash === "string" ? hash : ""
+  return current.replace(/^#\/?/, "").split("/")[0] === "login"
+}
+
+/** Navega por hash: o app é um hash-router, então `assign('/login')` daria 404. */
+export function redirectToLogin(): void {
+  if (isLoginHash()) return
+  window.location.hash = LOGIN_HASH
 }
 
 /** Remove padrões de segredo antes de qualquer texto chegar à UI. */
@@ -142,9 +148,9 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     const payload = await readBody(response)
 
     if (!response.ok) {
-      if (response.status === 401) {
+      if (response.status === 401 && !isAuthRequest(path)) {
         clearToken()
-        window.location.assign("/login")
+        redirectToLogin()
       }
       const { detail, code } = failureMessage(response.status, payload)
       throw new ApiError(detail, response.status, code, detail)

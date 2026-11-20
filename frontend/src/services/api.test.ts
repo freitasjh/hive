@@ -11,10 +11,12 @@ function jsonResponse(body: unknown, status = 200): Response {
 describe('apiRequest', () => {
   beforeEach(() => {
     localStorage.clear()
+    window.history.replaceState(null, '', '/')
     vi.unstubAllGlobals()
   })
 
   afterEach(() => {
+    window.history.replaceState(null, '', '/')
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
@@ -60,16 +62,40 @@ describe('apiRequest', () => {
     await expect(apiRequest('/provider-credentials/OPENAI', { method: 'DELETE' })).resolves.toBeUndefined()
   })
 
-  it('em 401 limpa o token e redireciona para /login', async () => {
+  it('em 401 fora do login limpa o token e navega por hash para #login sem recarregar', async () => {
     localStorage.setItem('hive_token', 'token-expirado')
-    const assign = vi.fn()
+    window.history.replaceState(null, '', '/#overview')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 401 }, 401)))
-    vi.stubGlobal('window', { ...globalThis.window, location: { assign } })
 
     await expect(apiRequest('/provider-credentials')).rejects.toBeInstanceOf(ApiError)
 
     expect(localStorage.getItem('hive_token')).toBeNull()
-    expect(assign).toHaveBeenCalledWith('/login')
+    expect(window.location.hash).toBe('#login')
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('em 401 do próprio /auth/login não redireciona nem limpa sessão existente', async () => {
+    localStorage.setItem('hive_token', 'token-valido')
+    window.history.replaceState(null, '', '/#login')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 401 }, 401)))
+
+    await expect(
+      apiRequest('/auth/login', { method: 'POST', body: { username: 'u', password: 'p' } })
+    ).rejects.toBeInstanceOf(ApiError)
+
+    expect(window.location.hash).toBe('#login')
+    expect(localStorage.getItem('hive_token')).toBe('token-valido')
+  })
+
+  it('em 401 quando já estamos em #login não repete a navegação (sem loop)', async () => {
+    localStorage.setItem('hive_token', 'token-expirado')
+    window.history.replaceState(null, '', '/#login')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 401 }, 401)))
+
+    await expect(apiRequest('/provider-credentials')).rejects.toBeInstanceOf(ApiError)
+
+    expect(window.location.hash).toBe('#login')
+    expect(window.location.pathname).toBe('/')
   })
 
   it('expõe status/code/detail do problema e remove segredos do detail', async () => {

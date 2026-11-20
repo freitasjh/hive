@@ -6,7 +6,7 @@ import { VIEW_LABELS, type ViewPageProps } from "../overview"
 import { PlaceholderView } from "./PlaceholderView"
 
 export interface PlaceholderPageProps extends ViewPageProps {
-  view: Exclude<DashboardViewId, "overview" | "ai" | "settings" | "providers" | "agents" | "chat" | "prompts">
+  view: Exclude<DashboardViewId, "overview" | "login" | "ai" | "settings" | "providers" | "agents" | "chat" | "prompts">
 }
 
 /** Demais ids do DashboardViewId continuam como placeholders — telas admin têm ids próprios. */

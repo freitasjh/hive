@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect } from "react"
+import { useCallback, useEffect } from "react"
 import { isTabbedView, useHashRoute, type RouteTab } from "@/hooks/use-hash-route"
+import { LoginPage } from "@/pages/LoginPage"
 import {
   AiAdminPage,
   ChatPage,
@@ -20,6 +21,7 @@ import {
 export default function App() {
   const [route, navigate, replaceRoute] = useHashRoute()
   const { view, tab, id } = route
+  const handleAuthenticated = useCallback(() => navigate("overview"), [navigate])
 
   // Páginas admin definem "<View> · <Aba>"; demais views exibem só o rótulo da view.
   useEffect(() => {
@@ -28,6 +30,10 @@ export default function App() {
     }
   }, [view])
 
+  // Login vive fora do shell Atlas: nenhuma sidebar/header é montada antes dele.
+  if (view === "login") {
+    return <LoginPage onAuthenticated={handleAuthenticated} />
+  }
   if (view === "overview") {
     return <OverviewPage onSelectView={navigate} />
   }

@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardViewId } from '@/components/shadcn/navigation'
-import { parseHash, parseRoute, useHashRoute } from './use-hash-route'
+import { buildHash, isTabbedView, parseHash, parseRoute, useHashRoute } from './use-hash-route'
 
 /** replaceState muda o fragmento sem disparar hashchange (MDN, Location.hash). */
 function setHash(hash: string) {
@@ -10,6 +10,7 @@ function setHash(hash: string) {
 
 const CANONICAL_IDS: DashboardViewId[] = [
   'overview',
+  'login',
   'providers',
   'agents',
   'prompts',
@@ -46,15 +47,26 @@ describe('parseHash (compat: retorna só a view)', () => {
     expect(parseHash('#ai/models')).toBe('providers')
   })
 
-  it.each(['', '#', '#/login', '#/shadcn', '#desconhecido', '#foo/bar'])(
+  it.each(['', '#', '#/shadcn', '#desconhecido', '#foo/bar'])(
     'cai em overview para hash %j',
     (hash) => {
       expect(parseHash(hash)).toBe('overview')
     }
   )
+
+  it('aceita #login e a forma legada #/login como rota de autenticação', () => {
+    expect(parseHash('#login')).toBe('login')
+    expect(parseHash('#/login')).toBe('login')
+  })
 })
 
 describe('parseRoute', () => {
+  it('login é view simples, sem aba, serializada como #login', () => {
+    expect(parseRoute('#login')).toEqual({ view: 'login' })
+    expect(buildHash('login')).toBe('#login')
+    expect(isTabbedView('login')).toBe(false)
+  })
+
   it('deep-link de aba nas views admin', () => {
     expect(parseRoute('#agents/models')).toEqual({ view: 'agents', tab: 'models' })
     expect(parseRoute('#providers/credentials')).toEqual({

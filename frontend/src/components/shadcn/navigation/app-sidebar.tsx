@@ -40,7 +40,7 @@ import {
   useSidebar,
 } from "@/components/shadcn/ui/sidebar"
 
-export type DashboardViewId = "overview" | "ai" | "providers" | "agents" | "chat" | "prompts" | "kanban" | "scheduler" | "transactions" | "cards" | "checkout" | "pdv" | "accounts" | "files" | "backoffice" | "internal-admin" | "settings"
+export type DashboardViewId = "overview" | "login" | "ai" | "providers" | "agents" | "chat" | "prompts" | "kanban" | "scheduler" | "transactions" | "cards" | "checkout" | "pdv" | "accounts" | "files" | "backoffice" | "internal-admin" | "settings"
 
 const data = {
   user: {

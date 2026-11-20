@@ -32,3 +32,14 @@ export const Dark: Story = {
     ),
   ],
 }
+
+/** Viewport mobile de 375px: sem overflow e com o formulário utilizável. */
+export const Mobile: Story = {
+  decorators: [
+    (Story) => (
+      <div className="mx-auto w-[375px] max-w-full bg-background text-foreground">
+        <Story />
+      </div>
+    ),
+  ],
+}

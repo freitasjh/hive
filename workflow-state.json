@@ -1,13 +1,14 @@
 {
   "type": "feature",
-  "current_feature": "chat-assistant",
+  "current_feature": "login-ui-401-hash",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
     "frontend": "frontend/",
-    "chat": "frontend/src/modules/hive/chat/",
-    "services": "frontend/src/services/chat.service.ts"
+    "auth": "frontend/src/services/auth.service.ts",
+    "storage": "frontend/src/services/token.storage.ts",
+    "login": "frontend/src/pages/LoginPage.tsx"
   },
   "code_review_status": "passed",
   "code_review": {
@@ -15,11 +16,11 @@
     "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_session": "ses_e099dbc12ffed6GOFE4z1Hq404",
-    "scope": "chat Assistant; loop de correção (iteração 1) fechou 2 🔴 + 1 regra vinculante, re-review passed"
+    "reviewer_session": "ses_e0986abdcffeJKV3IaJjDwcFyB",
+    "scope": "login React + chave hive_token unica + guard 401 sem loop; deep-link com token valido coberto; returnTo apos 401 fora do PICCO"
   },
   "harness_status": "passed",
-  "harness_note": "Suíte 176/176 (14 arquivos), build 0. Decisão canônica scope-assistant-sem-rag respeitada: prompt selecionável, sem agente/RAG. Regra do primeiro turno e unwrapPage nas duas listagens testadas. H3 com backend Java real: listagens 200; POST /v1/chat real 502 por provider mimo-v2.5 deprecado (ambiente), turno LLM com fixture declarada; console JS 0 ERROR/WARN; portas 8080/5173 encerradas por PID. Dívidas declaradas: teto 50 prompts sem busca (ux-assistant-fluxo-revisavel §1, fora do PICCO); aresta newChat→selectSession com getSession falho (🔵); createSession sem consumidor. Efeito colateral: 2 sessões de teste criadas no Postgres dev (dado, não diff).",
+  "harness_note": "Suite 196/196 (17 arquivos), build 0. H3 com backend Java real (qa-engineer ses_e098ab83effeNiyKzygBFo3DAU): POST /auth/login 200, token hive_token (unica chave), navegacao overview, 401 real limpa token e leva a #login sem 404/loop, console 0 ERROR/WARN JS, screenshots 375/1280, portas 8080/5189 encerradas por PID. Dividas 🔵 fora do PICCO: returnTo (401 em #agents/models -> login -> volta a rota alvo); dupla semantica isLoginHash vs VIEW_IDS; auto-redirect com push em vez de replace. Signup/refresh-token fora do escopo.",
   "gates": {
     "P1_P2": null,
     "P2_P3": null

@@ -94,6 +94,7 @@ function tabSelected(name: RegExp) {
 
 describe('App', () => {
   beforeEach(() => {
+    localStorage.clear()
     setHash('')
     mocks.promptList.mockResolvedValue(EMPTY_PAGE)
     mocks.sessionList.mockResolvedValue(EMPTY_PAGE)
@@ -355,9 +356,54 @@ describe('App', () => {
     expect(overviewHeading()).toBeTruthy()
     first.unmount()
 
-    setHash('#/login')
+    setHash('#/rota-inexistente')
     render(<App />)
     expect(overviewHeading()).toBeTruthy()
+  })
+
+  it('rota #login renderiza o formulário antes do shell Atlas', () => {
+    setHash('#login')
+    render(<App />)
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Entrar na sua conta' })
+    ).toBeTruthy()
+    expect(screen.getByLabelText('Usuário')).toBeTruthy()
+    expect(screen.getByLabelText('Senha')).toBeTruthy()
+    expect(screen.queryByRole('banner')).toBeNull()
+    expect(
+      screen.queryByRole('navigation', { name: 'Navegação móvel inferior' })
+    ).toBeNull()
+    expect(screen.queryByText('Visão geral do Hive')).toBeNull()
+  })
+
+  it('após autenticação bem-sucedida navega para overview', async () => {
+    const { loginService } = await import('@/services/auth.service')
+    const loginSpy = vi.spyOn(loginService, 'login').mockResolvedValue({
+      userId: '11111111-1111-1111-1111-111111111111',
+      accessToken: 'jwt-opaco',
+      type: 'Bearer',
+    })
+    try {
+      setHash('#login')
+      render(<App />)
+
+      fireEvent.change(screen.getByLabelText('Usuário'), {
+        target: { value: 'freitasjh' },
+      })
+      fireEvent.change(screen.getByLabelText('Senha'), {
+        target: { value: 'senha-nunca-persistida' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe('#overview')
+        expect(overviewHeading()).toBeTruthy()
+      })
+      expect(loginSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      loginSpy.mockRestore()
+    }
   })
 
   it('deep-link: #agents/models abre models e mantém breadcrumb só da view', () => {
