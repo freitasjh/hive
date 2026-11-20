@@ -95,6 +95,14 @@ public class MfaRepositoryAdapter implements MfaRepositoryPort {
 
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
+    public int markRecoveryCodeUsedIfUnused(UUID id, Instant usedAt) {
+        // UPDATE atômico no banco (@Modifying/@Query na interface Spring Data).
+        // A condição `usedAt is null` garante uso único mesmo sob concorrência.
+        return recoveryCodeRepository.markRecoveryCodeUsedIfUnused(id, usedAt);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRED)
     public void deleteRecoveryCodesByUserId(UUID userId) {
         recoveryCodeRepository.deleteAll(recoveryCodeRepository.findByUserId(userId));
     }

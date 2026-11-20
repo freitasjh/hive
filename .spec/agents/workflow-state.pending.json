@@ -1,14 +1,15 @@
 {
   "_note": "Estado pendente (substitui snapshots anteriores). workflow-state.json na raiz é gravável apenas por delegação a papel de implementação — permissão nativa do orchestrator nega root. Não contornar via bash.",
   "type": "feature",
-  "current_feature": "mfa-fase1-dominio",
+  "current_feature": "mfa-fase2-servico-endpoints",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
   "artifacts": {
-    "backend": "backend/security/api/",
-    "migration": "backend/identity/dbupdate/src/main/resources/db/migration/identity_db/V4__create_table_user_mfa.sql",
-    "impl": "backend/security/impl/"
+    "backend": "backend/security/",
+    "adapter": "backend/security/impl/src/main/java/br/com/systec/hive/security/impl/security/TotpAdapter.java",
+    "service": "backend/security/impl/src/main/java/br/com/systec/hive/security/impl/service/MfaService.java",
+    "controller": "backend/security/web/internal/v1/src/main/java/br/com/systec/hive/security/web/internal/v1/controller/MfaControllerV1.java"
   },
   "code_review_status": "passed",
   "code_review": {
@@ -16,11 +17,11 @@
     "approval_status": "APPROVED",
     "critical_issues_count": 0,
     "must_fix_before_done": [],
-    "reviewer_sessions": ["ses_e0762acfdffeyOoo3xKNfq5HDp", "ses_e075bcffaffemXWHZ0iamaq2Tp"],
-    "scope": "Fase 1 MFA: VOs/portas, migration V4, repositorio JPA, cache Redis e cifra AES-GCM; 🟡 isProd fail-closed corrigido"
+    "reviewer_sessions": ["ses_e0732e180ffe9R12skUR2Wa7f2", "ses_e07293dfaffeynXejmRQy16Z41"],
+    "scope": "Fase 2 MFA: TotpAdapter, MfaService, MfaControllerV1 (5 endpoints), autoridade unica de recovery codes; 🔴 atomicidade do recovery corrigido"
   },
   "harness_status": "passed",
-  "harness_note": "Branch feature/login-tela-mfa. Backend 443 testes exit 0 (438+5 do fix isProd) + 80 ITs (incl. 4 MfaPersistenceIT). Sem cycle identity<->security, sem endpoints, sem mudanca no login/refresh/logout. Divergencia de escopo aprovada pelo orchestrator: application-dev.properties, application-test.properties, security/impl pom (deps test). 🟡 corrigido: isProd() usa acceptsProfiles(Profiles.of('prod')) cobrindo spring.profiles.default=prod, com TDD red. Dividas 🔵: TOCTOU cache (chave orfa expira 120s), contrato duplicado recovery codes (fixar autoridade Fase 2), teste MfaMasterKey sem isolar env, 5 arquivos nao-MFA no working tree (decisao de separacao antes do merge).",
+  "harness_note": "Branch feature/login-tela-mfa. Backend 484 testes exit 0 (443+41), frontend 233. 5 endpoints /auth/mfa/{setup,enable,disable,verify,recovery}, verify/recovery devolvem 204 SEM JWT (Fase 3 emite). 🔴 corrigido: UPDATE condicional WHERE used_at IS NULL com checagem de linhas afetadas — uso unico de recovery code mesmo concorrente, teste CyclicBarrier prova. Dividas 🔵 para Fase 3: reautenticacao recente no setup, binding remoteIp/userAgent do challenge, consume atomico do challenge (compare-and-delete), bloqueio 15min por usuario, teste de tenant malformado enganoso, IT de concorrencia real no Postgres. Arquivos nao-MFA no working tree seguem fora do commit.",
   "gates": {
     "P1_P2": null,
     "P2_P3": null

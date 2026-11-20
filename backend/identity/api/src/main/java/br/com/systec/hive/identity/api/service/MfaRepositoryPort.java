@@ -32,5 +32,14 @@ public interface MfaRepositoryPort {
 
     void markRecoveryCodeUsed(UUID id, Instant usedAt);
 
+    /**
+     * Consome o código de recuperação somente se ainda estiver não usado, de forma atômica.
+     *
+     * @return 1 se este chamador consumiu o código; 0 se outro chamador já o consumiu
+     *         (ou se o id não existe). O chamador só considera o login válido quando
+     *         obteve exatamente 1 linha afetada.
+     */
+    int markRecoveryCodeUsedIfUnused(UUID id, Instant usedAt);
+
     void deleteRecoveryCodesByUserId(UUID userId);
 }

@@ -39,6 +39,15 @@
             <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-security-api</artifactId>
         </dependency>
+        <!-- Fase 2 MFA: principal autenticado (User) para setup/enable/disable. -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-identity-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
