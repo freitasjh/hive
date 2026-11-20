@@ -2,7 +2,13 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { ApiError } from '@/services/api'
-import { setToken, TENANT_STORAGE_KEY, TOKEN_STORAGE_KEY } from '@/services/auth.service'
+import {
+  loginService,
+  mfaService,
+  setToken,
+  TENANT_STORAGE_KEY,
+  TOKEN_STORAGE_KEY,
+} from '@/services/auth.service'
 
 const AUTH_TOKEN = 'jwt-opaco-de-teste'
 const AUTH_TENANT = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
@@ -481,9 +487,11 @@ describe('App', () => {
       // O serviço real persiste a sessão; o spy deve reproduzir esse efeito para o guard.
       authenticate()
       return {
+        kind: 'authenticated',
         userId: '11111111-1111-1111-1111-111111111111',
         accessToken: AUTH_TOKEN,
         type: 'Bearer',
+        mfaSetupAvailable: false,
       }
     })
     try {
@@ -625,5 +633,206 @@ describe('App', () => {
     expect(await screen.findByText(/não foi possível abrir este prompt/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: /voltar aos templates/i })).toBeTruthy()
     expect(screen.queryByTestId('input-name')).toBeNull()
+  })
+
+  describe('MFA — rota #mfa fora do shell', () => {
+    const CHALLENGE = 'e8a2658f-8830-4bcd-aa4c-a1f260ae59fd'
+    const CHALLENGE_TENANT = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'
+
+    it('deep-link #mfa sem desafio em memória redireciona para #login', async () => {
+      anonymize()
+      setHash('#mfa')
+      render(<App />)
+
+      await waitFor(() => expect(window.location.hash).toBe('#login'))
+      expect(screen.getByRole('heading', { level: 1, name: 'Entrar na sua conta' })).toBeTruthy()
+      expect(screen.queryByRole('banner')).toBeNull()
+    })
+
+    it('login com MFA abre #mfa sem token salvo e sem shell', async () => {
+      const { loginService } = await import('@/services/auth.service')
+      const loginSpy = vi.spyOn(loginService, 'login').mockResolvedValue({
+        kind: 'mfa-required',
+        challengeId: CHALLENGE,
+        expiresIn: 120,
+        tenantId: CHALLENGE_TENANT,
+      })
+      try {
+        anonymize()
+        setHash('#login')
+        render(<App />)
+
+        fireEvent.change(screen.getByLabelText('Usuário'), { target: { value: 'teste.login.mfa' } })
+        fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'it-secret-pw' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+        await waitFor(() => expect(window.location.hash).toBe('#mfa'))
+        expect(
+          screen.getByRole('heading', { level: 1, name: /verificação em duas etapas/i })
+        ).toBeTruthy()
+        expect(screen.queryByRole('banner')).toBeNull()
+        expect(screen.queryByText('Visão geral do Hive')).toBeNull()
+        expect(screen.queryByTestId('mfa-setup-invite')).toBeNull()
+        expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
+        expect(localStorage.getItem(TENANT_STORAGE_KEY)).toBeNull()
+        expect(window.location.hash).not.toContain(CHALLENGE_TENANT)
+        expect(document.body.textContent).not.toContain(CHALLENGE_TENANT)
+      } finally {
+        loginSpy.mockRestore()
+      }
+    })
+
+    it('código correto emite token, salva sessão e navega overview', async () => {
+      const { loginService, mfaService } = await import('@/services/auth.service')
+      const loginSpy = vi.spyOn(loginService, 'login').mockResolvedValue({
+        kind: 'mfa-required',
+        challengeId: CHALLENGE,
+        expiresIn: 120,
+        tenantId: CHALLENGE_TENANT,
+      })
+      const verifySpy = vi.spyOn(mfaService, 'verify').mockImplementation(async () => {
+        // O serviço real persiste a sessão; o spy reproduz esse efeito para o guard.
+        authenticate()
+        return {
+          userId: '11111111-1111-1111-1111-111111111111',
+          accessToken: AUTH_TOKEN,
+          type: 'Bearer',
+        }
+      })
+      try {
+        anonymize()
+        setHash('#login')
+        render(<App />)
+
+        fireEvent.change(screen.getByLabelText('Usuário'), { target: { value: 'teste.login.mfa' } })
+        fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'it-secret-pw' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+        await waitFor(() => expect(window.location.hash).toBe('#mfa'))
+        fireEvent.change(screen.getByRole('textbox', { name: /código de 6 dígitos/i }), {
+          target: { value: '123456' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: /verificar/i }))
+
+        await waitFor(() => {
+          expect(window.location.hash).toBe('#overview')
+          expect(overviewHeading()).toBeTruthy()
+        })
+        expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe(AUTH_TOKEN)
+        expect(verifySpy).toHaveBeenCalledWith(CHALLENGE, '123456', CHALLENGE_TENANT)
+        expect(document.body.textContent).not.toContain(CHALLENGE_TENANT)
+      } finally {
+        loginSpy.mockRestore()
+        verifySpy.mockRestore()
+      }
+    })
+  })
+
+  describe('onboarding MFA opcional — convite não bloqueante', () => {
+    const SETUP_DATA = {
+      secret: 'JBSWY3DPEHPK3PXP',
+      qrDataUri: 'data:image/png;base64,iVBORw0KGgo=',
+      recoveryCodes: ['a1b2-c3d4', 'e5f6-g7h8', 'i9j0-k1l2', 'm3n4-o5p6', 'q7r8-s9t0', 'u1v2-w3x4', 'y5z6-a7b8', 'c9d0-e1f2'],
+    }
+
+    function authenticated(mfaSetupAvailable: boolean) {
+      return {
+        kind: 'authenticated' as const,
+        userId: '11111111-1111-1111-1111-111111111111',
+        accessToken: AUTH_TOKEN,
+        type: 'Bearer',
+        mfaSetupAvailable,
+      }
+    }
+
+    async function loginWith(mfaSetupAvailable: boolean) {
+      const loginSpy = vi.spyOn(loginService, 'login').mockImplementation(async () => {
+        authenticate()
+        return authenticated(mfaSetupAvailable)
+      })
+      anonymize()
+      setHash('#login')
+      render(<App />)
+
+      fireEvent.change(screen.getByLabelText('Usuário'), { target: { value: 'sem.mfa' } })
+      fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'senha-nunca-persistida' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+      await waitFor(() => expect(window.location.hash).toBe('#overview'))
+      return loginSpy
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('login com mfaSetupAvailable=true mostra convite sobre overview sem bloquear a navegação', async () => {
+      mocks.getLlmConfig.mockResolvedValue(null)
+      const loginSpy = await loginWith(true)
+      try {
+        expect(overviewHeading()).toBeTruthy()
+        expect(screen.getByTestId('mfa-setup-invite')).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Configurar agora' })).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Pular' })).toBeTruthy()
+        expect(screen.queryByRole('dialog')).toBeNull()
+        expect(document.body.style.pointerEvents).not.toBe('none')
+
+        // Overview continua interativo enquanto o convite está visível.
+        fireEvent.click(menuButton(/Config LLM/))
+        await waitFor(() => expect(window.location.hash).toBe('#agents'))
+        expect(screen.getByTestId('mfa-setup-invite')).toBeTruthy()
+        expect(loginSpy).toHaveBeenCalledTimes(1)
+      } finally {
+        loginSpy.mockRestore()
+      }
+    })
+
+    it('Pular dispensa apenas em memória: sem chave em storage e novo login volta a oferecer', async () => {
+      const first = await loginWith(true)
+      try {
+        fireEvent.click(screen.getByRole('button', { name: 'Pular' }))
+        expect(screen.queryByTestId('mfa-setup-invite')).toBeNull()
+        expect(window.location.hash).toBe('#overview')
+        expect(localStorage.getItem('mfa-setup-dismissed')).toBeNull()
+        const storedKeys: string[] = []
+        for (let i = 0; i < localStorage.length; i += 1) storedKeys.push(localStorage.key(i) ?? '')
+        expect(storedKeys.sort()).toEqual([TENANT_STORAGE_KEY, TOKEN_STORAGE_KEY].sort())
+      } finally {
+        first.mockRestore()
+      }
+
+      const second = await loginWith(true)
+      try {
+        expect(screen.getByTestId('mfa-setup-invite')).toBeTruthy()
+      } finally {
+        second.mockRestore()
+      }
+    })
+
+    it('Configurar agora abre o MfaSetupDialog existente com QR via Bearer', async () => {
+      const setupSpy = vi.spyOn(mfaService, 'setup').mockResolvedValue(SETUP_DATA)
+      const loginSpy = await loginWith(true)
+      try {
+        fireEvent.click(screen.getByRole('button', { name: 'Configurar agora' }))
+
+        expect(await screen.findByRole('dialog')).toBeTruthy()
+        expect(await screen.findByAltText(/QR Code/i)).toBeTruthy()
+        expect(screen.queryByTestId('mfa-setup-invite')).toBeNull()
+        expect(setupSpy).toHaveBeenCalledTimes(1)
+      } finally {
+        loginSpy.mockRestore()
+        setupSpy.mockRestore()
+      }
+    })
+
+    it('campo ausente/false => nenhum convite', async () => {
+      const loginSpy = await loginWith(false)
+      try {
+        expect(overviewHeading()).toBeTruthy()
+        expect(screen.queryByTestId('mfa-setup-invite')).toBeNull()
+      } finally {
+        loginSpy.mockRestore()
+      }
+    })
   })
 })

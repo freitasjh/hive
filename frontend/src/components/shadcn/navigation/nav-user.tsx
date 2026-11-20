@@ -8,6 +8,7 @@ import {
   IconNotification,
   IconUserCircle,
 } from "@tabler/icons-react"
+import { ShieldCheck, ShieldOff } from "lucide-react"
 
 import { Badge } from "@/components/shadcn/ui/badge"
 import {
@@ -31,6 +32,8 @@ import {
   useSidebar,
 } from "@/components/shadcn/ui/sidebar"
 import { useAuthI18n } from "@/modules/hive/auth/i18n"
+import { MfaSetupDialog } from "@/modules/hive/auth/components/MfaSetupDialog"
+import { MfaDisableDialog } from "@/modules/hive/auth/components/MfaDisableDialog"
 import { logout as logoutService } from "@/services/auth.service"
 
 interface NavUserProps {
@@ -47,6 +50,7 @@ export function NavUser({ user, onLogout }: NavUserProps) {
   const { isMobile } = useSidebar()
   const { t } = useAuthI18n()
   const [isPending, setIsPending] = useState(false)
+  const [mfaDialog, setMfaDialog] = useState<"setup" | "disable" | null>(null)
 
   const handleLogout = useCallback(async () => {
     if (isPending) return
@@ -133,6 +137,17 @@ export function NavUser({ user, onLogout }: NavUserProps) {
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onSelect={() => setMfaDialog("setup")}>
+                <ShieldCheck />
+                {t("auth.nav.mfa.setup")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setMfaDialog("disable")}>
+                <ShieldOff />
+                {t("auth.nav.mfa.disable")}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               disabled={isPending}
               aria-busy={isPending}
@@ -149,6 +164,18 @@ export function NavUser({ user, onLogout }: NavUserProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
+      <MfaSetupDialog
+        open={mfaDialog === "setup"}
+        onOpenChange={(open) => {
+          if (!open) setMfaDialog(null)
+        }}
+      />
+      <MfaDisableDialog
+        open={mfaDialog === "disable"}
+        onOpenChange={(open) => {
+          if (!open) setMfaDialog(null)
+        }}
+      />
     </SidebarMenu>
   )
 }

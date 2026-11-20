@@ -25,7 +25,7 @@ import {
 } from "@/components/shadcn/ui/sidebar"
 
 /** Apenas telas que existem no Hive. Ids de template e aliases legados foram removidos. */
-export type DashboardViewId = "overview" | "login" | "providers" | "agents" | "chat" | "prompts"
+export type DashboardViewId = "overview" | "login" | "mfa" | "providers" | "agents" | "chat" | "prompts"
 
 const data = {
   user: {

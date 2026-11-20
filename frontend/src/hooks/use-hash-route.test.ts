@@ -12,6 +12,7 @@ function setHash(hash: string) {
 const CANONICAL_IDS: DashboardViewId[] = [
   'overview',
   'login',
+  'mfa',
   'providers',
   'agents',
   'chat',
@@ -58,6 +59,12 @@ describe('parseRoute', () => {
     expect(parseRoute('#login')).toEqual({ view: 'login' })
     expect(buildHash('login')).toBe('#login')
     expect(isTabbedView('login')).toBe(false)
+  })
+
+  it('mfa é view simples fora do shell, serializada como #mfa', () => {
+    expect(parseRoute('#mfa')).toEqual({ view: 'mfa' })
+    expect(buildHash('mfa')).toBe('#mfa')
+    expect(isTabbedView('mfa')).toBe(false)
   })
 
   it('deep-link de aba nas views admin', () => {

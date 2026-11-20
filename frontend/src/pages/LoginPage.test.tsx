@@ -47,6 +47,11 @@ describe('LoginPage — fluxo de autenticação fora do shell', () => {
     expect(password.name).toBe('password')
     expect(password.type).toBe('password')
     expect(password.autocomplete).toBe('current-password')
+
+    const heroImage = screen.getByRole('img', {
+      name: /orquestração multi-agente do hive/i,
+    }) as HTMLImageElement
+    expect(heroImage.getAttribute('src')).toBeTruthy()
   })
 
   it('submete username/password, persiste via serviço e navega para overview', async () => {

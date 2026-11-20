@@ -20,6 +20,7 @@ export interface Route {
 const VIEW_IDS = {
   overview: true,
   login: true,
+  mfa: true,
   providers: true,
   agents: true,
   chat: true,

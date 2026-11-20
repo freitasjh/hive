@@ -1,9 +1,12 @@
 "use client"
 
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { isTabbedView, useHashRoute, type RouteTab } from "@/hooks/use-hash-route"
-import { getToken } from "@/services/auth.service"
+import { getToken, type MfaChallengeState } from "@/services/auth.service"
 import { LoginPage } from "@/pages/LoginPage"
+import { MfaVerifyPage } from "@/pages/MfaVerifyPage"
+import { MfaSetupDialog } from "@/modules/hive/auth/components/MfaSetupDialog"
+import { MfaSetupInvite } from "@/modules/hive/auth/components/MfaSetupInvite"
 import {
   AiAdminPage,
   ChatPage,
@@ -21,7 +24,40 @@ import {
 export default function App() {
   const [route, navigate, replaceRoute] = useHashRoute()
   const { view, tab, id } = route
-  const handleAuthenticated = useCallback(() => navigate("overview"), [navigate])
+  // Desafio MFA vive SOMENTE em memória: troca de view sem persistir em storage/URL.
+  const [mfaChallenge, setMfaChallenge] = useState<MfaChallengeState | null>(null)
+  // Onboarding opcional: convite e dispensa vivem apenas neste useState. NUNCA
+  // em localStorage/sessionStorage — após reload o sinal de login não reaparece
+  // sozinho, e um novo login com mfaSetupAvailable pode oferecer novamente.
+  const [mfaInviteOpen, setMfaInviteOpen] = useState(false)
+  const [mfaSetupOpen, setMfaSetupOpen] = useState(false)
+
+  const handleAuthenticated = useCallback(
+    (mfaSetupAvailable?: boolean) => {
+      setMfaChallenge(null)
+      setMfaSetupOpen(false)
+      setMfaInviteOpen(mfaSetupAvailable === true)
+      navigate("overview")
+    },
+    [navigate]
+  )
+  const handleMfaInviteSkip = useCallback(() => setMfaInviteOpen(false), [])
+  const handleMfaInviteConfigure = useCallback(() => {
+    setMfaInviteOpen(false)
+    setMfaSetupOpen(true)
+  }, [])
+  const handleMfaSetupSuccess = useCallback(() => setMfaInviteOpen(false), [])
+  const handleMfaRequired = useCallback(
+    (challenge: MfaChallengeState) => {
+      setMfaChallenge(challenge)
+      navigate("mfa")
+    },
+    [navigate]
+  )
+  const handleMfaCancel = useCallback(() => {
+    setMfaChallenge(null)
+    navigate("login")
+  }, [navigate])
   // Token é lido a cada render: logout/401 mudam o hash e forçam nova leitura.
   const authenticated = Boolean(getToken())
 
@@ -33,23 +69,43 @@ export default function App() {
   }, [view])
 
   // Guard: rota protegida sem sessão volta para #login ANTES de qualquer shell
-  // Atlas montar. `useLoginController` mantém o redirect inverso (token em
-  // #login → overview). Todos os hooks estão acima do early return.
+  // Atlas montar. #mfa é exceção (desafio ainda não gerou token) e vive fora do
+  // shell, como o login. Deep-link #mfa sem desafio em memória volta ao login.
+  // `useLoginController` mantém o redirect inverso (token em #login → overview).
+  // Todos os hooks estão acima do early return.
   useEffect(() => {
-    if (!authenticated && view !== "login") navigate("login")
-  }, [authenticated, view, navigate])
+    if (!authenticated && view !== "login" && view !== "mfa") navigate("login")
+    if (view === "mfa" && !mfaChallenge) navigate("login")
+  }, [authenticated, view, mfaChallenge, navigate])
 
-  if (!authenticated && view !== "login") return null
+  if (!authenticated && view !== "login" && view !== "mfa") return null
 
-  // Login vive fora do shell Atlas: nenhuma sidebar/header é montada antes dele.
+  // Login e MFA vivem fora do shell Atlas: nenhuma sidebar/header é montada.
   if (view === "login") {
-    return <LoginPage onAuthenticated={handleAuthenticated} />
-  }
-  if (view === "overview") {
-    return <OverviewPage onSelectView={navigate} />
-  }
-  if (view === "providers") {
     return (
+      <LoginPage
+        onAuthenticated={handleAuthenticated}
+        onMfaRequired={handleMfaRequired}
+      />
+    )
+  }
+  if (view === "mfa") {
+    if (!mfaChallenge) return null
+    return (
+      <MfaVerifyPage
+        challenge={mfaChallenge}
+        onAuthenticated={handleAuthenticated}
+        onCancel={handleMfaCancel}
+      />
+    )
+  }
+  // Shell Atlas: a página continua sendo a única fonte de conteúdo; o convite
+  // é irmão dela (sem overlay), então a overview permanece navegável.
+  let shell: ReactNode
+  if (view === "overview") {
+    shell = <OverviewPage onSelectView={navigate} />
+  } else if (view === "providers") {
+    shell = (
       <AiAdminPage
         view="providers"
         tab={tab === "models" ? "models" : "credentials"}
@@ -57,9 +113,8 @@ export default function App() {
         onSelectView={navigate}
       />
     )
-  }
-  if (view === "agents") {
-    return (
+  } else if (view === "agents") {
+    shell = (
       <AiAdminPage
         view="agents"
         tab={tab === "credentials" ? "credentials" : "models"}
@@ -67,12 +122,10 @@ export default function App() {
         onSelectView={navigate}
       />
     )
-  }
-  if (view === "chat") {
-    return <ChatPage onSelectView={navigate} />
-  }
-  if (view === "prompts") {
-    return (
+  } else if (view === "chat") {
+    shell = <ChatPage onSelectView={navigate} />
+  } else if (view === "prompts") {
+    shell = (
       <PromptsAdminPage
         tab={tab === "editor" ? "editor" : "templates"}
         editorId={id}
@@ -84,7 +137,26 @@ export default function App() {
         onSelectView={navigate}
       />
     )
+  } else {
+    // Exaustivo: após login/mfa + overview/providers/agents/chat/prompts, `view`
+    // é `never` — placeholder inalcançável.
+    shell = <PlaceholderPage view={view} onSelectView={navigate} />
   }
-  // Exaustivo: após os 6 ids acima, `view` é `never` — placeholder inalcançável.
-  return <PlaceholderPage view={view} onSelectView={navigate} />
+
+  return (
+    <>
+      {shell}
+      {authenticated && mfaInviteOpen && (
+        <MfaSetupInvite
+          onConfigure={handleMfaInviteConfigure}
+          onSkip={handleMfaInviteSkip}
+        />
+      )}
+      <MfaSetupDialog
+        open={authenticated && mfaSetupOpen}
+        onOpenChange={setMfaSetupOpen}
+        onSuccess={handleMfaSetupSuccess}
+      />
+    </>
+  )
 }

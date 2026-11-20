@@ -12,6 +12,7 @@ import type { DashboardViewId } from "@/components/shadcn/navigation"
 export const VIEW_LABELS: Record<DashboardViewId, string> = {
   overview: "Visão geral",
   login: "Entrar",
+  mfa: "Verificação",
   providers: "Provedores e credenciais",
   agents: "Config LLM",
   chat: "Assistant",
