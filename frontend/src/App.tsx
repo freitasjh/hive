@@ -13,8 +13,8 @@ import {
   OverviewPage,
   PlaceholderPage,
   PromptsAdminPage,
-  VIEW_LABELS,
 } from "@/modules/hive"
+import { documentTitleFor } from "@/modules/hive/i18n/document-title"
 
 /**
  * Cada página embrulha a si mesma em `AtlasAdminTemplate` — DESIGN.md §3.
@@ -61,10 +61,10 @@ export default function App() {
   // Token é lido a cada render: logout/401 mudam o hash e forçam nova leitura.
   const authenticated = Boolean(getToken())
 
-  // Páginas admin definem "<View> · <Aba>"; demais views exibem só o rótulo da view.
+  // Páginas tabbed definem "<View> · <Aba>"; demais views usam título i18n centralizado.
   useEffect(() => {
     if (!isTabbedView(view)) {
-      document.title = VIEW_LABELS[view]
+      document.title = documentTitleFor(view)
     }
   }, [view])
 

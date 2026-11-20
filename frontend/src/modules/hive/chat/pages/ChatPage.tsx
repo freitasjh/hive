@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect } from "react"
 import type { DashboardViewId } from "@/components/shadcn/navigation"
 import { AtlasAdminTemplate } from "@/layouts"
 import { ChatView } from "../components/ChatView"
@@ -15,10 +14,7 @@ export interface ChatPageProps {
 export function ChatPage({ onSelectView }: ChatPageProps) {
   const { state, actions } = useChatController()
   const { t } = useChatI18n()
-
-  useEffect(() => {
-    document.title = t("chat.document.title")
-  }, [t])
+  // document.title desta rota é escrito somente por App.tsx via documentTitleFor.
 
   return (
     <AtlasAdminTemplate title={t("chat.title")} activeView="chat" onSelectView={onSelectView}>

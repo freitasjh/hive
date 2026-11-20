@@ -98,6 +98,11 @@ const dictionaries: Record<ChatLocale, Record<ChatMessageKey, string>> = {
   "en-US": enUS,
 }
 
+/** Consulta síncrona das mesmas chaves, para compositores fora de hooks (ex.: document.title). */
+export function chatMessage(locale: ChatLocale, key: ChatMessageKey): string {
+  return dictionaries[locale][key] ?? ptBR[key] ?? key
+}
+
 export function detectChatLocale(): ChatLocale {
   try {
     const stored = localStorage.getItem("hive_locale")
@@ -120,7 +125,7 @@ export function useChatI18n(): ChatI18n {
   const [locale] = useState<ChatLocale>(detectChatLocale)
   const t = useCallback<ChatI18n["t"]>(
     (key, params) => {
-      const template = dictionaries[locale][key] ?? ptBR[key] ?? key
+      const template = chatMessage(locale, key)
       if (!params) return template
       return template.replace(/\{(\w+)\}/g, (match, name: string) =>
         name in params ? String(params[name]) : match

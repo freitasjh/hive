@@ -183,6 +183,11 @@ const dictionaries: Record<AuthLocale, Record<AuthMessageKey, string>> = {
   "en-US": enUS,
 }
 
+/** Consulta síncrona das mesmas chaves, para compositores fora de hooks (ex.: document.title). */
+export function authMessage(locale: AuthLocale, key: AuthMessageKey): string {
+  return dictionaries[locale][key] ?? ptBR[key] ?? key
+}
+
 export function detectAuthLocale(): AuthLocale {
   try {
     const stored = localStorage.getItem("hive_locale")
@@ -203,9 +208,6 @@ export interface AuthI18n {
 
 export function useAuthI18n(): AuthI18n {
   const [locale] = useState<AuthLocale>(detectAuthLocale)
-  const t = useCallback<AuthI18n["t"]>(
-    (key) => dictionaries[locale][key] ?? ptBR[key] ?? key,
-    [locale]
-  )
+  const t = useCallback<AuthI18n["t"]>((key) => authMessage(locale, key), [locale])
   return { locale, t }
 }

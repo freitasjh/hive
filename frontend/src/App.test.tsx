@@ -841,4 +841,90 @@ describe('App', () => {
       }
     })
   })
+
+  describe('document.title localizado — views não-tabbed', () => {
+    const originalLang = document.documentElement.lang
+
+    afterEach(() => {
+      document.documentElement.lang = originalLang
+    })
+
+    function withLang<T>(lang: string, run: () => T): T {
+      document.documentElement.lang = lang
+      return run()
+    }
+
+    it.each([
+      ['#overview', 'Visão geral'],
+      ['#chat', 'Assistant'],
+    ])('pt-BR: %s mantém o título atual', (hash, expected) => {
+      setHash(hash)
+      withLang('pt-BR', () => render(<App />))
+      expect(document.title).toBe(expected)
+    })
+
+    it.each([
+      ['#overview', 'Overview'],
+      ['#chat', 'Assistant'],
+    ])('en: %s usa título sem literal pt', (hash, expected) => {
+      setHash(hash)
+      withLang('en', () => render(<App />))
+      expect(document.title).toBe(expected)
+      expect(document.title).not.toMatch(/[áéíóúâêôãõç]/i)
+    })
+
+    it.each([
+      ['pt-BR', 'Entrar', 'Usuário', 'Senha'],
+      ['en', 'Sign in', 'Username', 'Password'],
+    ])('login em %s usa auth.document.title', (lang, expectedTitle, usernameLabel, passwordLabel) => {
+      anonymize()
+      setHash('#login')
+      withLang(lang, () => render(<App />))
+
+      expect(document.title).toBe(expectedTitle)
+      expect(screen.getByLabelText(usernameLabel)).toBeTruthy()
+      expect(screen.getByLabelText(passwordLabel)).toBeTruthy()
+    })
+
+    it.each([
+      ['pt-BR', 'Verificação em duas etapas', 'Usuário', 'Senha', 'Entrar'],
+      ['en', 'Two-step verification', 'Username', 'Password', 'Sign in'],
+    ])('mfa em %s usa auth.mfa.document.title', async (lang, expectedTitle, usernameLabel, passwordLabel, submitLabel) => {
+      const loginSpy = vi.spyOn(loginService, 'login').mockResolvedValue({
+        kind: 'mfa-required',
+        challengeId: 'e8a2658f-8830-4bcd-aa4c-a1f260ae59fd',
+        expiresIn: 120,
+        tenantId: 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff',
+      })
+      try {
+        anonymize()
+        setHash('#login')
+        document.documentElement.lang = lang
+        render(<App />)
+
+        fireEvent.change(screen.getByLabelText(usernameLabel), { target: { value: 'user' } })
+        fireEvent.change(screen.getByLabelText(passwordLabel), { target: { value: 'pw' } })
+        fireEvent.click(screen.getByRole('button', { name: submitLabel }))
+
+        await waitFor(() => expect(window.location.hash).toBe('#mfa'))
+        expect(document.title).toBe(expectedTitle)
+        expect(screen.queryByRole('banner')).toBeNull()
+      } finally {
+        loginSpy.mockRestore()
+      }
+    })
+
+    it('tabbed: en mantém o title próprio de admin.document.title', () => {
+      setHash('#prompts/editor/new')
+      withLang('en', () => render(<App />))
+      expect(document.title).toBe('Prompts · Editor')
+    })
+
+    it('tabbed: pt mantém o title próprio de admin.document.title', () => {
+      mocks.getLlmConfig.mockResolvedValue(null)
+      setHash('#providers/models')
+      withLang('pt-BR', () => render(<App />))
+      expect(document.title).toBe('Provedores de IA · Provedor e modelo')
+    })
+  })
 })
