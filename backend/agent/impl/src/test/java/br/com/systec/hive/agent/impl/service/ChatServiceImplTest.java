@@ -2,7 +2,7 @@ package br.com.systec.hive.agent.impl.service;
 
 import br.com.systec.hive.agent.api.diagnostics.ChatTrace;
 import br.com.systec.hive.agent.api.diagnostics.ChatTraceRecorder;
-import br.com.systec.hive.agent.api.domain.ChatMessage;
+import br.com.systec.hive.history.api.domain.ChatMessage;
 import br.com.systec.hive.agent.api.domain.ChatRequest;
 import br.com.systec.hive.agent.api.domain.ChatResponse;
 import br.com.systec.hive.agent.api.domain.ChatSession;
@@ -13,7 +13,7 @@ import br.com.systec.hive.agent.api.exceptions.ConfigMissingException;
 import br.com.systec.hive.agent.api.exceptions.ModelReturnedEmptyException;
 import br.com.systec.hive.agent.api.exceptions.ProviderException;
 import br.com.systec.hive.agent.api.port.ChatTurnGateway;
-import br.com.systec.hive.agent.api.service.ChatMessageService;
+import br.com.systec.hive.history.api.service.ChatMessageService;
 import br.com.systec.hive.agent.api.service.ChatSessionService;
 import br.com.systec.hive.agent.impl.diagnostics.FailureClassifier;
 import br.com.systec.hive.api.domain.TenantLlmConfig;

@@ -1,14 +1,10 @@
 package br.com.systec.hive.agent.web.internal.v1.controller;
 
-import br.com.systec.hive.agent.api.domain.ChatMessage;
 import br.com.systec.hive.agent.api.domain.ChatSession;
-import br.com.systec.hive.agent.api.service.ChatMessageService;
 import br.com.systec.hive.agent.api.service.ChatSessionService;
-import br.com.systec.hive.agent.web.internal.v1.dto.ChatMessageDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.ChatSessionDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.CreateSessionDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.UpdateSessionDTO;
-import br.com.systec.hive.agent.web.internal.v1.mapper.ChatMessageMapperDTO;
 import br.com.systec.hive.agent.web.internal.v1.mapper.ChatSessionMapperDTO;
 import br.com.systec.hive.commons.api.tools.controller.RestControllerTool;
 import br.com.systec.hive.commons.api.tools.controller.RestPath;
@@ -36,18 +32,12 @@ import java.util.UUID;
 public class ChatSessionControllerV1 {
 
     private final ChatSessionService chatSessionService;
-    private final ChatMessageService chatMessageService;
     private final ChatSessionMapperDTO sessionMapper;
-    private final ChatMessageMapperDTO messageMapper;
 
     public ChatSessionControllerV1(ChatSessionService chatSessionService,
-                                   ChatMessageService chatMessageService,
-                                   ChatSessionMapperDTO sessionMapper,
-                                   ChatMessageMapperDTO messageMapper) {
+                                   ChatSessionMapperDTO sessionMapper) {
         this.chatSessionService = chatSessionService;
-        this.chatMessageService = chatMessageService;
         this.sessionMapper = sessionMapper;
-        this.messageMapper = messageMapper;
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -88,25 +78,6 @@ public class ChatSessionControllerV1 {
         UUID userId = currentUserId();
         ChatSession session = chatSessionService.getSession(id, tenantId, userId);
         return RestControllerTool.of().buildSuccessResponse(sessionMapper.toDto(session));
-    }
-
-    @GetMapping(value = "/{id}/messages", produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(description = "Lista mensagens da sessão ordenadas createAt ASC")
-    @HasPermission("CHAT_SESSION_MANAGE")
-    public ResponseEntity<Page<ChatMessageDTO>> messages(
-            @PathVariable UUID id,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size) {
-        if (size > 100) {
-            throw new IllegalArgumentException("size must be <= 100");
-        }
-        if (size <= 0) size = 50;
-        UUID tenantId = currentTenantId();
-        UUID userId = currentUserId();
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "createAt"));
-        Page<ChatMessage> result = chatMessageService.getMessages(id, tenantId, userId, pageable);
-        Page<ChatMessageDTO> dtoPage = result.map(messageMapper::toDto);
-        return RestControllerTool.of().buildSuccessResponse(dtoPage);
     }
 
     @DeleteMapping(value = "/{id}")

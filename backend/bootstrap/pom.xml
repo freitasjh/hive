@@ -162,9 +162,24 @@
             <artifactId>hive-agent-impl</artifactId>
             <scope>compile</scope>
         </dependency>
+        <!-- ADR-016/017: history/impl entra no classpath de runtime para o @Service
+             implementador da porta ChatMessageService e seus @Repository/@Mapper serem descobertos. -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-history-impl</artifactId>
+            <version>${revision}</version>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-agent-web-internal-v1</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <!-- ADR-017: @RestController de GET /v1/chat/sessions/{id}/messages (history/web). -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-history-web-internal-v1</artifactId>
+            <version>${revision}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

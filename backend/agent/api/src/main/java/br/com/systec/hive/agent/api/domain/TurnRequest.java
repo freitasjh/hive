@@ -46,7 +46,7 @@ import java.util.UUID;
  */
 public record TurnRequest(UUID sessionId, PromptTemplate promptTemplate, AiProvider provider, String model,
                           String apiKey, String baseUrl,
-                          List<br.com.systec.hive.agent.api.domain.ChatMessage> history,
+                          List<br.com.systec.hive.history.api.domain.ChatMessage> history,
                           List<ChatMessage> conversation) {
 
     public TurnRequest {

@@ -25,6 +25,13 @@
             <artifactId>hive-agent-api</artifactId>
             <version>${revision}</version>
         </dependency>
+        <!-- ADR-017: PublicChatServiceImpl usa ProviderMessages/ChatMessage de history/api.
+             Dependência direta exigida; transitividade via agent/api não basta. -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-history-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
         <dependency>
             <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-tenant-api</artifactId>

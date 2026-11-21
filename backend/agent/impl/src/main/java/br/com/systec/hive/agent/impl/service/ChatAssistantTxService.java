@@ -1,9 +1,9 @@
 package br.com.systec.hive.agent.impl.service;
 
-import br.com.systec.hive.agent.impl.repository.ChatMessageRepository;
-import br.com.systec.hive.agent.impl.repository.ChatSessionRepository;
-import br.com.systec.hive.agent.impl.entity.ChatMessageEntity;
-import br.com.systec.hive.agent.impl.entity.ChatSessionEntity;
+import br.com.systec.hive.history.impl.repository.ChatMessageRepository;
+import br.com.systec.hive.history.impl.repository.ChatSessionRepository;
+import br.com.systec.hive.history.impl.entity.ChatMessageEntity;
+import br.com.systec.hive.history.impl.entity.ChatSessionEntity;
 import br.com.systec.hive.agent.api.exceptions.ChatSessionNotFoundException;
 import br.com.systec.hive.provider.api.ChatRole;
 import org.springframework.stereotype.Service;

@@ -1,7 +1,7 @@
 package br.com.systec.hive.agent.impl.service;
 
-import br.com.systec.hive.agent.api.domain.ChatMessage;
-import br.com.systec.hive.agent.api.util.ProviderMessages;
+import br.com.systec.hive.history.api.domain.ChatMessage;
+import br.com.systec.hive.history.api.util.ProviderMessages;
 import br.com.systec.hive.provider.api.ChatRole;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessageType;
@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>The rule is that every caller of {@code ChatTurnGateway} sends the same prompt for the same
  * history: system entries stay in the list, assistant entries arrive as {@link AiMessage}, and an
  * entry with no text on either field is dropped instead of being sent as an empty message. The
- * class moved to {@code agent/api} in the D4/D5 extraction and the internal chat path tests it
+ * class moved to {@code history/api} (ADR-017) and the internal chat path tests it
  * through {@link ChatServiceImplTest}; these cases assert the mapping itself, because the public
  * chat API will call the same static function with an empty history plus its own system prompt.
  */

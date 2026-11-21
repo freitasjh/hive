@@ -9,7 +9,7 @@ import br.com.systec.hive.agent.api.exceptions.PromptInUseException;
 import br.com.systec.hive.agent.api.exceptions.PromptTemplateNotFoundException;
 import br.com.systec.hive.agent.impl.entity.PromptTemplateEntity;
 import br.com.systec.hive.agent.impl.mapper.PromptTemplateDomainMapper;
-import br.com.systec.hive.agent.impl.repository.ChatSessionRepository;
+import br.com.systec.hive.history.impl.repository.ChatSessionRepository;
 import br.com.systec.hive.agent.impl.repository.PromptTemplateRepository;
 import br.com.systec.hive.commons.impl.security.TenantContext;
 import org.junit.jupiter.api.Test;
