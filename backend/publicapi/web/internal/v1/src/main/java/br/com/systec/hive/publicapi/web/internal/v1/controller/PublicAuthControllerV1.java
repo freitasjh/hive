@@ -1,5 +1,11 @@
 package br.com.systec.hive.publicapi.web.internal.v1.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import br.com.systec.hive.commons.api.tools.controller.RestPath;
 import br.com.systec.hive.publicapi.api.exceptions.InvalidClientException;
 import br.com.systec.hive.publicapi.api.exceptions.InvalidGrantException;
@@ -8,7 +14,7 @@ import br.com.systec.hive.publicapi.impl.quota.RedisQuotaGuard;
 import br.com.systec.hive.publicapi.impl.service.PublicClientTokenIssuer;
 import br.com.systec.hive.publicapi.web.internal.v1.dto.TokenRequestDTO;
 import br.com.systec.hive.publicapi.web.internal.v1.dto.TokenResponseDTO;
-import br.com.systec.hive.publicapi.web.internal.v1.error.OpenAiErrorResponse;
+import br.com.systec.hive.publicapi.api.dto.OpenAiError;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -26,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 @RestController
+@Tag(name = "Public Auth", description = "OAuth client_credentials para a API pública do Hive")
 @RequestMapping(RestPath.V1 + "/public/auth")
 public class PublicAuthControllerV1 {
 
@@ -37,12 +44,31 @@ public class PublicAuthControllerV1 {
         this.quotaGuard = quotaGuard;
     }
 
+    @Operation(summary = "Emite token client_credentials (JSON)",
+            description = "Basic preferido; corpo legado aceito. Erros locais: 400 invalid_request e 401 invalid_client. "
+                    + "Não há 429 neste endpoint neste ciclo (bugfix separado, ADR-004).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Token emitido; Cache-Control: no-store, Pragma: no-cache"),
+            @ApiResponse(responseCode = "400", description = "invalid_request",
+                    content = @Content(schema = @Schema(implementation = OpenAiError.class))),
+            @ApiResponse(responseCode = "401", description = "invalid_client",
+                    content = @Content(schema = @Schema(implementation = OpenAiError.class)))
+    })
     @PostMapping(value = "/token", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<TokenResponseDTO> token(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
                                                   @RequestBody @Valid TokenRequestDTO body) {
         return doToken(authorization, body);
     }
 
+    @Operation(summary = "Emite token client_credentials (form-urlencoded)",
+            description = "Mesmo contrato da variante JSON. Erros locais: 400 invalid_request e 401 invalid_client.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Token emitido; Cache-Control: no-store, Pragma: no-cache"),
+            @ApiResponse(responseCode = "400", description = "invalid_request",
+                    content = @Content(schema = @Schema(implementation = OpenAiError.class))),
+            @ApiResponse(responseCode = "401", description = "invalid_client",
+                    content = @Content(schema = @Schema(implementation = OpenAiError.class)))
+    })
     @PostMapping(value = "/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<TokenResponseDTO> tokenForm(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
                                                       @org.springframework.web.bind.annotation.ModelAttribute @Valid TokenRequestDTO body) {
@@ -109,30 +135,30 @@ public class PublicAuthControllerV1 {
     }
 
     @ExceptionHandler(InvalidClientException.class)
-    public ResponseEntity<OpenAiErrorResponse> handleInvalidClient(InvalidClientException ex) {
-        OpenAiErrorResponse.Error err = new OpenAiErrorResponse.Error("Invalid client credentials", "invalid_request_error", null, "invalid_client");
+    public ResponseEntity<OpenAiError> handleInvalidClient(InvalidClientException ex) {
+        OpenAiError.Error err = new OpenAiError.Error("Invalid client credentials", "invalid_request_error", null, "invalid_client");
         return ResponseEntity.status(401)
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .header("Pragma", "no-cache")
-                .body(new OpenAiErrorResponse(err));
+                .body(new OpenAiError(err));
     }
 
     @ExceptionHandler(InvalidGrantException.class)
-    public ResponseEntity<OpenAiErrorResponse> handleInvalidGrant(InvalidGrantException ex) {
-        OpenAiErrorResponse.Error err = new OpenAiErrorResponse.Error("grant_type must be client_credentials", "invalid_request_error", null, "invalid_grant");
+    public ResponseEntity<OpenAiError> handleInvalidGrant(InvalidGrantException ex) {
+        OpenAiError.Error err = new OpenAiError.Error("grant_type must be client_credentials", "invalid_request_error", null, "invalid_grant");
         return ResponseEntity.status(400)
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .header("Pragma", "no-cache")
-                .body(new OpenAiErrorResponse(err));
+                .body(new OpenAiError(err));
     }
 
     @ExceptionHandler(InvalidScopeException.class)
-    public ResponseEntity<OpenAiErrorResponse> handleInvalidScope(InvalidScopeException ex) {
-        OpenAiErrorResponse.Error err = new OpenAiErrorResponse.Error("Requested scope not granted", "invalid_request_error", null, "invalid_scope");
+    public ResponseEntity<OpenAiError> handleInvalidScope(InvalidScopeException ex) {
+        OpenAiError.Error err = new OpenAiError.Error("Requested scope not granted", "invalid_request_error", null, "invalid_scope");
         return ResponseEntity.status(400)
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .header("Pragma", "no-cache")
-                .body(new OpenAiErrorResponse(err));
+                .body(new OpenAiError(err));
     }
 
     // catch-all
@@ -140,8 +166,8 @@ public class PublicAuthControllerV1 {
             org.springframework.web.bind.MethodArgumentNotValidException.class,
             org.springframework.web.HttpRequestMethodNotSupportedException.class,
             org.springframework.dao.DataIntegrityViolationException.class})
-    public ResponseEntity<OpenAiErrorResponse> handleCatchAll(Exception ex) {
-        OpenAiErrorResponse.Error err = new OpenAiErrorResponse.Error("Bad request", "invalid_request_error", null, "invalid_request");
+    public ResponseEntity<OpenAiError> handleCatchAll(Exception ex) {
+        OpenAiError.Error err = new OpenAiError.Error("Bad request", "invalid_request_error", null, "invalid_request");
         // map status
         int status = 400;
         if (ex instanceof org.springframework.web.HttpRequestMethodNotSupportedException) {
@@ -150,15 +176,15 @@ public class PublicAuthControllerV1 {
         return ResponseEntity.status(status)
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .header("Pragma", "no-cache")
-                .body(new OpenAiErrorResponse(err));
+                .body(new OpenAiError(err));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<OpenAiErrorResponse> handleGeneric(Exception ex) {
-        OpenAiErrorResponse.Error err = new OpenAiErrorResponse.Error("Bad request", "invalid_request_error", null, "invalid_request");
+    public ResponseEntity<OpenAiError> handleGeneric(Exception ex) {
+        OpenAiError.Error err = new OpenAiError.Error("Bad request", "invalid_request_error", null, "invalid_request");
         return ResponseEntity.status(400)
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .header("Pragma", "no-cache")
-                .body(new OpenAiErrorResponse(err));
+                .body(new OpenAiError(err));
     }
 }

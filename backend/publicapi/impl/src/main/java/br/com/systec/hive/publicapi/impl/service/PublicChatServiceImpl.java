@@ -19,7 +19,13 @@ import br.com.systec.hive.publicapi.api.exceptions.SystemRoleNotAllowedException
 import br.com.systec.hive.publicapi.api.exceptions.UnknownModelException;
 import br.com.systec.hive.publicapi.api.service.PublicChatService;
 import br.com.systec.hive.publicapi.impl.quota.RedisQuotaGuard;
+import br.com.systec.hive.publicapi.api.dto.ChatCompletionChoice;
+import br.com.systec.hive.publicapi.api.dto.ChatCompletionMessage;
+import br.com.systec.hive.publicapi.api.dto.ChatCompletionMetadata;
 import br.com.systec.hive.publicapi.api.dto.ChatCompletionRequestDTO;
+import br.com.systec.hive.publicapi.api.dto.ChatCompletionResponse;
+import br.com.systec.hive.publicapi.api.dto.ChatCompletionUsage;
+import br.com.systec.hive.publicapi.api.dto.HiveMetadata;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -61,13 +67,12 @@ public class PublicChatServiceImpl implements PublicChatService {
     }
 
     @Override
-    public Object complete(br.com.systec.hive.publicapi.api.dto.ChatCompletionRequestDTO request) {
-        br.com.systec.hive.publicapi.api.dto.ChatCompletionRequestDTO req = request;
+    public ChatCompletionResponse complete(ChatCompletionRequestDTO request) {
         // validation handled by @Valid in controller; extra checks here
-        if (req.getStream() != null && Boolean.TRUE.equals(req.getStream())) {
+        if (request.getStream() != null && Boolean.TRUE.equals(request.getStream())) {
             throw new IllegalArgumentException("stream_not_supported");
         }
-        for (ChatCompletionRequestDTO.ChatMessageDTO m : req.getMessages()) {
+        for (ChatCompletionRequestDTO.ChatMessageDTO m : request.getMessages()) {
             if ("system".equalsIgnoreCase(m.getRole())) {
                 throw new SystemRoleNotAllowedException();
             }
@@ -117,11 +122,11 @@ public class PublicChatServiceImpl implements PublicChatService {
         int maxTotal = limit(limits, "t", 256000);
 
         // validate messages against plim
-        if (req.getMessages().size() > maxMessages) {
+        if (request.getMessages().size() > maxMessages) {
             throw new IllegalArgumentException("too_many_messages");
         }
         int total = 0;
-        for (ChatCompletionRequestDTO.ChatMessageDTO m : req.getMessages()) {
+        for (ChatCompletionRequestDTO.ChatMessageDTO m : request.getMessages()) {
             if (m.getContent() == null || m.getContent().trim().isEmpty() || m.getContent().length() > maxChars) {
                 throw new IllegalArgumentException("request_too_large");
             }
@@ -135,17 +140,17 @@ public class PublicChatServiceImpl implements PublicChatService {
         quotaGuard.checkClient(clientId, 60);
 
         // allowlist before lookup
-        if (!allowlist.contains(req.getPrompt_code())) {
+        if (!allowlist.contains(request.getPrompt_code())) {
             throw new PromptNotInAllowlistException();
         }
 
         // resolve prompt inside runWithTenant (already in context)
-        PromptTemplate prompt = promptGrantResolver.resolve(req.getPrompt_code(), allowlist, pinned);
+        PromptTemplate prompt = promptGrantResolver.resolve(request.getPrompt_code(), allowlist, pinned);
 
         // unknown model check
         ProviderResolution.Resolved resolved = providerResolution.resolve(tenantId);
-        if (req.getModel() != null && !req.getModel().isBlank()
-                && !req.getModel().equals(resolved.model())) {
+        if (request.getModel() != null && !request.getModel().isBlank()
+                && !request.getModel().equals(resolved.model())) {
             throw new UnknownModelException();
         }
 
@@ -154,7 +159,7 @@ public class PublicChatServiceImpl implements PublicChatService {
         // Agora ambos produzem List<ChatMessage> via ProviderMessages.toProviderMessages e entregam
         // a mesma TurnRequest ao mesmo proxy (role=system já rejeitado acima, com 400).
         List<br.com.systec.hive.history.api.domain.ChatMessage> conversationInput = new ArrayList<>();
-        for (ChatCompletionRequestDTO.ChatMessageDTO m : req.getMessages()) {
+        for (ChatCompletionRequestDTO.ChatMessageDTO m : request.getMessages()) {
             br.com.systec.hive.history.api.domain.ChatMessage entry =
                     new br.com.systec.hive.history.api.domain.ChatMessage();
             entry.setRole("assistant".equalsIgnoreCase(m.getRole())
@@ -179,45 +184,33 @@ public class PublicChatServiceImpl implements PublicChatService {
         String text = reply.text();
         String fingerprint = "sha256:" + sha256(prompt.getTemplate() == null ? "" : prompt.getTemplate());
 
-        Map<String, Object> usage = new HashMap<>();
-        usage.put("prompt_tokens", reply.promptTokens());
-        usage.put("completion_tokens", reply.completionTokens());
-        usage.put("total_tokens", reply.totalTokens());
+        ChatCompletionUsage usage = new ChatCompletionUsage(
+                reply.promptTokens(), reply.completionTokens(), reply.totalTokens());
+        ChatCompletionMessage message = new ChatCompletionMessage("assistant", text);
+        ChatCompletionChoice choice = new ChatCompletionChoice(
+                0, message, reply.finishReason() == null ? "stop" : reply.finishReason().toLowerCase());
 
-        Map<String, Object> message = new HashMap<>();
-        message.put("role", "assistant");
-        message.put("content", text);
+        HiveMetadata hive = new HiveMetadata(
+                turnId.toString(),
+                prompt.getCode(),
+                prompt.getVersion(),
+                fingerprint,
+                pinned.containsKey(request.getPrompt_code()) ? "PINNED" : "FOLLOW_ACTIVE",
+                resolved.provider().name(),
+                resolved.model(),
+                elapsed,
+                tenantId.toString());
+        ChatCompletionMetadata metadata = new ChatCompletionMetadata(hive);
 
-        Map<String, Object> choice = new HashMap<>();
-        choice.put("index", 0);
-        choice.put("message", message);
-        choice.put("finish_reason", reply.finishReason() == null ? "stop" : reply.finishReason().toLowerCase());
-
-        Map<String, Object> hive = new HashMap<>();
-        hive.put("turn_id", turnId.toString());
-        hive.put("prompt_code", prompt.getCode());
-        hive.put("prompt_version", prompt.getVersion());
-        hive.put("prompt_fingerprint", fingerprint);
-        hive.put("pin_mode", pinned.containsKey(req.getPrompt_code()) ? "PINNED" : "FOLLOW_ACTIVE");
-        hive.put("provider", resolved.provider().name());
-        hive.put("model", resolved.model());
-        hive.put("elapsed_ms", elapsed);
-        hive.put("tenant_id", tenantId.toString());
-
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("hive", hive);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("id", "chatcmpl-" + turnId.toString().substring(0, 8));
-        response.put("object", "chat.completion");
-        response.put("created", Instant.now().getEpochSecond());
-        response.put("model", resolved.model());
-        response.put("choices", List.of(choice));
-        response.put("usage", usage);
-        response.put("prompt_code", prompt.getCode());
-        response.put("metadata", metadata);
-
-        return response;
+        return new ChatCompletionResponse(
+                "chatcmpl-" + turnId.toString().substring(0, 8),
+                "chat.completion",
+                Instant.now().getEpochSecond(),
+                resolved.model(),
+                List.of(choice),
+                usage,
+                prompt.getCode(),
+                metadata);
     }
 
     private String currentClientId() {

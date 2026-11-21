@@ -1,5 +1,7 @@
 package br.com.systec.hive.publicapi.impl.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
 import br.com.systec.hive.ai.api.domain.TurnReply;
 import br.com.systec.hive.ai.api.domain.TurnRequest;
@@ -8,6 +10,7 @@ import br.com.systec.hive.commons.impl.security.TenantContext;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.assistant.impl.service.ProviderResolution;
 import br.com.systec.hive.publicapi.api.dto.ChatCompletionRequestDTO;
+import br.com.systec.hive.publicapi.api.dto.ChatCompletionResponse;
 import br.com.systec.hive.publicapi.api.exceptions.InvalidClientException;
 import br.com.systec.hive.publicapi.api.exceptions.PromptNotActiveException;
 import br.com.systec.hive.publicapi.api.exceptions.PromptNotFoundException;
@@ -236,12 +239,7 @@ class PublicChatServiceImplTest {
         previous.setContent("resposta antiga");
         r.setMessages(List.of(previous, r.getMessages().get(0)));
 
-        java.util.Map<String, Object> response = TenantContext.runWithTenant(UUID.randomUUID(), () -> {
-            Object result = svc().complete(r);
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> cast = (java.util.Map<String, Object>) result;
-            return cast;
-        });
+        ChatCompletionResponse response = TenantContext.runWithTenant(UUID.randomUUID(), () -> svc().complete(r));
 
         ArgumentCaptor<TurnRequest> captor = ArgumentCaptor.forClass(TurnRequest.class);
         verify(turnGateway).execute(captor.capture());
@@ -254,7 +252,72 @@ class PublicChatServiceImplTest {
         assertThat(((dev.langchain4j.data.message.UserMessage) turn.conversation().get(1)).singleText())
                 .isEqualTo("pergunta atual");
         // ADR-001 item 4: role=system rejeitado antes, e metadata.hive presente na resposta de sucesso.
-        assertThat(response.get("metadata")).isNotNull();
+        assertThat(response.getMetadata()).isNotNull();
+    }
+
+    /**
+     * ADR-001/CT03: congela a serialização da response antes da troca do {@code Map} por DTOs
+     * tipados. O teste serializa o objeto retornado sem conhecer seu tipo, então continua válido
+     * depois da refatoração — qualquer divergência de JSON quebra o contrato OpenAI.
+     */
+    @Test
+    void when_completeSucceeds_then_serializationPreservesContractShape() throws Exception {
+        auth("client");
+        requestAttrs(List.of("p"), Map.of(), Map.of("m", 200, "c", 32000, "t", 256000));
+        UUID tenantId = UUID.randomUUID();
+        PromptTemplate prompt = new PromptTemplate();
+        prompt.setId(UUID.randomUUID());
+        prompt.setCode("p");
+        prompt.setVersion(1);
+        prompt.setTemplate("tpl");
+        when(promptGrantResolver.resolve(any(), any(), any())).thenReturn(prompt);
+        when(turnGateway.execute(any())).thenReturn(
+                TurnReply.answered("resposta", 2, 20, 10, 5, 15, "STOP"));
+
+        String json = TenantContext.runWithTenant(tenantId, () -> {
+            try {
+                Object result = svc().complete(req("user", "hi", "p", null, null));
+                return new ObjectMapper().writeValueAsString(result);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+
+        JsonNode root;
+        try {
+            root = new ObjectMapper().readTree(json);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+        assertThat(root.fieldNames()).toIterable().containsExactlyInAnyOrder(
+                "id", "object", "created", "model", "choices", "usage", "prompt_code", "metadata");
+        assertThat(root.path("object").asText()).isEqualTo("chat.completion");
+        assertThat(root.path("model").asText()).isEqualTo("gpt-4");
+        assertThat(root.path("prompt_code").asText()).isEqualTo("p");
+        assertThat(root.path("id").asText()).startsWith("chatcmpl-");
+        assertThat(root.path("created").isNumber()).isTrue();
+
+        JsonNode choice = root.path("choices").get(0);
+        assertThat(root.path("choices")).hasSize(1);
+        assertThat(choice.path("index").asInt()).isZero();
+        assertThat(choice.path("message").path("role").asText()).isEqualTo("assistant");
+        assertThat(choice.path("message").path("content").asText()).isEqualTo("resposta");
+        assertThat(choice.path("finish_reason").asText()).isEqualTo("stop");
+
+        assertThat(root.path("usage").path("prompt_tokens").asInt()).isEqualTo(10);
+        assertThat(root.path("usage").path("completion_tokens").asInt()).isEqualTo(5);
+        assertThat(root.path("usage").path("total_tokens").asInt()).isEqualTo(15);
+
+        JsonNode hive = root.path("metadata").path("hive");
+        assertThat(hive.path("turn_id").asText()).isNotBlank();
+        assertThat(hive.path("prompt_code").asText()).isEqualTo("p");
+        assertThat(hive.path("prompt_version").asInt()).isEqualTo(1);
+        assertThat(hive.path("prompt_fingerprint").asText()).startsWith("sha256:");
+        assertThat(hive.path("pin_mode").asText()).isEqualTo("FOLLOW_ACTIVE");
+        assertThat(hive.path("provider").asText()).isEqualTo("OPENAI");
+        assertThat(hive.path("model").asText()).isEqualTo("gpt-4");
+        assertThat(hive.path("elapsed_ms").isNumber()).isTrue();
+        assertThat(hive.path("tenant_id").asText()).isEqualTo(tenantId.toString());
     }
 
     @Test

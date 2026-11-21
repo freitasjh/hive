@@ -36,6 +36,11 @@
             <artifactId>hive-publicapi-api</artifactId>
             <version>${revision}</version>
         </dependency>
+        <!-- @Operation/@ApiResponse: documentação code-first do contrato público. -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-scalar</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-tx</artifactId>
