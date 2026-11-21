@@ -4,6 +4,22 @@
   "agent": "qa-engineer",
   "phase": "Testing",
   "gitSha": "08f3a2ff2f52dcac04e4c45494d75d762698cdc8",
+  "mergeVerification": {
+    "status": "MERGE_CONFIRMADO",
+    "data": "2026-11-21",
+    "mergeCommitOriginMain": "d0d38909dcc2e71926fadd29c5588e1832a44c5f",
+    "mergeCommitSubject": "Merge pull request #4 from freitasjh/adr/public-chat-api/01-contrato-openapi",
+    "adrsCommit": "5177af7e40be0cc0e1271d3943577722ce3083fa",
+    "ancestryExit": 0,
+    "provas": [
+      "git fetch origin main: 08f3a2f..d0d3890 main -> origin/main (exit 0)",
+      "git merge-base --is-ancestor 5177af7... origin/main: exit 0",
+      "git ls-tree -r --name-only origin/main -- .spec/prd/public-chat-api: ADR-INDEX.md, ADR.md, SPEC.md, TASKS.md, CODE-REVIEW.md, PRD.md, RESEARCH.md e demais artefatos presentes",
+      "git reflog show origin/main -5: d0d3890 fetch origin main: fast-forward",
+      "git show -s d0d3890: pais 08f3a2f (main) e 5177af7 (ADR-001), 2026-11-21 20:43:45 -0300"
+    ],
+    "observacoes": "branch local adr/public-chat-api/01-contrato-openapi permanece e é a atual; main local ainda em 08f3a2f (fetch atualizou apenas origin/main); VERIFY.md ainda ausente em origin/main — geração fica com o orquestrador; git status --short limpo. Nenhum checkout/commit/merge executado pelo QA."
+  },
   "commands": [
     {
       "cmd": "npm test",

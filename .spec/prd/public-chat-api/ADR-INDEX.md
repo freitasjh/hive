@@ -2,7 +2,7 @@
 
 | order | id | title | status | depends_on | dir | branch | merge | unit |
 |---|---|---|---|---|---|---|---|---|
-| 1 | ADR-001 | Contrato tipado e especificação OpenAPI da API pública | in-progress | — | ADRs/ADR-001-contrato-openapi/ | adr/public-chat-api/01-contrato-openapi | — | adr |
+| 1 | ADR-001 | Contrato tipado e especificação OpenAPI da API pública | merged | — | ADRs/ADR-001-contrato-openapi/ | adr/public-chat-api/01-contrato-openapi | d0d3890 · PR #4 | adr |
 
 `prd_version: 2` (§16 do `PRD.md`, aprovado em 2026-11-21). Unidade de entrega = ADR: 1 ADR = 1 branch = 1 PR = 1 revisão, merge humano. Com `unit: adr`, a linha `in-progress` exige `ADR.md` + `SPEC.md` + `TASKS.md`; `VERIFY.md` entra só após merge.
 

@@ -1,6 +1,6 @@
 # ADR-001 — Contrato tipado e especificação OpenAPI da API pública
 
-**Status:** in-progress · **Data:** 2026-11-21 · **PRD:** `public-chat-api` · **Branch:** `adr/public-chat-api/01-contrato-openapi`
+**Status:** merged · **Data:** 2026-11-21 · **PRD:** `public-chat-api` · **Branch:** `adr/public-chat-api/01-contrato-openapi` · **Merge:** `d0d3890` (PR #4)
 
 **depende-de:** nenhuma ADR. Pré-condição técnica: validar a geração de spec no springdoc compatível com Spring Boot 4.1.0 antes de anotar controllers.
 
