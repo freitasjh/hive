@@ -11,11 +11,25 @@
  * - RestPath.V1 = "/v1"; context path "/hive" em services/api.ts:20
  */
 
+import type { AiProvider } from "./admin.types"
+
+/**
+ * Contrato HTTP espelhado dos DTOs reais — verificação em 2026-11-20:
+ * - ChatRequestDTO.java:15-21 → provider/model são override OPCIONAL; sem eles o
+ *   tenant usa o default de tenant_llm_config; com sessionId a sessão é autoritativa.
+ * - ChatResponseDTO.java:13-20 → provider/model são o par EFETIVO que respondeu.
+ * - ChatSessionDTO.java:13-23 → provider/model gravados na conversa (null = default).
+ * - ProviderCatalogIT.java:21-60 → GET /v1/providers/catalog devolve ARRAY direto
+ *   com { provider, models, defaultModel, configured } (sem wrapper).
+ */
 export interface ChatRequestDTO {
   /** Somente no PRIMEIRO turno. Turnos seguintes usam sessionId. */
   promptTemplateId?: string
   sessionId?: string
   message: string
+  /** Override explícito. Enviar somente quando diferente do par efetivo. */
+  provider?: AiProvider
+  model?: string
 }
 
 export interface ChatResponseDTO {
@@ -23,6 +37,8 @@ export interface ChatResponseDTO {
   role: string
   message: string
   timestamp: string
+  provider?: AiProvider | null
+  model?: string | null
 }
 
 export interface ChatSessionDTO {
@@ -33,6 +49,21 @@ export interface ChatSessionDTO {
   summary?: string | null
   createAt: string
   updateAt: string
+  provider?: AiProvider | null
+  model?: string | null
+}
+
+export interface ProviderCatalogEntry {
+  provider: AiProvider
+  models: string[]
+  defaultModel: string
+  configured: boolean
+}
+
+/** Par provedor/modelo escolhido na UI. `null` = usar o default efetivo. */
+export interface ModelChoice {
+  provider: AiProvider
+  model: string
 }
 
 export interface ChatMessageDTO {

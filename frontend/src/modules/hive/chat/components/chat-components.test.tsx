@@ -176,7 +176,7 @@ describe('ChatThread', () => {
     expect(screen.getByText('resposta')).toBeTruthy()
   })
 
-  it('usa avatar e bolha por papel e mantém o container de rolagem interno', () => {
+  it('usa avatar e bolha por papel e mantém o scroller de mensagens interno', () => {
     const { container } = render(
       <ChatThread
         messages={[message('a', 'USER', 'pergunta'), message('b', 'ASSISTANT', 'resposta')]}
@@ -185,7 +185,7 @@ describe('ChatThread', () => {
         onRetry={vi.fn()}
       />
     )
-    expect(container.querySelector('[data-slot="scroll-area-viewport"]')).toBeTruthy()
+    expect(container.querySelector('[data-slot="message-scroller-viewport"]')).toBeTruthy()
     expect(container.querySelectorAll('[data-slot="avatar-fallback"]')).toHaveLength(2)
     const userRow = screen.getByLabelText('Você')
     const assistantRow = screen.getByLabelText('Assistente')
@@ -193,56 +193,70 @@ describe('ChatThread', () => {
     expect(assistantRow.querySelector('[data-chat-bubble="ASSISTANT"]')?.textContent).toContain('resposta')
   })
 
-  it('rola para o fim já na montagem quando o histórico vem preenchido', () => {
-    const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollHeight')
-    Object.defineProperty(Element.prototype, 'scrollHeight', { configurable: true, get: () => 200 })
-    try {
-      const { container } = render(
-        <ChatThread
-          messages={[message('a', 'USER', 'oi'), message('b', 'ASSISTANT', 'resposta')]}
-          onStarter={vi.fn()}
-          onLoadOlder={vi.fn()}
-          onRetry={vi.fn()}
-        />
-      )
-      const viewport = container.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement
-      expect(viewport.scrollTop).toBe(200)
-    } finally {
-      if (descriptor) Object.defineProperty(Element.prototype, 'scrollHeight', descriptor)
-      else Reflect.deleteProperty(Element.prototype, 'scrollHeight')
-    }
+  it('âncora de turno na fala da pessoa e jump ao fim', () => {
+    const first = message('a', 'USER', 'oi')
+    const second = message('b', 'ASSISTANT', 'resposta')
+    const third = message('c', 'USER', 'mais uma')
+    const { container } = render(
+      <ChatThread
+        messages={[first, second, third]}
+        onStarter={vi.fn()}
+        onLoadOlder={vi.fn()}
+        onRetry={vi.fn()}
+      />
+    )
+    const rows = container.querySelectorAll('[data-slot="message-scroller-item"]')
+    const anchors = Array.from(rows).filter((row) => row.getAttribute('data-scroll-anchor') === 'true')
+    expect(anchors).toHaveLength(2)
+    expect(anchors.map((row) => row.getAttribute('data-message-id'))).toEqual(['a', 'c'])
+    expect(container.querySelector('[data-slot="message-scroller-button"]')).toBeTruthy()
   })
 
-  it('rola para o fim só quando o usuário já estava no fim', () => {
+  // Port dos 2 testes de scroll removidos na migração ScrollArea → MessageScroller.
+  // jsdom não tem layout: o primitive decide "seguir" por scrollTop e chama
+  // viewport.scrollTo. Espiamos scrollTo em vez de medir pixels (H3 cobre o real).
+  const scrollerSetups = (root: HTMLElement) => {
+    const vp = root.querySelector('[data-slot="message-scroller-viewport"]') as HTMLElement
+    Object.defineProperty(vp, 'scrollHeight', { configurable: true, value: 1000 })
+    Object.defineProperty(vp, 'clientHeight', { configurable: true, value: 100 })
+    const scrollTo = vi.fn()
+    vp.scrollTo = scrollTo as unknown as typeof vp.scrollTo
+    return { vp, scrollTo }
+  }
+
+  it('não sequestra leitor: quem scrollou para cima não é puxado por nova mensagem', () => {
     const first = message('a', 'USER', 'oi')
     const second = message('b', 'ASSISTANT', 'resposta')
     const third = message('c', 'USER', 'mais uma')
     const { container, rerender } = render(
-      <ChatThread messages={[first]} onStarter={vi.fn()} onLoadOlder={vi.fn()} onRetry={vi.fn()} />
-    )
-    const viewport = container.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement
-    expect(viewport).toBeTruthy()
-
-    const metrics = (scrollHeight: number, clientHeight: number) => {
-      Object.defineProperty(viewport, 'scrollHeight', { configurable: true, value: scrollHeight })
-      Object.defineProperty(viewport, 'clientHeight', { configurable: true, value: clientHeight })
-    }
-    metrics(1000, 200)
-
-    viewport.scrollTop = 600
-    fireEvent.scroll(viewport) // usuário subiu: não gruda mais
-    rerender(
       <ChatThread messages={[first, second]} onStarter={vi.fn()} onLoadOlder={vi.fn()} onRetry={vi.fn()} />
     )
-    expect(viewport.scrollTop).toBe(600)
+    const { vp, scrollTo } = scrollerSetups(container)
+    Object.defineProperty(vp, 'scrollTop', { configurable: true, writable: true, value: 300 })
+    fireEvent.scroll(vp)
+    scrollTo.mockClear()
 
-    viewport.scrollTop = 800
-    fireEvent.scroll(viewport) // voltou ao fim: volta a grudar
-    metrics(1200, 200)
     rerender(
       <ChatThread messages={[first, second, third]} onStarter={vi.fn()} onLoadOlder={vi.fn()} onRetry={vi.fn()} />
     )
-    expect(viewport.scrollTop).toBe(1200)
+
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(vp.scrollTop).toBe(300)
+  })
+
+  it('jump ao fim é o controle de reengajamento, com rótulo traduzido', () => {
+    // jsdom não tem geometria real: @shadcn/react 0.3.1 marca o botão como inert
+    // (data-active=false) e não chama viewport.scrollTo. O follow automático e o
+    // clique no jump são verificados em H3 no browser real (scrollTop → máximo).
+    const first = message('a', 'USER', 'oi')
+    const second = message('b', 'ASSISTANT', 'resposta')
+    const { container } = render(
+      <ChatThread messages={[first, second]} onStarter={vi.fn()} onLoadOlder={vi.fn()} onRetry={vi.fn()} />
+    )
+    const jump = container.querySelector('[data-slot="message-scroller-button"]') as HTMLElement
+    expect(jump).toBeTruthy()
+    expect(jump.getAttribute('data-direction')).toBe('end')
+    expect(jump.textContent).toContain('Ir para o fim')
   })
 
   it('erro SYSTEM tem rótulo próprio — nunca máscara de assistente', () => {
@@ -376,6 +390,14 @@ describe('ChatView', () => {
     sendError: null,
     notice: null,
     lastUserMessage: null,
+    catalog: [
+      { provider: "OPENAI", models: ["gpt-4o-mini"], defaultModel: "gpt-4o-mini", configured: true },
+    ],
+    catalogLoading: false,
+    catalogError: null,
+    tenantDefault: { provider: "OPENAI", model: "gpt-4o-mini" },
+    selectedModel: null,
+    effectiveModel: { provider: "OPENAI", model: "gpt-4o-mini" },
   }
 
   const baseActions = {
@@ -390,6 +412,7 @@ describe('ChatView', () => {
     loadOlderMessages: vi.fn(),
     retryLast: vi.fn(),
     dismissNotice: vi.fn(),
+    selectModel: vi.fn(),
   }
 
   it('compõe seletor, thread e composer com aviso de prompt', () => {
@@ -419,7 +442,7 @@ describe('ChatView', () => {
     expect(grid.className).toContain('lg:grid-cols-[18rem_minmax(0,1fr)]')
 
     expect(screen.getByTestId('chat-thread').className).toContain('min-h-0')
-    expect(container.querySelector('[data-slot="scroll-area-viewport"]')).toBeTruthy()
+    expect(container.querySelector('[data-slot="message-scroller-viewport"]')).toBeTruthy()
     expect(screen.getByTestId('chat-form')).toBeTruthy()
   })
 

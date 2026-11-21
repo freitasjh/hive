@@ -1,5 +1,11 @@
 import { apiRequest, unwrapData } from "./api"
+import type { AiProvider } from "./admin.types"
 import type { ChatRequestDTO, ChatResponseDTO } from "./chat.types"
+
+export interface ChatPayloadDefaults {
+  provider?: AiProvider | null
+  model?: string | null
+}
 
 /**
  * Regra do turno (bkp/front_bkp/src/services/chat.service.ts:4-15 + decisão canônica):
@@ -7,18 +13,47 @@ import type { ChatRequestDTO, ChatResponseDTO } from "./chat.types"
  * autoritativa — reenviar o template de um cliente com seleção velha trocaria
  * a conversa silenciosamente. Mensagem vazia/sem prompt no primeiro turno não
  * vira requisição.
+ *
+ * Provider/model entram no body SOMENTE quando o par escolhido difere do par
+ * efetivo (tenant ou sessão). Fonte: ui.shadcn.com/docs/ai-elements/base/model-selector
+ * ("Send the model with the message"), consultado em 2026-11-20; contrato backend
+ * ChatRequestDTO.java:15-21 (override opcional).
  */
-export function buildChatPayload(input: ChatRequestDTO): Record<string, unknown> | null {
+export function buildChatPayload(
+  input: ChatRequestDTO,
+  defaults?: ChatPayloadDefaults | null
+): Record<string, unknown> | null {
   const message = typeof input.message === "string" ? input.message.trim() : ""
   if (!message) return null
-  if (input.sessionId) return { sessionId: input.sessionId, message }
-  if (!input.promptTemplateId) return null
-  return { promptTemplateId: input.promptTemplateId, message }
+  const payload: Record<string, unknown> | null = input.sessionId
+    ? { sessionId: input.sessionId, message }
+    : input.promptTemplateId
+      ? { promptTemplateId: input.promptTemplateId, message }
+      : null
+  if (!payload) return null
+
+  // Sessão existente é autoritativa no backend (ChatServiceImpl.java:182-188):
+  // override enviado seria descartado e o seletor ficaria mentindo. Nunca vai na wire.
+  if (input.sessionId) return payload
+
+  const changed =
+    (!!input.provider && input.provider !== defaults?.provider) ||
+    (!!input.model && input.model !== defaults?.model)
+  if (!changed) return payload
+
+  // O par é atômico na UI: um modelo só faz sentido com o provedor que o oferece.
+  // Enviar os dois evita que o backend valide um modelo órfão contra o tenant default.
+  if (input.provider) payload.provider = input.provider
+  if (input.model) payload.model = input.model
+  return payload
 }
 
 export const chatService = {
-  async sendMessage(input: ChatRequestDTO): Promise<ChatResponseDTO> {
-    const payload = buildChatPayload(input)
+  async sendMessage(
+    input: ChatRequestDTO,
+    defaults?: ChatPayloadDefaults | null
+  ): Promise<ChatResponseDTO> {
+    const payload = buildChatPayload(input, defaults)
     if (!payload) {
       throw new Error("Selecione um prompt e informe uma mensagem antes de enviar.")
     }

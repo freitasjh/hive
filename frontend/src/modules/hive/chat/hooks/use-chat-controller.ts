@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { ApiError } from "@/services/api"
-import type { ChatMessageDTO, ChatRequestDTO, ChatSessionDTO } from "@/services/chat.types"
+import type {
+  ChatMessageDTO,
+  ChatRequestDTO,
+  ChatSessionDTO,
+  ModelChoice,
+  ProviderCatalogEntry,
+} from "@/services/chat.types"
+import { agentAdminService } from "@/services/agent-admin.service"
 import { chatService } from "@/services/chat.service"
 import { promptService } from "@/services/prompt.service"
 import { sessionService } from "@/services/session.service"
@@ -37,6 +44,16 @@ export interface ChatControllerState {
   sendError: string | null
   notice: string | null
   lastUserMessage: string | null
+
+  catalog: ProviderCatalogEntry[]
+  catalogLoading: boolean
+  catalogError: string | null
+  /** Par padrão do tenant (ou derivado do catálogo quando o tenant não tem config). */
+  tenantDefault: ModelChoice | null
+  /** Escolha explícita da UI; null = usar o par efetivo. */
+  selectedModel: ModelChoice | null
+  /** Par que respondeu o turno / gravado na sessão — usado para exibir o modelo ativo. */
+  effectiveModel: ModelChoice | null
 }
 
 const INITIAL_STATE: ChatControllerState = {
@@ -60,6 +77,12 @@ const INITIAL_STATE: ChatControllerState = {
   sendError: null,
   notice: null,
   lastUserMessage: null,
+  catalog: [],
+  catalogLoading: true,
+  catalogError: null,
+  tenantDefault: null,
+  selectedModel: null,
+  effectiveModel: null,
 }
 
 export interface ChatControllerActions {
@@ -74,6 +97,7 @@ export interface ChatControllerActions {
   loadOlderMessages: () => Promise<void>
   retryLast: () => Promise<void>
   dismissNotice: () => void
+  selectModel: (choice: ModelChoice | null) => void
 }
 
 function statusOf(error: unknown): number | undefined {
@@ -135,6 +159,50 @@ export function useChatController(): {
     }
   }, [patch, t])
 
+  /**
+   * Catálogo + default do tenant carregados em paralelo.Endpoint novo
+   * GET /v1/providers/catalog pode ainda não existir no backend: falha é
+   * graceful — lista vazia e o seletor continua funcional com o default.
+   */
+  useEffect(() => {
+    let alive = true
+    // Endpoint recém-entregue: em builds que ainda não o têm, o serviço pode
+    // não expor o método. Degradar para rejeição evita quebrar a tela do chat.
+    const catalogRequest: Promise<ProviderCatalogEntry[]> =
+      typeof agentAdminService.getProviderCatalog === "function"
+        ? agentAdminService.getProviderCatalog()
+        : Promise.reject(new Error("GET /providers/catalog indisponível"))
+    Promise.allSettled([
+      catalogRequest,
+      typeof agentAdminService.getLlmConfig === "function"
+        ? agentAdminService.getLlmConfig()
+        : Promise.resolve(null),
+    ]).then(([catalogResult, configResult]) => {
+      if (!alive) return
+      const entries = catalogResult.status === "fulfilled" ? catalogResult.value : []
+      const config = configResult.status === "fulfilled" ? configResult.value : null
+      const fallbackEntry = entries.find((entry) => entry.configured) ?? entries[0]
+      const tenantDefault: ModelChoice | null =
+        config?.provider && config.model
+          ? { provider: config.provider, model: config.model }
+          : fallbackEntry
+            ? { provider: fallbackEntry.provider, model: fallbackEntry.defaultModel }
+            : null
+      patch({
+        catalog: entries,
+        catalogLoading: false,
+        catalogError: catalogResult.status === "rejected" ? t("chat.model.unavailable") : null,
+        tenantDefault,
+        effectiveModel: stateRef.current.sessionId
+          ? stateRef.current.effectiveModel
+          : tenantDefault,
+      })
+    })
+    return () => {
+      alive = false
+    }
+  }, [patch, t])
+
   const selectPrompt = useCallback(
     (id: string) => {
       const current = stateRef.current
@@ -183,7 +251,24 @@ export function useChatController(): {
     try {
       const request: ChatRequestDTO = { promptTemplateId, message: text }
       if (sessionId) request.sessionId = sessionId
-      const answer = await chatService.sendMessage(request)
+      // Baseline: sessão aberta é autoritativa; nova conversa usa o default do tenant.
+      const baseline = sessionId
+        ? current.effectiveModel ?? current.tenantDefault
+        : current.tenantDefault
+      const chosen = current.selectedModel
+
+      // Trocar modelo em conversa existente é enganoso: o backend ignora o override
+      // e a resposta viria de outro par. Volta ao efetivo e avisa (UI), enquanto
+      // buildChatPayload é a única autoridade sobre o que vai na wire.
+      if (sessionId && chosen && baseline) {
+        if (chosen.provider !== baseline.provider || chosen.model !== baseline.model) {
+          patch({ selectedModel: null, notice: t("chat.model.sessionLocked") })
+        }
+      } else if (chosen) {
+        request.provider = chosen.provider
+        request.model = chosen.model
+      }
+      const answer = await chatService.sendMessage(request, baseline)
       if (seq !== seqRef.current) return
       const after = stateRef.current
       const assistantMessage: ChatMessageDTO = {
@@ -197,6 +282,10 @@ export function useChatController(): {
         sessionId: after.sessionId ?? answer.sessionId ?? null,
         messages: [...after.messages, assistantMessage],
         historyError: null,
+        effectiveModel:
+          answer.provider && answer.model
+            ? { provider: answer.provider, model: answer.model }
+            : after.effectiveModel,
       })
 
       if (!sessionId && answer.sessionId) {
@@ -264,9 +353,17 @@ export function useChatController(): {
         // retorna cedo com sessão aberta) sem saída para o usuário.
         const fallbackPrompt = stateRef.current.selectedPromptTemplateId
         let promptTemplateId: string | null = fallbackPrompt
+        let sessionModel: ModelChoice | null = null
         try {
           const session = await sessionService.getSession(id)
-          if (seq === seqRef.current) promptTemplateId = session.promptTemplateId ?? fallbackPrompt
+          if (seq === seqRef.current) {
+            promptTemplateId = session.promptTemplateId ?? fallbackPrompt
+            // Seletor pintado com o par efetivo da conversa (ChatSessionDTO:21-22).
+            sessionModel =
+              session.provider && session.model
+                ? { provider: session.provider, model: session.model }
+                : null
+          }
         } catch {
           /* mantém prompt atual */
         }
@@ -276,6 +373,8 @@ export function useChatController(): {
           messagesPage: page.number,
           messagesTotalPages: page.totalPages,
           selectedPromptTemplateId: promptTemplateId,
+          effectiveModel: sessionModel,
+          selectedModel: null,
           historyLoading: false,
         })
       } catch (error) {
@@ -302,6 +401,8 @@ export function useChatController(): {
       historyError: null,
       notice: null,
       lastUserMessage: null,
+      selectedModel: null,
+      effectiveModel: stateRef.current.tenantDefault,
     })
   }, [patch])
 
@@ -375,6 +476,10 @@ export function useChatController(): {
   }, [patch, send])
 
   const dismissNotice = useCallback(() => patch({ notice: null }), [patch])
+  const selectModel = useCallback(
+    (choice: ModelChoice | null) => patch({ selectedModel: choice, notice: null }),
+    [patch]
+  )
 
   return {
     state,
@@ -390,6 +495,7 @@ export function useChatController(): {
       loadOlderMessages,
       retryLast,
       dismissNotice,
+      selectModel,
     },
   }
 }

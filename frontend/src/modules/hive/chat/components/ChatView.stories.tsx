@@ -26,6 +26,15 @@ const state: ChatControllerState = {
   sendError: null,
   notice: null,
   lastUserMessage: null,
+  catalog: [
+    { provider: "OPENAI", models: ["gpt-4o-mini", "gpt-4o"], defaultModel: "gpt-4o-mini", configured: true },
+    { provider: "GEMINI", models: ["gemini-2.0-flash"], defaultModel: "gemini-2.0-flash", configured: false },
+  ],
+  catalogLoading: false,
+  catalogError: null,
+  tenantDefault: { provider: "OPENAI", model: "gpt-4o-mini" },
+  selectedModel: null,
+  effectiveModel: { provider: "OPENAI", model: "gpt-4o-mini" },
 }
 
 const actions = {
@@ -40,6 +49,7 @@ const actions = {
   loadOlderMessages: async () => {},
   retryLast: async () => {},
   dismissNotice: () => {},
+  selectModel: () => {},
 }
 
 const meta = {

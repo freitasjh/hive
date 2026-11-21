@@ -9,6 +9,7 @@ import type {
   ValidateRequest,
   ValidateResponse,
 } from "./admin.types"
+import type { ProviderCatalogEntry } from "./chat.types"
 
 /**
  * Porta de bkp/front_bkp/src/services/agent-admin.service.ts:34-95.
@@ -87,6 +88,26 @@ export const agentAdminService = {
       filteredOut: Array.isArray(data?.filteredOut) ? data.filteredOut : [],
       cachedAt: data?.cachedAt ?? "",
     }
+  },
+
+  /**
+   * Catálogo local de provedores/modelos para o seletor do chat.
+   * Contrato: GET /v1/providers/catalog → array direto no envelope
+   * (ProviderCatalogIT.java:21-60 / buildSuccessResponse(List)), sem wrapper.
+   * Resposta inválida vira lista vazia: o chamador decide o fallback gracioso.
+   */
+  async getProviderCatalog(): Promise<ProviderCatalogEntry[]> {
+    const body = await apiRequest<unknown>("/providers/catalog")
+    const data = unwrapData<ProviderCatalogEntry[] | null>(body)
+    if (!Array.isArray(data)) return []
+    return data.filter(
+      (entry): entry is ProviderCatalogEntry =>
+        !!entry &&
+        typeof entry.provider === "string" &&
+        Array.isArray(entry.models) &&
+        typeof entry.defaultModel === "string" &&
+        typeof entry.configured === "boolean"
+    )
   },
 
   /** `null` é resposta esperada: tenant ainda sem LLM padrão. */

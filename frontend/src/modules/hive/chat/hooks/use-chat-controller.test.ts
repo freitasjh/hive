@@ -113,7 +113,7 @@ describe('useChatController', () => {
     expect(mocks.send).toHaveBeenCalledWith({
       promptTemplateId: P,
       message: 'primeira pergunta',
-    })
+    }, null)
     expect(result.current.state.sessionId).toBe(S)
     expect(result.current.state.messages.map((m) => m.content)).toEqual([
       'primeira pergunta',
@@ -142,7 +142,7 @@ describe('useChatController', () => {
       promptTemplateId: P,
       sessionId: S,
       message: 'dois',
-    })
+    }, null)
     const payload = buildChatPayload(mocks.send.mock.calls[1][0])
     expect(payload).toEqual({ sessionId: S, message: 'dois' })
     expect(payload).not.toHaveProperty('promptTemplateId')
@@ -207,7 +207,7 @@ describe('useChatController', () => {
       promptTemplateId: P,
       sessionId: S,
       message: 'ainda envia',
-    })
+    }, null)
   })
 
   it('abrir sessão existente trava o seletor no prompt dela e carrega o histórico', async () => {

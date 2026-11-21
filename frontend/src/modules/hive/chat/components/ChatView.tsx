@@ -49,6 +49,7 @@ export function ChatView({ state, actions }: ChatViewProps) {
           ) : null}
 
           <ChatThread
+            sessionKey={state.sessionId ?? "new"}
             messages={state.messages}
             loading={state.historyLoading}
             error={state.historyError}
@@ -68,6 +69,12 @@ export function ChatView({ state, actions }: ChatViewProps) {
             disabled={state.sending || state.historyLoading}
             sending={state.sending}
             warning={state.notice}
+            catalog={state.catalog}
+            selectedModel={state.selectedModel}
+            modelBaseline={state.effectiveModel ?? state.tenantDefault}
+            modelLoading={state.catalogLoading}
+            modelError={state.catalogError}
+            onSelectModel={actions.selectModel}
           />
         </div>
 
