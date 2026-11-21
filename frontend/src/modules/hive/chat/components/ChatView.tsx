@@ -26,7 +26,7 @@ export function ChatView({ state, actions }: ChatViewProps) {
         <p className="text-xs text-muted-foreground">{t("chat.subtitle")}</p>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] gap-3 lg:grid-cols-[18rem_minmax(0,1fr)] lg:grid-rows-1">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_auto] gap-3 lg:grid-cols-[18rem_minmax(0,1fr)] lg:grid-rows-1">
         <div
           data-chat-pane="conversation"
           className="order-1 flex min-h-0 min-w-0 flex-col gap-3 lg:order-none lg:col-start-2 lg:row-start-1"
@@ -57,6 +57,8 @@ export function ChatView({ state, actions }: ChatViewProps) {
             canLoadOlder={!!state.sessionId && state.messagesTotalPages > 1}
             retryable={!!state.sendError}
             canUseStarter={!!state.selectedPromptTemplateId && !state.sending}
+            targetMessageId={state.targetMessageId}
+            onTargetHandled={actions.clearTargetMessage}
             onLoadOlder={actions.loadOlderMessages}
             onRetry={actions.retryLast}
             onStarter={actions.useStarter}
@@ -86,9 +88,15 @@ export function ChatView({ state, actions }: ChatViewProps) {
             totalPages={state.sessionsTotalPages}
             loading={state.sessionsLoading}
             error={state.sessionsError}
+            query={state.query}
+            onQueryChange={actions.setQuery}
+            filteredSessions={state.filteredSessions}
+            matchingMessages={state.matchingMessages}
             onSelect={actions.selectSession}
             onNew={actions.newChat}
+            onRename={actions.renameSession}
             onDelete={actions.removeSession}
+            onJumpToMessage={actions.jumpToMessage}
             onPageChange={actions.goToSessionsPage}
           />
         </div>

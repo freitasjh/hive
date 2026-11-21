@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { AlertCircle, ArrowDown, Bot, Copy, LoaderCircle, RotateCcw, Sparkles, User } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/shadcn/ui/avatar"
 import { Badge } from "@/components/shadcn/ui/badge"
@@ -19,6 +20,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
 } from "@/components/shadcn/ui/message-scroller"
 import { Skeleton } from "@/components/shadcn/ui/skeleton"
 import {
@@ -47,6 +49,10 @@ export interface ChatThreadProps {
   canUseStarter?: boolean
   /** Remonta o provider ao trocar de conversa: reopen em `last-anchor` (regra 11). */
   sessionKey?: string
+  /** messageId alvo de um salto vindo da busca na sidebar. */
+  targetMessageId?: string | null
+  /** Avisa o controller para limpar o alvo após o scroll (evita jump repetido). */
+  onTargetHandled?: () => void
 }
 
 type Role = "USER" | "ASSISTANT" | "SYSTEM"
@@ -56,6 +62,35 @@ function roleOf(role: string): Role {
   if (upper === "USER") return "USER"
   if (upper === "ASSISTANT") return "ASSISTANT"
   return "SYSTEM"
+}
+
+/**
+ * Vive DENTRO do MessageScrollerProvider: `useMessageScroller` exige o contexto.
+ * Só salta quando o messageId já está montado — o primitive registra os itens
+ * por ref; se a mensagem ainda não chegou, o alvo permanece pendente no
+ * controller até o histórico carregar. No @shadcn/react 0.3.1, sem
+ * `keepPreviousPeek`, o scrollToMessage entra em `settling-jump` e mantém a
+ * posição ancorada na mensagem — sem sequestrar quem scrollou manualmente.
+ */
+function ScrollToTarget({
+  targetMessageId,
+  messages,
+  onHandled,
+}: {
+  targetMessageId?: string | null
+  messages: ChatMessageDTO[]
+  onHandled?: () => void
+}) {
+  const { scrollToMessage } = useMessageScroller()
+  const available = !!targetMessageId && messages.some((item) => item.id === targetMessageId)
+
+  useEffect(() => {
+    if (!targetMessageId || !available) return
+    scrollToMessage(targetMessageId, { align: "start", behavior: "smooth" })
+    onHandled?.()
+  }, [targetMessageId, available, scrollToMessage, onHandled])
+
+  return null
 }
 
 function LoadingSkeleton({ label }: { label: string }) {
@@ -90,6 +125,8 @@ export function ChatThread({
   retryable = false,
   canUseStarter = false,
   sessionKey = "new",
+  targetMessageId = null,
+  onTargetHandled,
 }: ChatThreadProps) {
   const { t } = useChatI18n()
   // Histórico de uma sessão recém-aberta chega depois do mount. Montar o provider
@@ -325,6 +362,11 @@ export function ChatThread({
                 <span className="sr-only">{t("chat.thread.jumpToEnd")}</span>
               </MessageScrollerButton>
             </MessageScroller>
+            <ScrollToTarget
+              targetMessageId={targetMessageId}
+              messages={messages}
+              onHandled={onTargetHandled}
+            />
           </MessageScrollerProvider>
           )}
         </Card>

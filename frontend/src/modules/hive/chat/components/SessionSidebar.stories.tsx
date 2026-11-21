@@ -1,15 +1,30 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import type { ChatSessionDTO } from "@/services/chat.types"
+import type { ChatMessageDTO, ChatSessionDTO } from "@/services/chat.types"
 import { SessionSidebar } from "./SessionSidebar"
+
+const localDay = (days: number) =>
+  new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() - days, 12).toISOString()
 
 const sessions: ChatSessionDTO[] = Array.from({ length: 3 }, (_, index) => ({
   id: `22222222-2222-2222-2222-22222222222${index}`,
   userId: "u",
   promptTemplateId: "11111111-1111-1111-1111-111111111111",
   title: `Conversa ${index + 1}`,
-  createAt: "2026-11-19T12:00:00Z",
-  updateAt: "2026-11-19T12:00:00Z",
+  createAt: localDay(0),
+  updateAt: localDay(0),
 }))
+
+const datedSessions: ChatSessionDTO[] = [
+  { ...sessions[0], title: "Sessão de hoje", updateAt: localDay(0) },
+  { ...sessions[1], title: "Sessão de ontem", updateAt: localDay(1) },
+  { ...sessions[2], title: "Sessão da semana", updateAt: localDay(4) },
+  { ...sessions[0], id: sessions[0].id + "-old", title: "Sessão antiga", updateAt: localDay(12) },
+]
+
+const matchingMessages: ChatMessageDTO[] = [
+  { id: "m-1", sessionId: sessions[0].id, role: "ASSISTANT", content: "Resumo do relatório trimestral", createAt: localDay(0) },
+  { id: "m-2", sessionId: sessions[0].id, role: "USER", content: "Resuma este texto", createAt: localDay(0) },
+]
 
 const meta = {
   title: "Hive/Chat/SessionSidebar",
@@ -25,6 +40,9 @@ const meta = {
     onSelect: () => {},
     onNew: () => {},
     onDelete: () => {},
+    onRename: async () => true,
+    onJumpToMessage: () => {},
+    onQueryChange: () => {},
     onPageChange: () => {},
   },
 } satisfies Meta<typeof SessionSidebar>
@@ -43,4 +61,31 @@ export const Hover: Story = {
 }
 export const Focus: Story = {
   decorators: [(Story) => <div className="focus-within:ring-2 focus-within:ring-ring"><Story /></div>],
+}
+
+export const Search: Story = {
+  args: { sessions: datedSessions, query: "semana" },
+}
+export const DateGroups: Story = {
+  args: { sessions: datedSessions },
+}
+export const SearchMessages: Story = {
+  args: { sessions, query: "resumo", matchingMessages },
+}
+export const SearchEmpty: Story = {
+  args: { sessions, query: "sem resultado" },
+}
+export const RenameDialog: Story = {
+  args: { sessions },
+  play: async ({ canvasElement }) => {
+    const trigger = canvasElement.querySelector('[data-testid="session-rename"]') as HTMLButtonElement | null
+    trigger?.click()
+  },
+}
+export const DeleteConfirmation: Story = {
+  args: { sessions },
+  play: async ({ canvasElement }) => {
+    const trigger = canvasElement.querySelector('[data-testid="session-delete"]') as HTMLButtonElement | null
+    trigger?.click()
+  },
 }

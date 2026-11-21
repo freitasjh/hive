@@ -1,16 +1,20 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
+import type { ChatSessionDTO } from "@/services/chat.types"
 import type { ChatControllerState } from "../hooks/use-chat-controller"
 import { ChatView } from "./ChatView"
 
 const P = "11111111-1111-1111-1111-111111111111"
 const S = "22222222-2222-2222-2222-222222222222"
+const sessionsStub: ChatSessionDTO[] = [
+  { id: S, userId: "u", promptTemplateId: P, title: "Conversa", createAt: "2026-11-19T12:00:00Z", updateAt: "2026-11-19T12:00:00Z" },
+]
 
 const state: ChatControllerState = {
   prompts: [{ id: P, name: "Saudação", code: "greeting", template: "Olá", status: "ACTIVE", version: 1, createAt: "", updateAt: "" }],
   promptsLoading: false,
   promptsError: null,
   selectedPromptTemplateId: null,
-  sessions: [{ id: S, userId: "u", promptTemplateId: P, title: "Conversa", createAt: "", updateAt: "" }],
+  sessions: sessionsStub,
   sessionsPage: 0,
   sessionsTotalPages: 3,
   sessionsLoading: false,
@@ -35,6 +39,10 @@ const state: ChatControllerState = {
   tenantDefault: { provider: "OPENAI", model: "gpt-4o-mini" },
   selectedModel: null,
   effectiveModel: { provider: "OPENAI", model: "gpt-4o-mini" },
+  query: "",
+  filteredSessions: sessionsStub,
+  matchingMessages: [],
+  targetMessageId: null,
 }
 
 const actions = {
@@ -50,6 +58,10 @@ const actions = {
   retryLast: async () => {},
   dismissNotice: () => {},
   selectModel: () => {},
+  setQuery: () => {},
+  renameSession: async () => true,
+  jumpToMessage: async () => {},
+  clearTargetMessage: () => {},
 }
 
 const meta = {
@@ -91,7 +103,9 @@ export const Loading: Story = { args: { state: { ...state, promptsLoading: true,
 export const Error: Story = {
   args: { state: { ...state, promptsError: "Não foi possível carregar os prompts.", sendError: "Não foi possível enviar a mensagem." } },
 }
-export const EmptySessions: Story = { args: { state: { ...state, sessions: [], sessionsTotalPages: 1 } } }
+export const EmptySessions: Story = {
+  args: { state: { ...state, sessions: [], filteredSessions: [], sessionsTotalPages: 1 } },
+}
 export const Disabled: Story = { args: { state: { ...state, sending: true, input: "oi" } } }
 export const Success: Story = {
   args: {
@@ -100,6 +114,16 @@ export const Success: Story = {
       sessionId: S,
       selectedPromptTemplateId: P,
       messages: [{ id: "m1", sessionId: S, role: "ASSISTANT", content: "Resposta recebida.", createAt: "" }],
+    },
+  },
+}
+export const Search: Story = {
+  args: {
+    state: {
+      ...state,
+      query: "resumo",
+      messages: [{ id: "m1", sessionId: S, role: "ASSISTANT", content: "Resumo do relatório.", createAt: "" }],
+      matchingMessages: [{ id: "m1", sessionId: S, role: "ASSISTANT", content: "Resumo do relatório.", createAt: "" }],
     },
   },
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ApiError } from "@/services/api"
 import type {
   ChatMessageDTO,
@@ -15,6 +15,7 @@ import { promptService } from "@/services/prompt.service"
 import { sessionService } from "@/services/session.service"
 import type { PromptTemplateDTO } from "@/services/admin.types"
 import { chatErrorKey, useChatI18n } from "../i18n"
+import { filterMessagesByQuery, filterSessionsByQuery } from "./chat-history"
 
 const MESSAGE_LIMIT = 4000
 const SESSION_PAGE_SIZE = 20
@@ -54,6 +55,15 @@ export interface ChatControllerState {
   selectedModel: ModelChoice | null
   /** Par que respondeu o turno / gravado na sessão — usado para exibir o modelo ativo. */
   effectiveModel: ModelChoice | null
+
+  /** Termo da busca local do histórico (ver chat-history.ts — limitação documentada). */
+  query: string
+  /** Derivado de sessions + query. */
+  filteredSessions: ChatSessionDTO[]
+  /** Derivado de messages (já carregadas) + query. */
+  matchingMessages: ChatMessageDTO[]
+  /** Mensagem alvo do salto via scrollToMessage; limpa pelo ChatThread após o jump. */
+  targetMessageId: string | null
 }
 
 const INITIAL_STATE: ChatControllerState = {
@@ -83,6 +93,10 @@ const INITIAL_STATE: ChatControllerState = {
   tenantDefault: null,
   selectedModel: null,
   effectiveModel: null,
+  query: "",
+  filteredSessions: [],
+  matchingMessages: [],
+  targetMessageId: null,
 }
 
 export interface ChatControllerActions {
@@ -98,6 +112,10 @@ export interface ChatControllerActions {
   retryLast: () => Promise<void>
   dismissNotice: () => void
   selectModel: (choice: ModelChoice | null) => void
+  setQuery: (value: string) => void
+  renameSession: (id: string, title: string) => Promise<boolean>
+  jumpToMessage: (messageId: string, sessionId?: string) => Promise<void>
+  clearTargetMessage: () => void
 }
 
 function statusOf(error: unknown): number | undefined {
@@ -344,6 +362,8 @@ export function useChatController(): {
         historyError: null,
         sendError: null,
         notice: null,
+        // alvo de uma conversa anterior não pode saltar no histórico recém-aberto
+        targetMessageId: null,
       })
       try {
         const page = await sessionService.getMessages(id, 0, MESSAGE_PAGE_SIZE)
@@ -403,6 +423,7 @@ export function useChatController(): {
       lastUserMessage: null,
       selectedModel: null,
       effectiveModel: stateRef.current.tenantDefault,
+      targetMessageId: null,
     })
   }, [patch])
 
@@ -481,8 +502,65 @@ export function useChatController(): {
     [patch]
   )
 
+  const setQuery = useCallback((value: string) => patch({ query: value }), [patch])
+
+  const clearTargetMessage = useCallback(() => patch({ targetMessageId: null }), [patch])
+
+  /** Renomeio: PATCH + reflejo imediato na lista + recarga (fonte = servidor). */
+  const renameSession = useCallback(
+    async (id: string, title: string): Promise<boolean> => {
+      const clean = title.trim()
+      if (!clean) return false
+      try {
+        await sessionService.updateSession(id, clean)
+        patch({
+          sessions: stateRef.current.sessions.map((session) =>
+            session.id === id ? { ...session, title: clean } : session
+          ),
+        })
+        await goToSessionsPage(stateRef.current.sessionsPage)
+        return true
+      } catch (error) {
+        patch({ notice: t(chatErrorKey(statusOf(error))) })
+        return false
+      }
+    },
+    [goToSessionsPage, patch, t]
+  )
+
+  /**
+   * Salto para uma mensagem endereçável. Quando o resultado pertence a outra
+   * sessão, carrega o histórico antes de mirar — o ChatThread só chama
+   * scrollToMessage se o messageId já estiver montado no scroller.
+   */
+  const jumpToMessage = useCallback(
+    async (messageId: string, sessionId?: string): Promise<void> => {
+      if (sessionId && sessionId !== stateRef.current.sessionId) {
+        await selectSession(sessionId)
+        // newChat/outra seleção durante o await cancelou o seq: não deixar alvo órfão.
+        if (stateRef.current.sessionId !== sessionId) return
+      }
+      patch({ targetMessageId: messageId })
+    },
+    [patch, selectSession]
+  )
+
+  // Derivados da busca local — memoizados para não recriar a lista a cada render.
+  const filteredSessions = useMemo(
+    () => filterSessionsByQuery(state.sessions, state.query),
+    [state.sessions, state.query]
+  )
+  const matchingMessages = useMemo(
+    () => (state.query.trim() ? filterMessagesByQuery(state.messages, state.query) : []),
+    [state.messages, state.query]
+  )
+  const viewState = useMemo<ChatControllerState>(
+    () => ({ ...state, filteredSessions, matchingMessages }),
+    [state, filteredSessions, matchingMessages]
+  )
+
   return {
-    state,
+    state: viewState,
     actions: {
       selectPrompt,
       setInput,
@@ -496,6 +574,10 @@ export function useChatController(): {
       retryLast,
       dismissNotice,
       selectModel,
+      setQuery,
+      renameSession,
+      jumpToMessage,
+      clearTargetMessage,
     },
   }
 }

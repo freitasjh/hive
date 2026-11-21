@@ -28,6 +28,7 @@ export const Error: Story = { args: { error: "Não foi possível carregar o hist
 export const Generating: Story = { args: { messages, generating: true } }
 export const Older: Story = { args: { messages, canLoadOlder: true } }
 export const Retry: Story = { args: { messages, retryable: true } }
+export const JumpTarget: Story = { args: { messages, targetMessageId: "2" } }
 export const LongConversation: Story = {
   args: {
     messages: Array.from({ length: 12 }, (_, index) => ({

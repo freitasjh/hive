@@ -398,6 +398,10 @@ describe('ChatView', () => {
     tenantDefault: { provider: "OPENAI", model: "gpt-4o-mini" },
     selectedModel: null,
     effectiveModel: { provider: "OPENAI", model: "gpt-4o-mini" },
+    query: "",
+    filteredSessions: [session],
+    matchingMessages: [],
+    targetMessageId: null,
   }
 
   const baseActions = {
@@ -413,6 +417,10 @@ describe('ChatView', () => {
     retryLast: vi.fn(),
     dismissNotice: vi.fn(),
     selectModel: vi.fn(),
+    setQuery: vi.fn(),
+    renameSession: vi.fn(),
+    jumpToMessage: vi.fn(),
+    clearTargetMessage: vi.fn(),
   }
 
   it('compõe seletor, thread e composer com aviso de prompt', () => {

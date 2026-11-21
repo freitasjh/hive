@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getMessages: vi.fn(),
   getSession: vi.fn(),
   deleteSession: vi.fn(),
+  updateSession: vi.fn(),
 }))
 
 vi.mock(import('@/services/chat.service'), async (importOriginal) => {
@@ -30,7 +31,7 @@ vi.mock('@/services/session.service', () => ({
     getSession: mocks.getSession,
     createSession: vi.fn(),
     deleteSession: mocks.deleteSession,
-    updateSession: vi.fn(),
+    updateSession: mocks.updateSession,
   },
 }))
 
@@ -74,6 +75,7 @@ describe('useChatController', () => {
     mocks.getSession.mockResolvedValue(session)
     mocks.send.mockResolvedValue(answer)
     mocks.deleteSession.mockResolvedValue(undefined)
+    mocks.updateSession.mockResolvedValue(undefined)
   })
 
   it('carrega prompts e sessões no mount e expõe totalPages do unwrapPage', async () => {
@@ -303,5 +305,103 @@ describe('useChatController', () => {
     expect(mocks.deleteSession).toHaveBeenCalledWith(S)
     expect(result.current.state.sessionId).toBeNull()
     expect(mocks.listSessions).toHaveBeenCalledTimes(2)
+  })
+
+  it('busca local: query filtra sessões por título e mensagens carregadas por conteúdo', async () => {
+    const { result } = renderHook(() => useChatController())
+    await waitFor(() => expect(result.current.state.sessionsLoading).toBe(false))
+    await act(async () => { await result.current.actions.selectSession(S) })
+
+    act(() => result.current.actions.setQuery('MENSAGEM'))
+    expect(result.current.state.query).toBe('MENSAGEM')
+    expect(result.current.state.filteredSessions).toEqual([])
+    expect(result.current.state.matchingMessages.map((m) => m.id)).toEqual(['m-0'])
+
+    act(() => result.current.actions.setQuery('Conversa'))
+    expect(result.current.state.filteredSessions.map((s) => s.id)).toEqual([S])
+    expect(result.current.state.matchingMessages).toEqual([])
+  })
+
+  it('renomear sessão persiste o título e recarrega a lista', async () => {
+    const { result } = renderHook(() => useChatController())
+    await waitFor(() => expect(result.current.state.sessionsLoading).toBe(false))
+    // servidor já devolve o título alterado na recarga (PATCH é síncrono)
+    mocks.listSessions.mockImplementationOnce(() =>
+      Promise.resolve({ ...sessionPage, content: [{ ...session, title: 'Novo título' }] })
+    )
+
+    await act(async () => { await result.current.actions.renameSession(S, 'Novo título') })
+
+    expect(mocks.updateSession).toHaveBeenCalledWith(S, 'Novo título')
+    expect(mocks.listSessions).toHaveBeenCalledTimes(2)
+    expect(result.current.state.sessions[0].title).toBe('Novo título')
+  })
+
+  it('renomear com título vazio não chama a API', async () => {
+    const { result } = renderHook(() => useChatController())
+    await waitFor(() => expect(result.current.state.sessionsLoading).toBe(false))
+
+    await act(async () => { await result.current.actions.renameSession(S, '   ') })
+
+    expect(mocks.updateSession).not.toHaveBeenCalled()
+    expect(mocks.listSessions).toHaveBeenCalledTimes(1)
+  })
+
+  it('jumpToMessage define o alvo e clearTargetMessage o limpa', async () => {
+    const { result } = renderHook(() => useChatController())
+    await waitFor(() => expect(result.current.state.sessionsLoading).toBe(false))
+
+    await act(async () => { await result.current.actions.jumpToMessage('m-42') })
+    expect(result.current.state.targetMessageId).toBe('m-42')
+
+    act(() => result.current.actions.clearTargetMessage())
+    expect(result.current.state.targetMessageId).toBeNull()
+  })
+
+  it('jumpToMessage entre sessões carrega o histórico antes de mirar a mensagem', async () => {
+    const other = S + '-2'
+    mocks.getMessages.mockImplementation((_id: string, page = 0) =>
+      Promise.resolve({ ...messagePage(page), content: [{ ...messagePage(page).content[0], id: 'alvo' }] })
+    )
+    const { result } = renderHook(() => useChatController())
+    await waitFor(() => expect(result.current.state.sessionsLoading).toBe(false))
+
+    await act(async () => { await result.current.actions.jumpToMessage('alvo', other) })
+
+    expect(mocks.getMessages).toHaveBeenCalledWith(other, 0, 50)
+    expect(result.current.state.sessionId).toBe(other)
+    expect(result.current.state.targetMessageId).toBe('alvo')
+  })
+
+  it('jump cancelado por newChat durante a troca de sessão não deixa alvo órfão', async () => {
+    const other = S + '-2'
+    let resolveMessages: (value: unknown) => void = () => {}
+    mocks.getMessages.mockImplementationOnce(() => new Promise((resolve) => { resolveMessages = resolve }))
+    const { result } = renderHook(() => useChatController())
+    await waitFor(() => expect(result.current.state.sessionsLoading).toBe(false))
+
+    let pending!: Promise<void>
+    await act(async () => {
+      pending = result.current.actions.jumpToMessage('alvo', other)
+      await Promise.resolve() // chega ao await de selectSession
+    })
+    act(() => result.current.actions.newChat())
+    await act(async () => { resolveMessages(messagePage(0)); await pending })
+
+    expect(result.current.state.sessionId).toBeNull()
+    expect(result.current.state.targetMessageId).toBeNull()
+  })
+
+  it('trocar de sessão ou nova conversa descarta alvo de jump pendente', async () => {
+    const { result } = renderHook(() => useChatController())
+    await waitFor(() => expect(result.current.state.sessionsLoading).toBe(false))
+    await act(async () => { await result.current.actions.jumpToMessage('m-42') })
+
+    await act(async () => { await result.current.actions.selectSession(S) })
+    expect(result.current.state.targetMessageId).toBeNull()
+
+    await act(async () => { await result.current.actions.jumpToMessage('m-42') })
+    act(() => result.current.actions.newChat())
+    expect(result.current.state.targetMessageId).toBeNull()
   })
 })
