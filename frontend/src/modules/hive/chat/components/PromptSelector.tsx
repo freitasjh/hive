@@ -3,9 +3,21 @@
 import { LoaderCircle, Lock } from "lucide-react"
 import { Badge } from "@/components/shadcn/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/shadcn/ui/card"
-import { cn } from "@/lib/cn"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/ui/select"
 import type { PromptTemplateDTO } from "@/services/admin.types"
 import { useChatI18n } from "../i18n"
+
+/**
+ * Radix não aceita `value=""` em Select.Item (lança erro). Sentinela não vazia
+ * representa "sem prompt"; o controller continua recebendo "" como antes.
+ */
+const EMPTY_VALUE = "__prompt_none__"
 
 export interface PromptSelectorProps {
   prompts: PromptTemplateDTO[]
@@ -45,26 +57,29 @@ export function PromptSelector({
       </CardHeader>
       <CardContent className="flex flex-col gap-1 px-3 pb-2">
         <div className="relative">
-          <select
-            id="chat-prompt"
-            data-testid="prompt-select"
-            aria-label={t("chat.prompt.label")}
-            aria-busy={loading}
+          <Select
+            value={value ?? EMPTY_VALUE}
+            onValueChange={(next) => onChange(next === EMPTY_VALUE ? "" : next)}
             disabled={isDisabled}
-            value={value ?? ""}
-            onChange={(event) => onChange(event.target.value)}
-            className={cn(
-              "h-9 w-full min-w-0 appearance-none rounded-md border border-input bg-transparent px-3 pr-9 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50",
-              "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            )}
           >
-            <option value="">{t("chat.prompt.placeholder")}</option>
-            {prompts.map((prompt) => (
-              <option key={prompt.id} value={prompt.id}>
-                {prompt.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              id="chat-prompt"
+              data-testid="prompt-select"
+              aria-label={t("chat.prompt.label")}
+              aria-busy={loading}
+              className="w-full min-w-0 pr-9 text-sm"
+            >
+              <SelectValue placeholder={t("chat.prompt.placeholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={EMPTY_VALUE}>{t("chat.prompt.placeholder")}</SelectItem>
+              {prompts.map((prompt) => (
+                <SelectItem key={prompt.id} value={prompt.id}>
+                  {prompt.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {locked ? (
             <Lock
               className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"

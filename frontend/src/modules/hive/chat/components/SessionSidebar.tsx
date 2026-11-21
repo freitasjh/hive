@@ -31,6 +31,10 @@ import { useChatI18n, type ChatMessageKey } from "../i18n"
 /** Teto de resultados de mensagem na sidebar — a busca é local, não varre o servidor. */
 const MESSAGE_RESULT_LIMIT = 6
 
+/** Primeiro fold: 5 linhas. Abaixo dele, adia layout/pintura sem sair da árvore de a11y. */
+const FIRST_FOLD_ROWS = 5
+const DEFERRED_ROW_CLASS = "[content-visibility:auto] [contain-intrinsic-size:auto_none_auto_40px]"
+
 const GROUP_LABEL: Record<ChatHistoryGroupKey, ChatMessageKey> = {
   today: "chat.sessions.group.today",
   yesterday: "chat.sessions.group.yesterday",
@@ -198,10 +202,16 @@ export function SessionSidebar({
                     <section key={group.key} aria-label={label} className="flex flex-col gap-1">
                       <h3 className="px-1 text-xs font-medium text-muted-foreground">{label}</h3>
                       <ul className="flex flex-col gap-1">
-                        {group.sessions.map((session) => {
+                        {group.sessions.map((session, index) => {
                           const rowLabel = session.title || session.id
                           return (
-                          <li key={session.id} className="flex items-center gap-0.5">
+                          <li
+                            key={session.id}
+                            className={cn(
+                              "flex items-center gap-0.5",
+                              index >= FIRST_FOLD_ROWS && DEFERRED_ROW_CLASS
+                            )}
+                          >
                             <button
                               type="button"
                               aria-current={selectedId === session.id ? "true" : undefined}
@@ -267,8 +277,13 @@ export function SessionSidebar({
                       {t("chat.sessions.messagesFound")}
                     </h3>
                     <ul className="flex flex-col gap-1">
-                      {results.map((result) => (
-                        <li key={result.id}>
+                      {results.map((result, index) => (
+                        <li
+                          key={result.id}
+                          className={cn(
+                            index >= FIRST_FOLD_ROWS && DEFERRED_ROW_CLASS
+                          )}
+                        >
                           <button
                             type="button"
                             data-testid="session-message-result"
@@ -369,6 +384,7 @@ export function SessionSidebar({
             <Button
               type="button"
               variant="outline"
+              autoFocus
               className="min-h-9"
               onClick={() => setDeleting(null)}
             >

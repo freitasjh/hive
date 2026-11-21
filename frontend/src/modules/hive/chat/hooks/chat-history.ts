@@ -50,6 +50,33 @@ function calendarDay(date: Date): number {
   return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS
 }
 
+type GroupBuckets = Partial<Record<ChatHistoryGroupKey, ChatSessionDTO[]>>
+
+type GroupByFn = <T, K extends PropertyKey>(
+  items: Iterable<T>,
+  keyOf: (item: T, index: number) => K
+) => Partial<Record<K, T[]>>
+
+/**
+ * `Object.groupBy` (ES2024) num único passo, com fallback para reduce em
+ * runtime sem a API. O resultado é null-prototype: leitura sempre com `?? []`.
+ * modern-web-guidance `js`, consultado 2026-11-20.
+ */
+function bucketSessions(
+  sessions: ChatSessionDTO[],
+  keyOf: (session: ChatSessionDTO) => ChatHistoryGroupKey
+): GroupBuckets {
+  const groupBy = (Object as typeof Object & { groupBy?: GroupByFn }).groupBy
+  if (typeof groupBy === "function") return groupBy(sessions, keyOf) as GroupBuckets
+
+  return sessions.reduce<GroupBuckets>((acc, session) => {
+    const key = keyOf(session)
+    acc[key] = acc[key] ?? []
+    acc[key].push(session)
+    return acc
+  }, Object.create(null) as GroupBuckets)
+}
+
 /**
  * Agrupa por `updateAt` usando o dia civil local. Ordem relativa do backend
  * (updateAt DESC) é preservada dentro de cada grupo; grupos vazios são omitidos.
@@ -59,23 +86,17 @@ export function groupSessionsByDate(
   reference: Date = new Date()
 ): ChatHistoryGroup[] {
   const today = calendarDay(reference)
-  const groups = new Map<ChatHistoryGroupKey, ChatSessionDTO[]>(
-    CHAT_HISTORY_GROUP_ORDER.map((key) => [key, []])
-  )
-
-  for (const session of sessions) {
+  const buckets = bucketSessions(sessions, (session) => {
     const updated = new Date(session.updateAt)
-    let key: ChatHistoryGroupKey = "older"
-    if (!Number.isNaN(updated.getTime())) {
-      const daysAgo = today - calendarDay(updated)
-      if (daysAgo <= 0) key = "today"
-      else if (daysAgo === 1) key = "yesterday"
-      else if (daysAgo < 7) key = "last7"
-    }
-    groups.get(key)!.push(session)
-  }
+    if (Number.isNaN(updated.getTime())) return "older"
+    const daysAgo = today - calendarDay(updated)
+    if (daysAgo <= 0) return "today"
+    if (daysAgo === 1) return "yesterday"
+    if (daysAgo < 7) return "last7"
+    return "older"
+  })
 
-  return CHAT_HISTORY_GROUP_ORDER.map((key) => ({ key, sessions: groups.get(key)! })).filter(
+  return CHAT_HISTORY_GROUP_ORDER.map((key) => ({ key, sessions: buckets[key] ?? [] })).filter(
     (group) => group.sessions.length > 0
   )
 }

@@ -10,6 +10,16 @@ import { ChatView } from './ChatView'
 import type { ChatControllerState } from '../hooks/use-chat-controller'
 import { STARTER_PROMPTS } from '../data/chat.data'
 
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {}
+}
+// jsdom não implementa Pointer Capture; o Radix Select usa ao abrir o popup.
+if (!HTMLElement.prototype.hasPointerCapture) {
+  HTMLElement.prototype.hasPointerCapture = () => false
+  HTMLElement.prototype.setPointerCapture = () => {}
+  HTMLElement.prototype.releasePointerCapture = () => {}
+}
+
 const P = '11111111-1111-1111-1111-111111111111'
 const S = '22222222-2222-2222-2222-222222222222'
 
@@ -42,32 +52,30 @@ const message = (id: string, role: string, content: string): ChatMessageDTO => (
 })
 
 describe('PromptSelector', () => {
-  it('lista prompts e propaga a escolha', () => {
+  it('lista prompts e propaga a escolha via popup do shadcn', async () => {
     const onChange = vi.fn()
     render(<PromptSelector prompts={[prompt]} value={null} onChange={onChange} />)
-    expect(screen.getByLabelText(/prompt/i)).toBeTruthy()
-    fireEvent.change(screen.getByTestId('prompt-select'), { target: { value: P } })
+    const trigger = screen.getByTestId('prompt-select')
+    expect(trigger.getAttribute('role')).toBe('combobox')
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    fireEvent.click(await screen.findByRole('option', { name: 'Saudação' }))
     expect(onChange).toHaveBeenCalledWith(P)
   })
 
-  it('rótulo é associado ao select (clique no rótulo ativa o controle)', () => {
+  it('rótulo é associado ao trigger (clique no rótulo ativa o controle)', () => {
     const { container } = render(<PromptSelector prompts={[prompt]} value={null} onChange={vi.fn()} />)
     const label = container.querySelector('label[for="chat-prompt"]') as HTMLLabelElement
-    const select = screen.getByTestId('prompt-select') as HTMLSelectElement
+    const trigger = screen.getByTestId('prompt-select') as HTMLButtonElement
     expect(label).toBeTruthy()
     expect(label.textContent).toContain('Prompt')
     expect(label.htmlFor).toBe('chat-prompt')
-    expect(label.control).toBe(select)
-    const onClick = vi.fn()
-    select.addEventListener('click', onClick)
-    label.click()
-    expect(onClick).toHaveBeenCalled()
+    expect(label.control).toBe(trigger)
   })
 
   it('trava o seletor quando há sessão (prompt da sessão é autoritativo)', () => {
     render(<PromptSelector prompts={[prompt]} value={P} locked onChange={vi.fn()} />)
-    const select = screen.getByTestId('prompt-select') as HTMLSelectElement
-    expect(select.disabled).toBe(true)
+    const trigger = screen.getByTestId('prompt-select') as HTMLButtonElement
+    expect(trigger.disabled).toBe(true)
     expect(screen.getByText(/travado nesta conversa/i)).toBeTruthy()
   })
 
@@ -79,7 +87,7 @@ describe('PromptSelector', () => {
     expect(screen.getByRole('alert').textContent).toContain('Falha')
 
     rerender(<PromptSelector prompts={[prompt]} value={P} disabled onChange={vi.fn()} />)
-    expect((screen.getByTestId('prompt-select') as HTMLSelectElement).disabled).toBe(true)
+    expect((screen.getByTestId('prompt-select') as HTMLButtonElement).disabled).toBe(true)
   })
 })
 
