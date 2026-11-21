@@ -5,7 +5,7 @@ import br.com.systec.hive.agent.api.domain.TurnReply;
 import br.com.systec.hive.agent.api.domain.TurnRequest;
 import br.com.systec.hive.agent.api.port.ChatTurnGateway;
 import br.com.systec.hive.agent.api.service.PromptTemplateService;
-import br.com.systec.hive.agent.api.util.ProviderMessages;
+import br.com.systec.hive.history.api.util.ProviderMessages;
 import br.com.systec.hive.agent.impl.service.ProviderResolution;
 import br.com.systec.hive.agent.impl.service.TurnOutcomeMapper;
 import br.com.systec.hive.commons.impl.security.TenantContext;
@@ -149,7 +149,7 @@ public class PublicChatServiceImpl implements PublicChatService {
         }
 
         // build conversation provider messages from request messages (user/assistant)
-        List<br.com.systec.hive.agent.api.domain.ChatMessage> history = new ArrayList<>();
+        List<br.com.systec.hive.history.api.domain.ChatMessage> history = new ArrayList<>();
         // TurnRequest.conversation expects provider messages; we convert via ProviderMessages from history empty? 
         // We'll build conversation list directly
         List<dev.langchain4j.data.message.ChatMessage> conversation = new ArrayList<>();

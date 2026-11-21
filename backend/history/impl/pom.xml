@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>br.com.systec.hive</groupId>
+        <artifactId>hive-history</artifactId>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>hive-history-impl</artifactId>
+    <name>Hive History Impl</name>
+    <packaging>jar</packaging>
+
+    <!-- ADR-017: adapter JPA de histórico. A porta e o domínio de mensagem saíram de
+         agent/api para history/api; hive-agent-api permanece SÓ por
+         ChatSessionNotFoundException (aresta residual permitida). Sem agent/impl. -->
+    <dependencies>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-history-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
+        <!-- Residual: ChatSessionNotFoundException (ADR-017 §1.2). -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-agent-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-commons-impl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-commons-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-provider-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

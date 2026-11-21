@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>br.com.systec.hive</groupId>
+        <artifactId>hive-history</artifactId>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>hive-history-api</artifactId>
+    <name>Hive History API</name>
+    <packaging>jar</packaging>
+
+    <!-- ADR-017: borda do bounded context de histórico — porta, domínio de mensagem e
+         conversão pura (ADR-001/K4). Sem dependência de agent/api nem de agent/impl. -->
+    <dependencies>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-commons-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-provider-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-commons</artifactId>
+        </dependency>
+    </dependencies>
+</project>

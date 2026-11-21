@@ -1,6 +1,6 @@
 package br.com.systec.hive.agent.impl.service;
 
-import br.com.systec.hive.agent.api.domain.ChatMessage;
+import br.com.systec.hive.history.api.domain.ChatMessage;
 import br.com.systec.hive.agent.api.domain.ChatRequest;
 import br.com.systec.hive.agent.api.domain.ChatResponse;
 import br.com.systec.hive.agent.api.domain.ChatSession;
@@ -9,10 +9,10 @@ import br.com.systec.hive.agent.api.domain.TurnReply;
 import br.com.systec.hive.agent.api.domain.TurnRequest;
 import br.com.systec.hive.agent.api.exceptions.PromptTemplateNotFoundException;
 import br.com.systec.hive.agent.api.port.ChatTurnGateway;
-import br.com.systec.hive.agent.api.service.ChatMessageService;
+import br.com.systec.hive.history.api.service.ChatMessageService;
 import br.com.systec.hive.agent.api.service.ChatService;
 import br.com.systec.hive.agent.api.service.ChatSessionService;
-import br.com.systec.hive.agent.api.util.ProviderMessages;
+import br.com.systec.hive.history.api.util.ProviderMessages;
 import br.com.systec.hive.agent.api.util.ProviderOverrideGuard;
 import br.com.systec.hive.agent.impl.util.ChatTitleUtil;
 import br.com.systec.hive.agent.impl.util.SecurityUtils;

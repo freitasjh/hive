@@ -1,7 +1,7 @@
 package br.com.systec.hive.agent.impl.mapper;
 
 import br.com.systec.hive.agent.api.domain.ChatSession;
-import br.com.systec.hive.agent.impl.entity.ChatSessionEntity;
+import br.com.systec.hive.history.impl.entity.ChatSessionEntity;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 

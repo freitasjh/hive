@@ -21,6 +21,7 @@
         <module>identity</module>
         <module>security</module>
         <module>agent</module>
+        <module>history</module>
         <module>provider</module>
         <module>publicapi</module>
         <module>integration-test</module>

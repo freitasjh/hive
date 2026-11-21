@@ -2,7 +2,7 @@ package br.com.systec.hive.agent.impl.service;
 
 import br.com.systec.hive.agent.api.diagnostics.ChatTrace;
 import br.com.systec.hive.agent.api.diagnostics.ChatTraceRecorder;
-import br.com.systec.hive.agent.api.domain.ChatMessage;
+import br.com.systec.hive.history.api.domain.ChatMessage;
 import br.com.systec.hive.agent.api.domain.InferenceParams;
 import br.com.systec.hive.agent.api.domain.PromptTemplate;
 import br.com.systec.hive.agent.api.domain.TurnReply;
