@@ -69,7 +69,7 @@ class DtoValidationTest {
 
     @Test
     void when_createSession_with_valid_then_noViolations() {
-        CreateSessionDTO dto = new CreateSessionDTO(java.util.UUID.randomUUID(), "Titulo");
+        CreateSessionDTO dto = new CreateSessionDTO(java.util.UUID.randomUUID(), "Titulo", null, null);
         assertThat(validator.validate(dto)).isEmpty();
     }
 
@@ -77,13 +77,13 @@ class DtoValidationTest {
     void when_createSession_with_nullPromptTemplate_then_violation() {
         // Não há prompt padrão e não há conversa sem prompt: a coluna é NOT NULL e o serviço exige
         // o template. Um DTO que aceitasse null aqui descreveria uma sessão que o banco rejeita.
-        CreateSessionDTO dto = new CreateSessionDTO(null, "Titulo");
+        CreateSessionDTO dto = new CreateSessionDTO(null, "Titulo", null, null);
         assertThat(validator.validate(dto)).isNotEmpty();
     }
 
     @Test
     void when_createSession_with_titleTooLong_then_violation() {
-        CreateSessionDTO dto = new CreateSessionDTO(java.util.UUID.randomUUID(), "t".repeat(51));
+        CreateSessionDTO dto = new CreateSessionDTO(java.util.UUID.randomUUID(), "t".repeat(51), null, null);
         assertThat(validator.validate(dto)).isNotEmpty();
     }
 
@@ -91,15 +91,15 @@ class DtoValidationTest {
     void when_chatRequest_with_nullablePromptTemplateId_then_valid() {
         // Válido no DTO e recusado no serviço: um turno em sessão existente não manda template, e a
         // distinção entre "nova conversa" e "continuar" só o serviço consegue fazer.
-        ChatRequestDTO dto = new ChatRequestDTO(null, null, "hello");
+        ChatRequestDTO dto = new ChatRequestDTO(null, null, "hello", null, null);
         assertThat(validator.validate(dto)).isEmpty();
-        ChatRequestDTO dto2 = new ChatRequestDTO(java.util.UUID.randomUUID(), null, "hello");
+        ChatRequestDTO dto2 = new ChatRequestDTO(java.util.UUID.randomUUID(), null, "hello", null, null);
         assertThat(validator.validate(dto2)).isEmpty();
     }
 
     @Test
     void when_chatRequest_with_blankMessage_then_violation() {
-        ChatRequestDTO dto = new ChatRequestDTO(null, null, "");
+        ChatRequestDTO dto = new ChatRequestDTO(null, null, "", null, null);
         assertThat(validator.validate(dto)).isNotEmpty();
     }
 }

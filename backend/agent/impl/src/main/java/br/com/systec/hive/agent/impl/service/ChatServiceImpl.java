@@ -13,9 +13,11 @@ import br.com.systec.hive.agent.api.service.ChatMessageService;
 import br.com.systec.hive.agent.api.service.ChatService;
 import br.com.systec.hive.agent.api.service.ChatSessionService;
 import br.com.systec.hive.agent.api.util.ProviderMessages;
+import br.com.systec.hive.agent.api.util.ProviderOverrideGuard;
 import br.com.systec.hive.agent.impl.util.ChatTitleUtil;
 import br.com.systec.hive.agent.impl.util.SecurityUtils;
 import br.com.systec.hive.commons.impl.security.TenantContext;
+import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.ChatRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,11 +62,12 @@ import java.util.UUID;
  * <h3>Where the two parameters come from</h3>
  *
  * <p>The <b>prompt</b> is a property of the conversation: the session names the template, and the
- * template is what the user picked when the conversation started. The <b>provider and model</b> are a
- * property of the tenant: there is exactly one row, read through {@link ProviderResolution}, which
- * throws rather than falling back. Both used to be read off the agent, and the two readings had
- * different lifetimes — a prompt that could differ per conversation and a model that could not —
- * which is the whole reason the agent had to exist.
+ * template is what the user picked when the conversation started. The <b>provider and model</b> are
+ * now a property of the conversation too when one was chosen — the choice is persisted in
+ * {@code chat_session} (V7) and is authoritative on later turns. Without a choice, the tenant's
+ * single row is read through {@link ProviderResolution}, which throws rather than falling back.
+ * Both used to be read off the agent, and the two readings had different lifetimes — which is the
+ * whole reason the agent had to exist.
  *
  * <h3>Who reads the ambient context, and who does not</h3>
  *
@@ -136,6 +139,8 @@ public class ChatServiceImpl implements ChatService {
 
         UUID sessionId;
         ChatSession session;
+        AiProvider effectiveProvider;
+        String effectiveModel;
 
         if (request.getSessionId() == null) {
             // A new conversation has to arrive with the prompt it will be answered by. There is no
@@ -145,10 +150,22 @@ public class ChatServiceImpl implements ChatService {
                 throw new IllegalArgumentException("promptTemplateId is required");
             }
             String title = ChatTitleUtil.truncate(request.getMessage(), 50);
-            session = chatSessionService.create(request.getPromptTemplateId(), title, tenantId, userId);
+
+            // A escolha da UI vem no body (https://ui.shadcn.com/docs/ai-elements/base/model-selector,
+            // consultado em 2026-11-20). Validar ANTES de criar a sessão impede que um par inválido
+            // seja persistido e herdado por todos os turnos seguintes daquela conversa.
+            effectiveProvider = request.getProvider();
+            effectiveModel = request.getModel();
+            if (effectiveProvider != null || effectiveModel != null) {
+                ProviderOverrideGuard.validate(effectiveProvider, effectiveModel);
+                session = chatSessionService.create(request.getPromptTemplateId(), title, tenantId,
+                        userId, effectiveProvider, effectiveModel);
+            } else {
+                session = chatSessionService.create(request.getPromptTemplateId(), title, tenantId, userId);
+            }
             sessionId = session.getId();
-            log.info("chat new session sessionId={} userId={} tenantId={} promptTemplateId={}",
-                    sessionId, userId, tenantId, request.getPromptTemplateId());
+            log.info("chat new session sessionId={} userId={} tenantId={} promptTemplateId={} provider={}",
+                    sessionId, userId, tenantId, request.getPromptTemplateId(), effectiveProvider);
         } else {
             sessionId = request.getSessionId();
             session = chatSessionService.getSession(sessionId, tenantId, userId);
@@ -160,6 +177,15 @@ public class ChatServiceImpl implements ChatService {
                 log.info("chat ignore divergent promptTemplateId request={} session={} sessionId={}",
                         request.getPromptTemplateId(), session.getPromptTemplateId(), sessionId);
             }
+            // A sessão é autoritativa: um cliente que reenvia provider/model no payload não pode
+            // trocar silenciosamente a conversa que já tem histórico (mesma regra do prompt).
+            effectiveProvider = session.getProvider();
+            effectiveModel = session.getModel();
+            if ((request.getProvider() != null && request.getProvider() != effectiveProvider)
+                    || (request.getModel() != null && !request.getModel().equals(effectiveModel))) {
+                log.info("chat ignore divergent provider/model request={}/{} session={}/{} sessionId={}",
+                        request.getProvider(), request.getModel(), effectiveProvider, effectiveModel, sessionId);
+            }
             log.info("chat existing session sessionId={} userId={} tenantId={} promptTemplateId={}",
                     sessionId, userId, tenantId, session.getPromptTemplateId());
         }
@@ -170,13 +196,12 @@ public class ChatServiceImpl implements ChatService {
             throw new PromptTemplateNotFoundException(promptTemplateId);
         }
 
-        // The provider and the model are the tenant's, not the conversation's. The three reads behind
-        // this call — the tenant's single row, the vendor catalog, and the credential for that vendor —
-        // are one decision with an order, and they live in ProviderResolution now. `require` throws
-        // TenantLlmConfigNotFoundException (422) when the tenant has not configured them: there is
-        // deliberately no fallback, because a silent default would turn a missing configuration into
-        // a conversation answered by a model nobody chose and nobody is paying for.
-        ProviderResolution.Resolved resolved = providerResolution.resolve(tenantId);
+        // The pair is the conversation's when it chose one (persisted in the session), otherwise the
+        // tenant's. The three reads behind this call — the tenant's single row (only on the default
+        // path), the vendor catalog, and the credential for that vendor — are one decision with an
+        // order, and they live in ProviderResolution now. A half pair is 400 before any write; a
+        // missing tenant default on the no-override path is 422, never a silent fallback.
+        ProviderResolution.Resolved resolved = providerResolution.resolve(tenantId, effectiveProvider, effectiveModel);
 
         // TX1: save user message
         chatMessageService.save(sessionId, tenantId, ChatRole.USER, request.getMessage());
@@ -206,6 +231,9 @@ public class ChatServiceImpl implements ChatService {
         chatResponse.setSessionId(sessionId);
         chatResponse.setMessage(reply.text());
         chatResponse.setRole(ChatRole.ASSISTANT);
+        // O par EFETIVO que respondeu — o frontend não precisa re-derivar o default do tenant.
+        chatResponse.setProvider(resolved.provider());
+        chatResponse.setModel(resolved.model());
         if (assistantMsg != null && assistantMsg.getCreateAt() != null) {
             chatResponse.setTimestamp(assistantMsg.getCreateAt().toInstant(ZoneOffset.UTC));
         } else {

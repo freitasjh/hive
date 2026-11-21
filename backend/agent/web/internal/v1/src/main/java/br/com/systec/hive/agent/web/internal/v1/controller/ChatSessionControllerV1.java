@@ -56,7 +56,8 @@ public class ChatSessionControllerV1 {
     public ResponseEntity<ChatSessionDTO> create(@RequestBody @Valid CreateSessionDTO payload) {
         UUID tenantId = currentTenantId();
         UUID userId = currentUserId();
-        ChatSession created = chatSessionService.create(payload.promptTemplateId(), payload.title(), tenantId, userId);
+        ChatSession created = chatSessionService.create(payload.promptTemplateId(), payload.title(), tenantId,
+                userId, payload.provider(), payload.model());
         ChatSessionDTO dto = sessionMapper.toDto(created);
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }

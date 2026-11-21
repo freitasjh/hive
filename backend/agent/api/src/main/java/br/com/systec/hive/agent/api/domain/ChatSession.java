@@ -1,6 +1,7 @@
 package br.com.systec.hive.agent.api.domain;
 
 import br.com.systec.hive.commons.api.domain.AbstractDomain;
+import br.com.systec.hive.provider.api.AiProvider;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -14,6 +15,12 @@ public class ChatSession extends AbstractDomain implements Serializable {
 
     private UUID userId;
     private UUID promptTemplateId;
+    /**
+     * Escolha da conversa (V7). {@code null} = usar o default do tenant. O par é atômico: os dois
+     * campos vêm juntos ou nenhum vem, e a sessão é autoritativa nos turnos seguintes.
+     */
+    private AiProvider provider;
+    private String model;
     private String title;
     private String summary;
     private LocalDateTime updateAt;
@@ -42,6 +49,22 @@ public class ChatSession extends AbstractDomain implements Serializable {
 
     public void setPromptTemplateId(UUID promptTemplateId) {
         this.promptTemplateId = promptTemplateId;
+    }
+
+    public AiProvider getProvider() {
+        return provider;
+    }
+
+    public void setProvider(AiProvider provider) {
+        this.provider = provider;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
     }
 
     public String getTitle() {

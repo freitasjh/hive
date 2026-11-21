@@ -18,6 +18,12 @@ public class ChatSessionEntity extends AbstractEntity {
     private UUID userId;
     @Column(name = "prompt_template_id", nullable = false)
     private UUID promptTemplateId;
+    // V7: nullable de propósito. NULL = usar o default do tenant; o par só é gravado quando o
+    // chamador escolheu explicitamente um provider/modelo para ESTA conversa.
+    @Column(name = "provider", length = 32)
+    private String provider;
+    @Column(name = "model", length = 255)
+    private String model;
     @Column(name = "title", nullable = false, length = 50)
     private String title;
     // length = 2000 reflete o DDL (VARCHAR(2000)). A anotação anterior dizia
@@ -41,6 +47,22 @@ public class ChatSessionEntity extends AbstractEntity {
 
     public void setPromptTemplateId(UUID promptTemplateId) {
         this.promptTemplateId = promptTemplateId;
+    }
+
+    public String getProvider() {
+        return provider;
+    }
+
+    public void setProvider(String provider) {
+        this.provider = provider;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
     }
 
     public String getTitle() {

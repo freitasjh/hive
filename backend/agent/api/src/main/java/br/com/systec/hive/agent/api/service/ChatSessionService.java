@@ -2,6 +2,7 @@ package br.com.systec.hive.agent.api.service;
 
 import br.com.systec.hive.agent.api.domain.ChatSession;
 import br.com.systec.hive.agent.api.domain.PromptTemplate;
+import br.com.systec.hive.provider.api.AiProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -10,6 +11,14 @@ import java.util.UUID;
 public interface ChatSessionService {
 
     ChatSession create(UUID promptTemplateId, String title, UUID tenantId, UUID userId);
+
+    /**
+     * Cria a sessão com a escolha de provider/modelo da conversa (V7). Os dois campos são atômicos;
+     * {@code null} em ambos mantém o default do tenant. A sessão é a fonte autoritativa nos turnos
+     * seguintes — um override no payload do turno não a troca.
+     */
+    ChatSession create(UUID promptTemplateId, String title, UUID tenantId, UUID userId,
+                       AiProvider provider, String model);
 
     Page<ChatSession> listSessions(UUID tenantId, UUID userId, Pageable pageable);
 

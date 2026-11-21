@@ -1,5 +1,6 @@
 package br.com.systec.hive.agent.api.domain;
 
+import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.ChatRole;
 
 import java.io.Serial;
@@ -15,6 +16,9 @@ public class ChatResponse implements Serializable {
     private String message;
     private ChatRole role;
     private Instant timestamp;
+    /** Par efetivo que respondeu o turno — pode vir do tenant ou da escolha da sessão. */
+    private AiProvider provider;
+    private String model;
 
     public UUID getSessionId() {
         return sessionId;
@@ -38,6 +42,22 @@ public class ChatResponse implements Serializable {
 
     public void setRole(ChatRole role) {
         this.role = role;
+    }
+
+    public AiProvider getProvider() {
+        return provider;
+    }
+
+    public void setProvider(AiProvider provider) {
+        this.provider = provider;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
     }
 
     public Instant getTimestamp() {

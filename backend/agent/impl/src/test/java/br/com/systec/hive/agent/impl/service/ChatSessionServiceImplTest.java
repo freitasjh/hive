@@ -10,6 +10,7 @@ import br.com.systec.hive.agent.impl.mapper.PromptTemplateDomainMapper;
 import br.com.systec.hive.agent.impl.repository.PromptTemplateRepository;
 import br.com.systec.hive.agent.impl.repository.ChatSessionRepository;
 import br.com.systec.hive.agent.impl.entity.PromptTemplateEntity;
+import br.com.systec.hive.provider.api.AiProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +30,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -77,6 +79,22 @@ class ChatSessionServiceImplTest {
         verify(chatSessionRepository).save(captor.capture());
         assertThat(captor.getValue().getTitle()).hasSize(50);
         assertThat(captor.getValue().getTitle()).doesNotContain("...");
+    }
+
+    @Test
+    void when_create_with_modelOutsideCatalog_then_throwAndNeverSave() {
+        UUID promptTemplateId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        // O guard tem de recusar ANTES de consultar o template e, claro, antes do INSERT —
+        // uma sessão gravada com par inválido não poderia ser corrigida pelo cliente depois.
+        assertThatThrownBy(() -> service.create(promptTemplateId, "title", tenantId, userId,
+                AiProvider.GEMINI, "gpt-9-turbo"))
+                .isInstanceOf(br.com.systec.hive.provider.api.exception.ModelNotSupportedForProviderException.class);
+
+        verify(chatSessionRepository, never()).save(any(ChatSessionEntity.class));
+        verify(promptTemplateRepository, never()).findByIdAndTenantId(any(), any());
     }
 
     @Test

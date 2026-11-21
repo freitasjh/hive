@@ -1,5 +1,7 @@
 package br.com.systec.hive.agent.web.internal.v1.controller;
 
+import br.com.systec.hive.agent.api.domain.ProviderCredential;
+import br.com.systec.hive.agent.api.service.ProviderCredentialService;
 import br.com.systec.hive.agent.api.service.ValidateRateLimitPolicy;
 import br.com.systec.hive.agent.web.internal.v1.dto.FilteredModelDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.ProviderModelsDTO;
@@ -41,6 +43,8 @@ class ProviderModelsControllerV1Test {
     OpencodeDiscoveryService discoveryService;
     @Mock
     ValidateRateLimitPolicy rateLimiter;
+    @Mock
+    ProviderCredentialService credentialService;
     @Spy
     ProviderModelsDTOMapper mapper = Mappers.getMapper(ProviderModelsDTOMapper.class);
 
@@ -139,6 +143,35 @@ class ProviderModelsControllerV1Test {
             }
             return null;
         });
+    }
+
+    @Test
+    void when_catalog_then_returnsDirectArrayFromLocalCatalogOnly() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        ProviderCredential openai = new ProviderCredential();
+        openai.setProvider(AiProvider.OPENAI);
+        openai.setConfigured(true);
+        when(credentialService.listStatuses(tenantId)).thenReturn(List.of(openai));
+
+        TenantContext.runWithTenant(tenantId, () -> {
+            try {
+                mockMvc.perform(get("/v1/providers/catalog").accept(MediaType.APPLICATION_JSON))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(AiProvider.values().length)))
+                        .andExpect(jsonPath("$[0].provider").exists())
+                        .andExpect(jsonPath("$[0].models").exists())
+                        .andExpect(jsonPath("$[0].defaultModel").exists())
+                        .andExpect(jsonPath("$[0].configured").exists())
+                        .andExpect(jsonPath("$[0].apiKey").doesNotExist());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            return null;
+        });
+
+        // Catálogo local: nem discovery remoto, nem rate limit de discovery.
+        verify(discoveryService, never()).discover(any());
+        verify(rateLimiter, never()).check(any());
     }
 
     @Test

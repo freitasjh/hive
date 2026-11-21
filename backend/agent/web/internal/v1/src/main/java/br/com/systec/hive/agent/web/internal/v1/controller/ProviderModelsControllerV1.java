@@ -1,8 +1,11 @@
 package br.com.systec.hive.agent.web.internal.v1.controller;
 
 import br.com.systec.hive.agent.api.domain.ModelValidation;
+import br.com.systec.hive.agent.api.domain.ProviderCredential;
+import br.com.systec.hive.agent.api.service.ProviderCredentialService;
 import br.com.systec.hive.agent.api.service.ValidateRateLimitPolicy;
 import br.com.systec.hive.agent.api.service.ValidateService;
+import br.com.systec.hive.agent.web.internal.v1.dto.ProviderCatalogEntryDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.ValidateRequestDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.ValidateResponseDTO;
 import br.com.systec.hive.agent.web.internal.v1.dto.ProviderModelsDTO;
@@ -30,7 +33,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping(RestPath.V1 + "/providers")
@@ -41,15 +48,49 @@ public class ProviderModelsControllerV1 {
     private final ValidateService validateService;
     private final ValidateRateLimitPolicy rateLimiter;
     private final ProviderModelsDTOMapper mapper;
+    private final ProviderCredentialService credentialService;
 
     public ProviderModelsControllerV1(OpencodeDiscoveryService discoveryService,
                                       ValidateService validateService,
                                       ValidateRateLimitPolicy rateLimiter,
-                                      ProviderModelsDTOMapper mapper) {
+                                      ProviderModelsDTOMapper mapper,
+                                      ProviderCredentialService credentialService) {
         this.discoveryService = discoveryService;
         this.validateService = validateService;
         this.rateLimiter = rateLimiter;
         this.mapper = mapper;
+        this.credentialService = credentialService;
+    }
+
+    /**
+     * Catálogo local para o seletor do chat: todos os vendors do {@code VendorCatalog}, com seus
+     * modelos, default e um booleano {@code configured} por tenant.
+     *
+     * <p>Não exige {@code AGENT_MANAGE}: qualquer usuário autenticado que use o chat precisa saber
+     * o que pode escolher. Não faz discovery remoto e não aplica o rate limit de discovery — a
+     * lista é estática e a checagem de credencial é uma leitura do mesmo repositório que
+     * {@code ProviderResolution} usa. Nenhuma chave, baseUrl ou last4 sai daqui.
+     *
+     * <p>Fonte da decisão (deepsearch 2026-11-20):
+     * https://ui.shadcn.com/docs/ai-elements/base/model-selector — o seletor envia {@code model}
+     * no body; sem este endpoint os vendors sem discovery remoto não poderiam ser oferecidos.
+     *
+     * <p>O corpo é um ARRAY direto ({@code buildSuccessResponse(List)}), lido no frontend por
+     * {@code unwrapData<ProviderCatalogEntry[]>(body)} — sem wrapper {@code { providers: [...] }}.
+     */
+    @GetMapping(value = "/catalog", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(description = "Catálogo local de providers e modelos para o seletor do chat")
+    public ResponseEntity<List<ProviderCatalogEntryDTO>> catalog() {
+        UUID tenantId = currentTenantId();
+        Set<AiProvider> configured = credentialService.listStatuses(tenantId).stream()
+                .filter(ProviderCredential::isConfigured)
+                .map(ProviderCredential::getProvider)
+                .collect(Collectors.toSet());
+
+        List<ProviderCatalogEntryDTO> entries = Arrays.stream(AiProvider.values())
+                .map(provider -> ProviderCatalogEntryDTO.of(provider, configured.contains(provider)))
+                .toList();
+        return RestControllerTool.of().buildSuccessResponse(entries);
     }
 
     /**

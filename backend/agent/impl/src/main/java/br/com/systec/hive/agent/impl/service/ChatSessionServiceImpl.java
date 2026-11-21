@@ -5,12 +5,14 @@ import br.com.systec.hive.agent.api.domain.PromptTemplate;
 import br.com.systec.hive.agent.api.exceptions.ChatSessionNotFoundException;
 import br.com.systec.hive.agent.api.exceptions.PromptTemplateNotFoundException;
 import br.com.systec.hive.agent.api.service.ChatSessionService;
+import br.com.systec.hive.agent.api.util.ProviderOverrideGuard;
 import br.com.systec.hive.agent.impl.entity.ChatSessionEntity;
 import br.com.systec.hive.agent.impl.mapper.ChatSessionMapperDomain;
 import br.com.systec.hive.agent.impl.mapper.PromptTemplateDomainMapper;
 import br.com.systec.hive.agent.impl.repository.PromptTemplateRepository;
 import br.com.systec.hive.agent.impl.repository.ChatSessionRepository;
 import br.com.systec.hive.agent.impl.util.ChatTitleUtil;
+import br.com.systec.hive.provider.api.AiProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -42,6 +44,17 @@ public class ChatSessionServiceImpl implements ChatSessionService {
     @Override
     @Transactional
     public ChatSession create(UUID promptTemplateId, String title, UUID tenantId, UUID userId) {
+        return create(promptTemplateId, title, tenantId, userId, null, null);
+    }
+
+    @Override
+    @Transactional
+    public ChatSession create(UUID promptTemplateId, String title, UUID tenantId, UUID userId,
+                              AiProvider provider, String model) {
+        // O MESMO guard do turno: metade de par ou modelo fora do catálogo é 400 aqui, antes da
+        // consulta do template e antes do INSERT. Uma sessão inválida não poderia ser corrigida
+        // depois — o turno com sessionId ignora o payload.
+        ProviderOverrideGuard.validate(provider, model);
         // The template is validated on the way in, not just by the FK. A session pointing at another
         // tenant's template is a 404 here and a confusing generation failure later; and the read
         // carries the tenant, so a foreign id is indistinguishable from a missing one (anti-IDOR).
@@ -53,6 +66,9 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         ChatSessionEntity entity = new ChatSessionEntity();
         entity.setUserId(userId);
         entity.setPromptTemplateId(promptTemplateId);
+        // NULL/NULL = usar o default do tenant; o par não é preenchido "por conveniência".
+        entity.setProvider(provider == null ? null : provider.name());
+        entity.setModel(model);
         entity.setTitle(truncatedTitle);
         entity.setTenantId(tenantId);
 
