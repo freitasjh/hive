@@ -130,7 +130,7 @@ Lock por `sessionId` antes da chamada ao proxy; IT de corrida (2 threads) sem co
 | AC-03 | Métricas K5 | IT: `promptTokens/totalTokens/finishReason/promptChars` idênticos ao baseline |
 | AC-04 | Memória por sessão | `grep -r 'chatMemoryProvider' backend/assistant/**` ≥ 1; `@MemoryId UUID`; zero `.chatMemory(` compartilhada; zero starter |
 | AC-05 | Concorrência | IT de corrida 2 threads mesmo `sessionId` → sem corrupção |
-| AC-06 | Seed removido | `grep -r 'default_general' backend/**/dbupdate/**` → zero; migration V8+ presente; `PromptSeedIT` reescrito |
+| AC-06 | Seed removido | migration V8+ presente com `DELETE FROM prompt_template WHERE code='default_general'`; `grep` do literal em **V6** permanece (migration imutável); nenhuma migration **nova** reintroduz o seed; `PromptSeedIT` reescrito para fallback em código |
 | AC-07 | K11 unificado | `PublicChatServiceImpl` chama o mesmo proxy; conversão manual removida |
 | AC-08 | Precedência prompt | IT: com PromptTemplate → system = template; sem → system = `AssistantDefault.PROMPT` |
 | AC-09 | Suíte verde | `mvn clean && npm test` → EXIT=0; 376/376; 62/503; 0/0/0 |

@@ -2,6 +2,7 @@ package br.com.systec.hive.publicapi.impl.service;
 
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
 import br.com.systec.hive.assistant.api.domain.TurnReply;
+import br.com.systec.hive.assistant.api.domain.TurnRequest;
 import br.com.systec.hive.assistant.api.service.PromptTemplateService;
 import br.com.systec.hive.commons.impl.security.TenantContext;
 import br.com.systec.hive.provider.api.AiProvider;
@@ -19,6 +20,7 @@ import br.com.systec.hive.publicapi.impl.quota.RedisQuotaGuard;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -31,9 +33,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -206,6 +210,51 @@ class PublicChatServiceImplTest {
                     .isInstanceOf(UnknownModelException.class);
             return null;
         });
+    }
+
+    /**
+     * ADR-020/K11: o chamador público e o human o usam a MESMA política de conversão
+     * ({@code history.api.ProviderMessages.toProviderMessages}) e o MESMO gateway/proxy. Antes esta
+     * classe montava AiMessage/UserMessage na mão — a divergência K11 que a ADR pede para unificar.
+     */
+    @Test
+    void when_publicCompletionSucceeds_then_conversationUsesTheSamePolicyAsTheHumanCaller() throws Exception {
+        auth("client");
+        requestAttrs(List.of("p"), Map.of(), Map.of("m", 200, "c", 32000, "t", 256000));
+        PromptTemplate prompt = new PromptTemplate();
+        prompt.setId(UUID.randomUUID());
+        prompt.setCode("p");
+        prompt.setVersion(1);
+        prompt.setTemplate("system do tenant");
+        when(promptGrantResolver.resolve(any(), any(), any())).thenReturn(prompt);
+        when(turnGateway.execute(any())).thenReturn(
+                TurnReply.answered("resposta", 2, 20, 10, 5, 15, "STOP"));
+
+        ChatCompletionRequestDTO r = req("user", "pergunta atual", "p", null, null);
+        ChatCompletionRequestDTO.ChatMessageDTO previous = new ChatCompletionRequestDTO.ChatMessageDTO();
+        previous.setRole("assistant");
+        previous.setContent("resposta antiga");
+        r.setMessages(List.of(previous, r.getMessages().get(0)));
+
+        java.util.Map<String, Object> response = TenantContext.runWithTenant(UUID.randomUUID(), () -> {
+            Object result = svc().complete(r);
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> cast = (java.util.Map<String, Object>) result;
+            return cast;
+        });
+
+        ArgumentCaptor<TurnRequest> captor = ArgumentCaptor.forClass(TurnRequest.class);
+        verify(turnGateway).execute(captor.capture());
+        TurnRequest turn = captor.getValue();
+        assertThat(turn.conversation()).hasSize(2);
+        assertThat(turn.conversation().get(0)).isInstanceOf(dev.langchain4j.data.message.AiMessage.class);
+        assertThat(turn.conversation().get(1)).isInstanceOf(dev.langchain4j.data.message.UserMessage.class);
+        assertThat(((dev.langchain4j.data.message.AiMessage) turn.conversation().get(0)).text())
+                .isEqualTo("resposta antiga");
+        assertThat(((dev.langchain4j.data.message.UserMessage) turn.conversation().get(1)).singleText())
+                .isEqualTo("pergunta atual");
+        // ADR-001 item 4: role=system rejeitado antes, e metadata.hive presente na resposta de sucesso.
+        assertThat(response.get("metadata")).isNotNull();
     }
 
     @Test

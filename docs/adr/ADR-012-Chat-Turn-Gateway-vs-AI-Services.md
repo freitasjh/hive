@@ -14,6 +14,21 @@
 porta do turno: sem RAG, ela é a costura onde o prompt entra como campo do `TurnRequest`, e é o
 diagnóstico e o trace (o que achou os 6 bugs do loop elementar) que valem mais agora, não menos.
 
+> ### ⚠️ Supersedido parcialmente em 2026-11-21 — decisão `ADR-020`
+>
+> Este ADR **também não foi reescrito** por isso: o raciocínio abaixo continua como registro do que
+> era verdadeiro em 2026-09-26. O que mudou é o gatilho **#3** de "Gatilhos de reavaliação": o
+> histórico passou a ser gerenciado pela biblioteca via `ChatMemory`/`chatMemoryProvider`, em
+> `AbstractLangChain4jTurnGateway` (`@MemoryId = sessionId`), e a opção **A** virou a implementação
+> da porta — via `AssistantDefault` + `AiServices.builder(...)`, sem starter.
+>
+> O que **sobrevive** é o núcleo deste ADR: `ChatTurnGateway` continua sendo a porta (1 método, 2
+> chamadores), `TurnReply` continua total (falha é valor), TX1/TX2 e o diagnóstico continuam fora do
+> gateway. A linha de "Conformidade" que nega `AiServices` no código está, portanto, desatualizada —
+> o aviso aqui a qualifica, sem apagar a afirmação original.
+>
+> Fonte primária da decisão atual: **[ADR-020 — Migrar o gateway para Ai Services com memória por sessão e `AssistantDefault`](../../.spec/adr/ADR-020-aiservice-migration/ADR.md)**.
+
 - **Data:** 2026-09-26
 - **Contexto:** Hive AI (Java 21 + Spring Boot 4.1.0 + LangChain4j 1.19.0 + PostgreSQL 16 + pgvector 0.8.2)
 - **Decisores:** architect (parecer de validação) + usuário
@@ -107,7 +122,7 @@ Reavaliar **C** (`EmbeddingStore`) quando surgir uma necessidade que SQL não ex
 ## Conformidade
 
 - [x] `ChatTurnGateway` permanece em `agent/api`; `agent/impl` continua fora do contrato
-- [x] Nenhum `dev.langchain4j.service.AiServices` no código (verificado por grep)
+- [x] Nenhum `dev.langchain4j.service.AiServices` no código (verificado por grep) — **afirmação de 2026-09-26, desatualizada: ver aviso de supersessão parcial por ADR-020 no topo**
 - [x] Nenhum `dev.langchain4j.store.embedding.pgvector` no código nem nos poms (verificado)
 - [x] `TurnReply` é o único portador de falha entre porta e chamador; o diagnosticador continua lendo a exceção original
 - [ ] Toda extração futura que mude o dono de uma decisão traz os testes que a fixavam (precedente: `RagTurnResolverTest`)

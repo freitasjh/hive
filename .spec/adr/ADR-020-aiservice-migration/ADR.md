@@ -15,6 +15,11 @@ decisor: architect
 
 - **depende-de**: ADR-001 (revisado), ADR-002 (revisado), ADR-003 (revisado), ADR-017 (history), ADR-019 (assistant).
 - **Sequenciamento**: ciclo único cobrindo ADR-001 + ADR-020 (decisão humana 2026-11-21). A unificação da conversão (K11) e a migração AiService são implementadas juntas; `PublicChatServiceImpl` passa a chamar o mesmo proxy que o caminho humano. IT de caracterização dos 2 chamadores é obrigatória.
+- **Deliberação pós-implementação (2026-11-21)**:
+  - **Desvios de API 1.19.0 (verificados em sources jar, 2026-11-21)**: `@SystemMessage`/`@UserMessage` têm `@Target({TYPE, METHOD})` — as anotações vão no **método** com `@V` nos parâmetros, não no parâmetro. Retorno é `Result<String>` (não `String`) para expor `TokenUsage`/`FinishReason` (RF-06). `@UserMessage` no parâmetro trataria o valor do usuário como template (risco `{{...}}` e texto vazio) — evitado.
+  - **MemoryId no fluxo público**: aceito `TurnRequest.sessionId()` (UUID sintético por request) como `@MemoryId` — cada request público é efetivamente stateless (histórico vem do payload); sem campo novo no `TurnRequest`. Decisão consciente de risco baixo.
+  - **Lock map sem evicção**: aceito por ora; crescimento proporcional ao número de sessões no processo. O `InMemoryChatMemoryStore` em `AbstractLangChain4jTurnGateway` retém mensagens por `sessionId` pelo mesmo ciclo de vida, também sem evicção — mesmo débito, mesma origem. Débito técnico registrado; gatilho de revisão = volume alto de sessões em produção.
+  - **AC-06 ajustado**: `grep default_general` permanece > 0 em V6 (migration imutável); seed removido por V8+. Critério corrigido na SPEC.
 - **Status**: in-progress
 
 ## 1. Decisão
@@ -50,6 +55,7 @@ Substituir a montagem manual de `List<ChatMessage>` e a chamada `client.chat(pro
 | **ADR-003** | **Revisado.** De "nenhuma `ChatMemory`/`@MemoryId`" para "memória por sessão via `ChatMemoryProvider`, `@MemoryId = sessionId (UUID)`". JPA/`history` **continua** fonte de verdade do histórico (memory não substitui history). Riscos A8/A12/A13/K2/K9 passam a ser tratados, não evitados. |
 | **ADR-002** | **Revisado.** De "só montagem/parsing, stateless" para "proxy AiService com memória, gateway via abstract". Mantém: porta `ChatTurnGateway` (agora em `assistant/api`), retry fora do builder, cliente por turno, sem starter, `TurnReply` com métricas. |
 | **ADR-001** | **Revisado no item 1**: a conversão `domínio → mensagens do provider` deixa de ser necessária no caminho interno — o proxy recebe `@UserMessage`/`@SystemMessage` e a memória gerencia o histórico. A ordem "template primeiro" (K4) é preservada por `@SystemMessage`. K11 (conversão pública divergente) deve ser resolvido neste ADR: `PublicChatServiceImpl` passa a chamar o mesmo proxy. |
+| **ADR-012** | **Supersedido parcialmente.** Gatilho #3 acionado: `ChatMemory`/`chatMemoryProvider` passa a gerenciar memória volátil por sessão e `AiServices` vira a implementação da porta. `ChatTurnGateway` (1 método, 2 chamadores) e `TurnReply` permanecem; aviso acrescentado ao ADR-012 sem reescrever o raciocínio original. |
 | **ADR-017 / ADR-019** | Inalterados. `history/` e o rename `assistant` permanecem. |
 
 ## 5. Desenho
@@ -127,7 +133,7 @@ A concreta mantém `@Component`, constrói o proxy via `AiServices.builder(Assis
 3. IT de caracterização: ordem system→user, `TokenUsage`/`FinishReason`/`promptChars` idênticos ao baseline.
 4. IT de corrida: 2 threads no mesmo `sessionId` → sem corrupção de memória.
 5. `npm test` EXIT=0; baseline 376/376 front + 62 reports/503 back; 0/0/0.
-6. `grep -r 'default_general' backend/**/dbupdate/**` → zero (seed removido); `PromptSeedIT` reescrito.
+6. Seed removido: zero ocorrências de `default_general` em migrations **novas além da V8** (que só faz `DELETE`); V6 permanece imutável no histórico Flyway e pode conter o literal; `PromptSeedIT` reescrito para o fallback em código (5/5).
 7. Zero diff MFA, zero contrato HTTP novo, zero `.sql` de criação de tabela (só DELETE da V8+).
 8. `code-reviewer` sem 🔴.
 

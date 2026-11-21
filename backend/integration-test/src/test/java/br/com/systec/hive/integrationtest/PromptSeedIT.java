@@ -1,5 +1,6 @@
 package br.com.systec.hive.integrationtest;
 
+import br.com.systec.hive.assistant.impl.ai.AssistantDefault;
 import br.com.systec.hive.integrationtest.support.WebIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -7,97 +8,133 @@ import org.springframework.core.io.ClassPathResource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * IT do seed do prompt generalista (agent V6), em Postgres real (Testcontainers).
- *
- * <p>O seed roda no boot, antes de este teste inserir qualquer tenant. Por isso cada caso
- * reaplica o arquivo de migration pelo JDBC: é a mesma operação que o Flyway executou, e é
- * o que prova a idempotência (ON CONFLICT ... DO NOTHING) e a contagem por tenant.
+ * ADR-020 RF-04 (Postgres real, Testcontainers): o seed V6 foi desfeito pela V8 e o texto padrão
+ * agora mora em {@link AssistantDefault#PROMPT}. V6 permanece imutável no histórico Flyway — este
+ * teste a reaplica pelo JDBC para provar que a V8 remove exatamente o que a V6 inseriu, sem tocar
+ * templates que o usuário escolheu.
  */
 class PromptSeedIT extends WebIntegrationTest {
 
-    private static final String MIGRATION_RESOURCE = "db/migration/agent/V6__seed_default_prompt.sql";
+    private static final String V6 = "db/migration/agent/V6__seed_default_prompt.sql";
+    private static final String V8 = "db/migration/agent/V8__remove_default_prompt_seed.sql";
     private static final String DEFAULT_CODE = "default_general";
+    private static final String FALLBACK_CODE = "system_fallback";
+
+    /** Texto exato de V6:65-67 — a constante em código não pode divergir do seed histórico. */
+    private static final String SEEDED_TEXT = "Você é um assistente útil e respeitoso. Responda sempre em português brasileiro, "
+            + "de forma clara, objetiva e correta. Se não tiver certeza, diga que não sabe "
+            + "em vez de inventar. Mantenha o tom profissional e cordial.";
 
     @Test
-    void when_migrationApplied_then_eachExistingTenantHasExactlyOneActiveDefaultPrompt() throws Exception {
+    void when_bootMigrationsRun_then_defaultSeedIsAlreadyGone() {
+        // V6 roda no boot e V8 desfaz o dado na sequência: nenhum tenant deve ter default_general.
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM prompt_template WHERE code = ?", Integer.class, DEFAULT_CODE);
+        assertThat(count).isZero();
+    }
+
+    @Test
+    void when_seedIsReapplied_then_v8RemovesIt() throws Exception {
         UUID tenantA = UUID.randomUUID();
         UUID tenantB = UUID.randomUUID();
         seedTenantAndUser(tenantA, "seed-default-a-" + UUID.randomUUID(), "it-pw");
         seedTenantAndUser(tenantB, "seed-default-b-" + UUID.randomUUID(), "it-pw");
 
-        applyMigration();
-
+        apply(V6);
         assertThat(countDefaults(tenantA)).isEqualTo(1);
         assertThat(countDefaults(tenantB)).isEqualTo(1);
 
-        Map<String, Object> row = defaultPrompt(tenantA);
-        assertThat(row.get("version")).isEqualTo(1);
-        assertThat((String) row.get("name")).isNotBlank();
-        assertThat((String) row.get("template")).isNotBlank();
-        assertThat(row.get("status")).isEqualTo("ACTIVE");
+        apply(V8);
+
+        assertThat(countDefaults(tenantA)).isZero();
+        assertThat(countDefaults(tenantB)).isZero();
     }
 
     @Test
-    void when_migrationReExecuted_then_noDuplicatePromptIsCreated() throws Exception {
+    void when_v8IsReApplied_then_itIsIdempotent() throws Exception {
         UUID tenantId = UUID.randomUUID();
         seedTenantAndUser(tenantId, "seed-default-repeat-" + UUID.randomUUID(), "it-pw");
+        apply(V6);
 
-        applyMigration();
-        applyMigration();
-        applyMigration();
+        apply(V8);
+        apply(V8);
 
-        // queryForMap já estouraria se houvesse duas linhas; a contagem explícita documenta o
-        // limite que o UNIQUE (tenant_id, code, version) e o índice parcial ACTIVE impõem.
-        assertThat(countDefaults(tenantId)).isEqualTo(1);
-        Integer allRows = jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM prompt_template WHERE tenant_id = ?", Integer.class, tenantId);
-        assertThat(allRows).isEqualTo(1);
+        assertThat(countDefaults(tenantId)).isZero();
     }
 
     @Test
-    void when_tenantIsCreatedAfterFirstSeed_then_onlyReRunningMigrationSeedsIt() throws Exception {
-        // Limitação documentada: tenant novo depois da migration do boot NÃO recebe prompt
-        // automaticamente (sem trigger cross-module). Reexecutar a migration é o que o semeia.
-        UUID first = UUID.randomUUID();
-        seedTenantAndUser(first, "seed-default-first-" + UUID.randomUUID(), "it-pw");
-        applyMigration();
-
-        UUID second = UUID.randomUUID();
-        seedTenantAndUser(second, "seed-default-second-" + UUID.randomUUID(), "it-pw");
-        assertThat(countDefaults(second)).isZero();
-
-        applyMigration();
-
-        assertThat(countDefaults(first)).isEqualTo(1);
-        assertThat(countDefaults(second)).isEqualTo(1);
-    }
-
-    @Test
-    void when_tenantAlreadyHasActiveV2_then_seedDoesNotInsertOrBreakPartialIndex() throws Exception {
-        // A segunda condição do NOT EXISTS (`status = 'ACTIVE'`) existe para não estourar o
-        // índice parcial uk_prompt_template_active_version quando já há uma v2 ativa com o
-        // mesmo code. Sem ela, o INSERT v1 ACTIVE quebraria a migration inteira.
+    void when_tenantHasItsOwnPrompt_then_v8KeepsIt() throws Exception {
         UUID tenantId = UUID.randomUUID();
         seedTenantAndUser(tenantId, "seed-v2-" + UUID.randomUUID(), "it-pw");
         jdbcTemplate.update(
                 "INSERT INTO prompt_template (tenant_id, name, template, version, code, status) "
                         + "VALUES (?, ?, ?, ?, ?, 'ACTIVE')",
-                tenantId, "custom", "x", 2, DEFAULT_CODE);
+                tenantId, "custom", "prompt escolhido pelo usuario", 2, "custom_code");
+        apply(V6);
 
-        applyMigration();
+        apply(V8);
 
-        assertThat(countDefaults(tenantId)).isEqualTo(1);
-        assertThat(defaultPrompt(tenantId).get("name")).isEqualTo("custom");
+        Integer custom = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM prompt_template WHERE tenant_id = ? AND code = ?",
+                Integer.class, tenantId, "custom_code");
+        assertThat(custom).isEqualTo(1);
+        assertThat(countDefaults(tenantId)).isZero();
     }
 
-    private void applyMigration() throws IOException {
-        try (InputStream in = new ClassPathResource(MIGRATION_RESOURCE).getInputStream()) {
+    @Test
+    void when_sessionPointsToDefault_then_v8ReallocatesItToSystemFallback() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        String username = "seed-session-" + UUID.randomUUID();
+        seedTenantAndUser(tenantId, username, "it-pw");
+        UUID userId = jdbcTemplate.queryForObject(
+                "SELECT id FROM users WHERE username = ?", UUID.class, username);
+
+        apply(V6);
+        UUID defaultId = jdbcTemplate.queryForObject(
+                "SELECT id FROM prompt_template WHERE tenant_id = ? AND code = ?",
+                UUID.class, tenantId, DEFAULT_CODE);
+
+        UUID sessionId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO chat_session (id, create_at, update_at, tenant_id, user_id, title, prompt_template_id) "
+                        + "VALUES (?, now(), now(), ?, ?, ?, ?)",
+                sessionId, tenantId, userId, "sessao legada", defaultId);
+
+        apply(V8);
+
+        UUID reallocatedId = jdbcTemplate.queryForObject(
+                "SELECT prompt_template_id FROM chat_session WHERE id = ?", UUID.class, sessionId);
+        assertThat(reallocatedId).isNotNull().isNotEqualTo(defaultId);
+
+        String reallocatedCode = jdbcTemplate.queryForObject(
+                "SELECT code FROM prompt_template WHERE id = ?", String.class, reallocatedId);
+        assertThat(reallocatedCode).isEqualTo(FALLBACK_CODE);
+
+        String reallocatedTemplate = jdbcTemplate.queryForObject(
+                "SELECT template FROM prompt_template WHERE id = ?", String.class, reallocatedId);
+        assertThat(reallocatedTemplate).isEqualTo(AssistantDefault.PROMPT);
+
+        Integer fallbackCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM prompt_template "
+                        + "WHERE tenant_id = ? AND code = ? AND status = 'ACTIVE' AND version = 1",
+                Integer.class, tenantId, FALLBACK_CODE);
+        assertThat(fallbackCount).isEqualTo(1);
+        assertThat(countDefaults(tenantId)).isZero();
+    }
+
+    @Test
+    void when_fallbackIsNeeded_then_codeConstantCarriesTheOldSeedText() {
+        // R-seed: tenants que tinham o prompt semeado passam a usar AssistantDefault.PROMPT.
+        assertThat(AssistantDefault.PROMPT).isEqualTo(SEEDED_TEXT);
+    }
+
+    private void apply(String resource) throws IOException {
+        try (InputStream in = new ClassPathResource(resource).getInputStream()) {
             jdbcTemplate.execute(new String(in.readAllBytes(), StandardCharsets.UTF_8));
         }
     }
@@ -107,12 +144,5 @@ class PromptSeedIT extends WebIntegrationTest {
                 "SELECT count(*) FROM prompt_template WHERE tenant_id = ? AND code = ?",
                 Integer.class, tenantId, DEFAULT_CODE);
         return count == null ? 0 : count;
-    }
-
-    private Map<String, Object> defaultPrompt(UUID tenantId) {
-        return jdbcTemplate.queryForMap(
-                "SELECT version, name, template, status FROM prompt_template "
-                        + "WHERE tenant_id = ? AND code = ? AND status = ?",
-                tenantId, DEFAULT_CODE, "ACTIVE");
     }
 }

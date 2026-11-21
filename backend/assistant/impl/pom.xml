@@ -73,6 +73,13 @@
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-core</artifactId>
         </dependency>
+        <!-- ADR-020: AiServices, @MemoryId/@SystemMessage, MessageWindowChatMemory e Result<T>
+             vivem no agregado `langchain4j`, não no core (verificado no jar 1.19.0, 2026-11-21).
+             O bootstrap já carrega o agregado em runtime; escopo `provided` vem do dependencyManagement. -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>

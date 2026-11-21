@@ -148,18 +148,22 @@ public class PublicChatServiceImpl implements PublicChatService {
             throw new UnknownModelException();
         }
 
-        // build conversation provider messages from request messages (user/assistant)
-        List<br.com.systec.hive.history.api.domain.ChatMessage> history = new ArrayList<>();
-        // TurnRequest.conversation expects provider messages; we convert via ProviderMessages from history empty? 
-        // We'll build conversation list directly
-        List<dev.langchain4j.data.message.ChatMessage> conversation = new ArrayList<>();
+        // ADR-020/K11: mesma conversão do caminho humano. Antes este chamador montava AiMessage/
+        // UserMessage na mão e passava history vazio; os dois chamadores discordavam sobre o prompt.
+        // Agora ambos produzem List<ChatMessage> via ProviderMessages.toProviderMessages e entregam
+        // a mesma TurnRequest ao mesmo proxy (role=system já rejeitado acima, com 400).
+        List<br.com.systec.hive.history.api.domain.ChatMessage> conversationInput = new ArrayList<>();
         for (ChatCompletionRequestDTO.ChatMessageDTO m : req.getMessages()) {
-            if ("assistant".equalsIgnoreCase(m.getRole())) {
-                conversation.add(new dev.langchain4j.data.message.AiMessage(m.getContent()));
-            } else {
-                conversation.add(new dev.langchain4j.data.message.UserMessage(m.getContent()));
-            }
+            br.com.systec.hive.history.api.domain.ChatMessage entry =
+                    new br.com.systec.hive.history.api.domain.ChatMessage();
+            entry.setRole("assistant".equalsIgnoreCase(m.getRole())
+                    ? br.com.systec.hive.provider.api.ChatRole.ASSISTANT
+                    : br.com.systec.hive.provider.api.ChatRole.USER);
+            entry.setContent(m.getContent());
+            conversationInput.add(entry);
         }
+        List<dev.langchain4j.data.message.ChatMessage> conversation =
+                br.com.systec.hive.history.api.util.ProviderMessages.toProviderMessages(conversationInput);
 
         UUID turnId = UUID.randomUUID();
         long started = System.nanoTime();

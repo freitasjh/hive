@@ -25,6 +25,7 @@ import br.com.systec.hive.provider.api.LlmClientFactory;
 import br.com.systec.hive.provider.api.exception.ModelNotSupportedForProviderException;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.request.DefaultChatRequestParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -114,7 +115,10 @@ class ChatServiceImplTest {
         // The two seams are the production ones. Only the factory they share stays a mock, so every
         // assertion about which model was asked, with which limits, still reads as a claim about the
         // real call rather than about a stand-in for the whole gateway.
-        turnGateway = new LangChain4jTurnGateway(llmClientFactory);
+        turnGateway = new AssistantTurnGateway(llmClientFactory);
+        // O proxy AiService chama os defaults de ChatModel; mocks devolvem null sem isto.
+        lenient().when(chatModel.defaultRequestParameters()).thenReturn(DefaultChatRequestParameters.EMPTY);
+        lenient().when(chatModel.listeners()).thenReturn(List.of());
         // The two extracted collaborators are the production ones too: their own tests cover the rules,
         // and stubbing them here would hide a real change of behaviour behind a fake.
         providerResolution = new ProviderResolution(tenantLlmConfigService, credentialResolver);
@@ -151,6 +155,15 @@ class ChatServiceImplTest {
         return template;
     }
 
+
+    /** Histórico realista: o conteúdo nunca é nulo (chat_message.content é NOT NULL). */
+    private static ChatMessage messageWithContent() {
+        ChatMessage message = new ChatMessage();
+        message.setRole(ChatRole.USER);
+        message.setContent("pergunta");
+        return message;
+    }
+
     private void stubCredential() {
         when(credentialResolver.resolve(tenantId, AiProvider.OPENAI))
                 .thenReturn(new CredentialResolver.ResolvedCredential("sk-fake-test-key", null));
@@ -159,7 +172,7 @@ class ChatServiceImplTest {
     private void stubClient(String reply) {
         when(llmClientFactory.createClientWithSession(eq(AiProvider.OPENAI), eq("gpt-4o-mini"), any(), any(), any(), eq("sk-fake-test-key"), any(), any()))
                 .thenReturn(chatModel);
-        when(chatModel.chat(any(List.class)))
+        when(chatModel.chat(any(dev.langchain4j.model.chat.request.ChatRequest.class)))
                 .thenReturn(dev.langchain4j.model.chat.response.ChatResponse.builder().aiMessage(AiMessage.from(reply)).build());
     }
 
@@ -206,8 +219,8 @@ class ChatServiceImplTest {
     void when_chatIsDrivenByParameters_then_itReadsNothingFromTheEnvironment() {
         prepareChat();
         stubClient("resposta sem sessao");
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
+        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(messageWithContent()));
 
         SecurityContext ambient = SecurityContextHolder.getContext();
         SecurityContextHolder.clearContext();
@@ -271,8 +284,8 @@ class ChatServiceImplTest {
         stubTenantConfig(openAiConfig());
         stubCredential();
         stubClient("reply");
-        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(eq(sessionId), eq(tenantId))).thenReturn(List.of(new ChatMessage()));
+        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(eq(sessionId), eq(tenantId))).thenReturn(List.of(messageWithContent()));
 
         service.chat(request, tenantId, userId);
 
@@ -311,10 +324,10 @@ class ChatServiceImplTest {
         ChatResponse response = service.chat(request, tenantId, userId);
 
         assertThat(response.getSessionId()).isEqualTo(sessionId);
-        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<dev.langchain4j.model.chat.request.ChatRequest> captor = ArgumentCaptor.forClass(dev.langchain4j.model.chat.request.ChatRequest.class);
         verify(chatModel).chat(captor.capture());
         // system do template + as três mensagens da conversa
-        assertThat(captor.getValue()).hasSize(4);
+        assertThat(captor.getValue().messages()).hasSize(4);
     }
 
     @Test
@@ -338,8 +351,8 @@ class ChatServiceImplTest {
         stubTenantConfig(openAiConfig());
         stubCredential();
         stubClient("reply");
-        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(eq(sessionId), eq(tenantId))).thenReturn(List.of(new ChatMessage()));
+        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(eq(sessionId), eq(tenantId))).thenReturn(List.of(messageWithContent()));
 
         service.chat(request, tenantId, userId);
 
@@ -381,9 +394,9 @@ class ChatServiceImplTest {
         stubTenantConfig(openAiConfig());
         stubCredential();
         when(llmClientFactory.createClientWithSession(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(chatModel);
-        when(chatModel.chat(any(List.class))).thenThrow(new RuntimeException("LLM down"));
-        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(eq(sessionId), eq(tenantId))).thenReturn(List.of(new ChatMessage()));
+        when(chatModel.chat(any(dev.langchain4j.model.chat.request.ChatRequest.class))).thenThrow(new RuntimeException("LLM down"));
+        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(eq(sessionId), eq(tenantId))).thenReturn(List.of(messageWithContent()));
 
         assertThatThrownBy(() -> service.chat(request, tenantId, userId))
                 .isInstanceOf(ProviderException.class);
@@ -408,7 +421,7 @@ class ChatServiceImplTest {
         stubTenantConfig(openAiConfig());
         stubCredential();
         stubClient("reply");
-        when(chatMessageService.save(any(), any(), eq(ChatRole.USER), any())).thenReturn(new ChatMessage());
+        when(chatMessageService.save(any(), any(), eq(ChatRole.USER), any())).thenReturn(messageWithContent());
 
         List<ChatMessage> history20 = new ArrayList<>();
         for (int i = 0; i < 20; i++) {
@@ -421,10 +434,10 @@ class ChatServiceImplTest {
 
         service.chat(request, tenantId, userId);
 
-        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<dev.langchain4j.model.chat.request.ChatRequest> captor = ArgumentCaptor.forClass(dev.langchain4j.model.chat.request.ChatRequest.class);
         verify(chatModel).chat(captor.capture());
         // system do template + as 20 últimas mensagens. O teto é da conversa; o system entra antes.
-        assertThat(captor.getValue()).hasSize(21);
+        assertThat(captor.getValue().messages()).hasSize(21);
     }
 
     @Test
@@ -513,10 +526,10 @@ class ChatServiceImplTest {
                 .thenReturn(new CredentialResolver.ResolvedCredential("go-fake", null));
         when(llmClientFactory.createClientWithSession(eq(AiProvider.OPENCODE_GO), eq("mimo-v2.5"), any(), any(), any(), eq("go-fake"), any(), any()))
                 .thenReturn(chatModel);
-        when(chatModel.chat(any(List.class)))
+        when(chatModel.chat(any(dev.langchain4j.model.chat.request.ChatRequest.class)))
                 .thenThrow(new dev.langchain4j.exception.ModelNotFoundException("model_not_found: mimo-v2.5"));
-        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(eq(sessionId), eq(tenantId))).thenReturn(List.of(new ChatMessage()));
+        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(eq(sessionId), eq(tenantId))).thenReturn(List.of(messageWithContent()));
 
         assertThatThrownBy(() -> service.chat(request, tenantId, userId))
                 .isInstanceOf(br.com.systec.hive.assistant.api.exceptions.ModelUnavailableException.class)
@@ -551,11 +564,11 @@ class ChatServiceImplTest {
                 .thenReturn(new CredentialResolver.ResolvedCredential("go-fake", null));
         when(llmClientFactory.createClientWithSession(eq(AiProvider.OPENCODE_GO), eq("mimo-v2.5"), any(), any(), any(), eq("go-fake"), any(), any()))
                 .thenReturn(chatModel);
-        when(chatModel.chat(any(List.class)))
+        when(chatModel.chat(any(dev.langchain4j.model.chat.request.ChatRequest.class)))
                 .thenThrow(new dev.langchain4j.exception.HttpException(404,
                         "<!DOCTYPE html><html><body>opencode.ai</body></html>"));
-        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(eq(sessionId), eq(tenantId))).thenReturn(List.of(new ChatMessage()));
+        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(eq(sessionId), eq(tenantId))).thenReturn(List.of(messageWithContent()));
 
         assertThatThrownBy(() -> service.chat(request, tenantId, userId))
                 .isInstanceOf(ProviderException.class)
@@ -660,8 +673,8 @@ class ChatServiceImplTest {
                 chatMessageService, chatAssistantTxService, chatRateLimiter, turnGateway,
                 new TurnOutcomeMapper(failingTraces, discoveryService));
         stubClient("reply");
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
+        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(messageWithContent()));
 
         assertThat(service.chat(newRequest(), tenantId, userId).getMessage()).isEqualTo("reply");
     }
@@ -675,8 +688,8 @@ class ChatServiceImplTest {
         template.setInferenceParams(new InferenceParams(0.7, 0.42, 1500));
         withTemplate(template);
         stubClient("reply");
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
+        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(messageWithContent()));
 
         service.chat(newRequest(), tenantId, userId);
 
@@ -688,8 +701,8 @@ class ChatServiceImplTest {
     void when_chat_withUnsetLimits_then_passesNullSoProviderDefaultApplies() {
         prepareChat();
         stubClient("reply");
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
+        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(messageWithContent()));
 
         service.chat(newRequest(), tenantId, userId);
 
@@ -709,9 +722,9 @@ class ChatServiceImplTest {
 
         service.chat(newRequest(), tenantId, userId);
 
-        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<dev.langchain4j.model.chat.request.ChatRequest> captor = ArgumentCaptor.forClass(dev.langchain4j.model.chat.request.ChatRequest.class);
         verify(chatModel).chat(captor.capture());
-        List<?> prompt = captor.getValue();
+        List<?> prompt = captor.getValue().messages();
         assertThat(prompt).hasSize(2);
         assertThat(prompt.get(0)).isInstanceOf(dev.langchain4j.data.message.SystemMessage.class);
         assertThat(((dev.langchain4j.data.message.SystemMessage) prompt.get(0)).text())
@@ -728,7 +741,7 @@ class ChatServiceImplTest {
                 .thenReturn(chatModel);
         when(chatMessageService.save(any(), any(), any(), any())).thenReturn(userMsg);
         when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(userMsg));
-        when(chatModel.chat(any(List.class))).thenReturn(dev.langchain4j.model.chat.response.ChatResponse.builder()
+        when(chatModel.chat(any(dev.langchain4j.model.chat.request.ChatRequest.class))).thenReturn(dev.langchain4j.model.chat.response.ChatResponse.builder()
                 .aiMessage(AiMessage.from("assistant reply"))
                 .tokenUsage(new dev.langchain4j.model.output.TokenUsage(120, 340, 460))
                 .finishReason(dev.langchain4j.model.output.FinishReason.STOP)
@@ -759,11 +772,11 @@ class ChatServiceImplTest {
         prepareChat();
         when(llmClientFactory.createClientWithSession(any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(chatModel);
-        when(chatModel.chat(any(List.class)))
+        when(chatModel.chat(any(dev.langchain4j.model.chat.request.ChatRequest.class)))
                 .thenThrow(new dev.langchain4j.exception.TimeoutException(
                         new java.net.http.HttpTimeoutException("read timed out")));
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
+        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(messageWithContent()));
 
         assertThatThrownBy(() -> service.chat(newRequest(), tenantId, userId))
                 .isInstanceOf(ProviderException.class);
@@ -785,17 +798,17 @@ class ChatServiceImplTest {
         withTemplate(template);
         when(llmClientFactory.createClientWithSession(any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(chatModel);
-        when(chatModel.chat(any(List.class)))
+        when(chatModel.chat(any(dev.langchain4j.model.chat.request.ChatRequest.class)))
                 .thenThrow(new dev.langchain4j.exception.TimeoutException(
                         new java.net.http.HttpTimeoutException("read timed out")));
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
+        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(messageWithContent()));
 
         assertThatThrownBy(() -> service.chat(newRequest(), tenantId, userId))
                 .isInstanceOf(ProviderException.class);
 
         // 3 x 30s was the ~90s stall: a read timeout must not be repeated.
-        verify(chatModel, times(1)).chat(any(List.class));
+        verify(chatModel, times(1)).chat(any(dev.langchain4j.model.chat.request.ChatRequest.class));
     }
 
     // ================================ RODADA 2 — resposta vazia do modelo (content NOT NULL -> 409)
@@ -875,13 +888,13 @@ class ChatServiceImplTest {
         withTemplate(template);
         when(llmClientFactory.createClientWithSession(any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(chatModel);
-        when(chatModel.chat(any(List.class))).thenReturn(
+        when(chatModel.chat(any(dev.langchain4j.model.chat.request.ChatRequest.class))).thenReturn(
                 dev.langchain4j.model.chat.response.ChatResponse.builder()
                         .aiMessage(AiMessage.from("resposta truncada mas util"))
                         .finishReason(dev.langchain4j.model.output.FinishReason.LENGTH)
                         .build());
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
+        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(messageWithContent()));
 
         ChatResponse response = service.chat(newRequest(), tenantId, userId);
 
@@ -905,9 +918,9 @@ class ChatServiceImplTest {
         if (finishReason != null) {
             builder.finishReason(finishReason);
         }
-        when(chatModel.chat(any(List.class))).thenReturn(builder.build());
-        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(new ChatMessage());
-        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(new ChatMessage()));
+        when(chatModel.chat(any(dev.langchain4j.model.chat.request.ChatRequest.class))).thenReturn(builder.build());
+        when(chatMessageService.save(any(), any(), any(), any())).thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(any(), any())).thenReturn(List.of(messageWithContent()));
     }
 
     private void verifyNoAssistantMessageSaved() {

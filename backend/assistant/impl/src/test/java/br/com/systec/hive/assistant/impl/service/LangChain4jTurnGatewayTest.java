@@ -6,11 +6,14 @@ import br.com.systec.hive.assistant.api.domain.TurnReply;
 import br.com.systec.hive.assistant.api.domain.TurnRequest;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.LlmClientFactory;
+import br.com.systec.hive.assistant.impl.ai.AssistantDefault;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.DefaultChatRequestParameters;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,7 +61,7 @@ class LangChain4jTurnGatewayTest {
     private UUID sessionId;
 
     /** Named so the assertion reads as "the gateway", not as a subclass detail. */
-    private static final class ChatTurnGatewayUnderTest extends LangChain4jTurnGateway {
+    private static final class ChatTurnGatewayUnderTest extends AssistantTurnGateway {
         private ChatTurnGatewayUnderTest(LlmClientFactory<ChatModel> factory) {
             super(factory);
         }
@@ -76,6 +80,9 @@ class LangChain4jTurnGatewayTest {
     private void stubClient() {
         when(factory.createClientWithSession(eq(AiProvider.OPENAI), eq("gpt-4o-mini"), eq(0.7),
                 any(), any(), eq("sk-test"), any(), eq(sessionId))).thenReturn(chatModel);
+        // O proxy AiService chama os defaults de ChatModel; um mock Mockito devolve null neles.
+        lenient().when(chatModel.defaultRequestParameters()).thenReturn(DefaultChatRequestParameters.EMPTY);
+        lenient().when(chatModel.listeners()).thenReturn(List.of());
     }
 
     private TurnRequest request() {
@@ -84,18 +91,17 @@ class LangChain4jTurnGatewayTest {
     }
 
     /**
-     * The gateway calls {@code chat(List)}. {@code any()} alone is ambiguous between that and the
-     * varargs overload the same interface also declares.
+     * ADR-020: o proxy AiService chama {@code chat(ChatRequest)}; o antigo {@code chat(List)} era um
+     * default que delegava a ele. {@code any()} sozinho é ambíguo entre as sobrecargas.
      */
-    private static List<ChatMessage> anyPrompt() {
-        return org.mockito.ArgumentMatchers.anyList();
+    private static ChatRequest anyPrompt() {
+        return any(ChatRequest.class);
     }
 
-    @SuppressWarnings("unchecked")
     private List<ChatMessage> capturedPrompt() {
-        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<ChatRequest> captor = ArgumentCaptor.forClass(ChatRequest.class);
         verify(chatModel).chat(captor.capture());
-        return captor.getValue();
+        return captor.getValue().messages();
     }
 
     // ------------------------------------------------------------------ the prompt
@@ -113,19 +119,20 @@ class LangChain4jTurnGatewayTest {
     }
 
     /**
-     * A template with blank text contributes nothing. An empty {@code SystemMessage} is an
-     * instruction to the model to be brief, and a conversation that never asked for brevity would be
-     * silently given it.
+     * ADR-020/RF-04: com o seed removido do banco, um template em branco usa
+     * {@link AssistantDefault#PROMPT} como fallback em código — nunca um {@code SystemMessage} vazio
+     * (que instruiria o modelo a ser breve) e nunca nenhum system.
      */
     @Test
-    void when_theTemplateHasBlankText_then_noSystemMessageIsAdded() {
+    void when_theTemplateHasBlankText_then_theCodeFallbackIsUsed() {
         template.setTemplate("   ");
         stubClient();
         when(chatModel.chat(anyPrompt())).thenReturn(answer("resposta", null, null));
 
         gateway.execute(request());
 
-        assertThat(capturedPrompt()).noneMatch(SystemMessage.class::isInstance);
+        assertThat(capturedPrompt().get(0)).isInstanceOf(SystemMessage.class);
+        assertThat(((SystemMessage) capturedPrompt().get(0)).text()).isEqualTo(AssistantDefault.PROMPT);
     }
 
     @Test
