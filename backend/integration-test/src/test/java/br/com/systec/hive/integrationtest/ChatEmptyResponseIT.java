@@ -1,6 +1,6 @@
 package br.com.systec.hive.integrationtest;
 
-import br.com.systec.hive.agent.api.exceptions.ModelReturnedEmptyException;
+import br.com.systec.hive.assistant.api.exceptions.ModelReturnedEmptyException;
 import br.com.systec.hive.integrationtest.support.WebIntegrationTest;
 import br.com.systec.hive.provider.api.LlmClientFactory;
 import dev.langchain4j.data.message.AiMessage;
@@ -62,8 +62,8 @@ class ChatEmptyResponseIT extends WebIntegrationTest {
                                               String apiKey, String baseUrl) {
                     return new ChatModel() {
                         @Override
-                        public dev.langchain4j.model.chat.response.ChatResponse chat(
-                                java.util.List<dev.langchain4j.data.message.ChatMessage> messages) {
+                        public dev.langchain4j.model.chat.response.ChatResponse doChat(
+                                dev.langchain4j.model.chat.request.ChatRequest chatRequest) {
                             return dev.langchain4j.model.chat.response.ChatResponse.builder()
                                     .aiMessage(replyIsNull
                                             ? AiMessage.builder().text(null).build()

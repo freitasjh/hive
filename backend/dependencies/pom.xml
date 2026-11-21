@@ -342,25 +342,25 @@
             </dependency>
             <dependency>
                 <groupId>br.com.systec.hive</groupId>
-                <artifactId>hive-agent-api</artifactId>
+                <artifactId>hive-assistant-api</artifactId>
                 <version>${project.version}</version>
                 <scope>compile</scope>
             </dependency>
             <dependency>
                 <groupId>br.com.systec.hive</groupId>
-                <artifactId>hive-agent-impl</artifactId>
+                <artifactId>hive-assistant-impl</artifactId>
                 <version>${project.version}</version>
                 <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>br.com.systec.hive</groupId>
-                <artifactId>hive-agent-dbupdate</artifactId>
+                <artifactId>hive-assistant-dbupdate</artifactId>
                 <version>${project.version}</version>
                 <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>br.com.systec.hive</groupId>
-                <artifactId>hive-agent-web-internal-v1</artifactId>
+                <artifactId>hive-assistant-web-internal-v1</artifactId>
                 <version>${project.version}</version>
                 <scope>provided</scope>
             </dependency>

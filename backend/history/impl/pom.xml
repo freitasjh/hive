@@ -15,7 +15,7 @@
     <packaging>jar</packaging>
 
     <!-- ADR-017: adapter JPA de histórico. A porta e o domínio de mensagem saíram de
-         agent/api para history/api; hive-agent-api permanece SÓ por
+         agent/api para history/api; hive-assistant-api permanece SÓ por
          ChatSessionNotFoundException (aresta residual permitida). Sem agent/impl. -->
     <dependencies>
         <dependency>
@@ -26,7 +26,7 @@
         <!-- Residual: ChatSessionNotFoundException (ADR-017 §1.2). -->
         <dependency>
             <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-agent-api</artifactId>
+            <artifactId>hive-assistant-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

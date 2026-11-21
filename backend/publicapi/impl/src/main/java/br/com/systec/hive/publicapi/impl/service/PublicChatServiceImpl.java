@@ -1,13 +1,13 @@
 package br.com.systec.hive.publicapi.impl.service;
 
-import br.com.systec.hive.agent.api.domain.PromptTemplate;
-import br.com.systec.hive.agent.api.domain.TurnReply;
-import br.com.systec.hive.agent.api.domain.TurnRequest;
-import br.com.systec.hive.agent.api.port.ChatTurnGateway;
-import br.com.systec.hive.agent.api.service.PromptTemplateService;
+import br.com.systec.hive.assistant.api.domain.PromptTemplate;
+import br.com.systec.hive.assistant.api.domain.TurnReply;
+import br.com.systec.hive.assistant.api.domain.TurnRequest;
+import br.com.systec.hive.assistant.api.port.ChatTurnGateway;
+import br.com.systec.hive.assistant.api.service.PromptTemplateService;
 import br.com.systec.hive.history.api.util.ProviderMessages;
-import br.com.systec.hive.agent.impl.service.ProviderResolution;
-import br.com.systec.hive.agent.impl.service.TurnOutcomeMapper;
+import br.com.systec.hive.assistant.impl.service.ProviderResolution;
+import br.com.systec.hive.assistant.impl.service.TurnOutcomeMapper;
 import br.com.systec.hive.commons.impl.security.TenantContext;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.publicapi.api.exceptions.PromptNotActiveException;
@@ -148,18 +148,22 @@ public class PublicChatServiceImpl implements PublicChatService {
             throw new UnknownModelException();
         }
 
-        // build conversation provider messages from request messages (user/assistant)
-        List<br.com.systec.hive.history.api.domain.ChatMessage> history = new ArrayList<>();
-        // TurnRequest.conversation expects provider messages; we convert via ProviderMessages from history empty? 
-        // We'll build conversation list directly
-        List<dev.langchain4j.data.message.ChatMessage> conversation = new ArrayList<>();
+        // ADR-020/K11: mesma conversão do caminho humano. Antes este chamador montava AiMessage/
+        // UserMessage na mão e passava history vazio; os dois chamadores discordavam sobre o prompt.
+        // Agora ambos produzem List<ChatMessage> via ProviderMessages.toProviderMessages e entregam
+        // a mesma TurnRequest ao mesmo proxy (role=system já rejeitado acima, com 400).
+        List<br.com.systec.hive.history.api.domain.ChatMessage> conversationInput = new ArrayList<>();
         for (ChatCompletionRequestDTO.ChatMessageDTO m : req.getMessages()) {
-            if ("assistant".equalsIgnoreCase(m.getRole())) {
-                conversation.add(new dev.langchain4j.data.message.AiMessage(m.getContent()));
-            } else {
-                conversation.add(new dev.langchain4j.data.message.UserMessage(m.getContent()));
-            }
+            br.com.systec.hive.history.api.domain.ChatMessage entry =
+                    new br.com.systec.hive.history.api.domain.ChatMessage();
+            entry.setRole("assistant".equalsIgnoreCase(m.getRole())
+                    ? br.com.systec.hive.provider.api.ChatRole.ASSISTANT
+                    : br.com.systec.hive.provider.api.ChatRole.USER);
+            entry.setContent(m.getContent());
+            conversationInput.add(entry);
         }
+        List<dev.langchain4j.data.message.ChatMessage> conversation =
+                br.com.systec.hive.history.api.util.ProviderMessages.toProviderMessages(conversationInput);
 
         UUID turnId = UUID.randomUUID();
         long started = System.nanoTime();

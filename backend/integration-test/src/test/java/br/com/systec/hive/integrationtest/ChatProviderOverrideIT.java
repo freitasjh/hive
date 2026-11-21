@@ -73,8 +73,8 @@ class ChatProviderOverrideIT extends WebIntegrationTest {
             CLIENT_CALLS.incrementAndGet();
             return new ChatModel() {
                 @Override
-                public dev.langchain4j.model.chat.response.ChatResponse chat(
-                        java.util.List<dev.langchain4j.data.message.ChatMessage> messages) {
+                public dev.langchain4j.model.chat.response.ChatResponse doChat(
+                                dev.langchain4j.model.chat.request.ChatRequest chatRequest) {
                     return dev.langchain4j.model.chat.response.ChatResponse.builder()
                             .aiMessage(AiMessage.from("resposta do stub"))
                             .build();

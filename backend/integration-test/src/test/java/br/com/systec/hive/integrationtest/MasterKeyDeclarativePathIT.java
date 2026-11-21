@@ -1,11 +1,11 @@
 package br.com.systec.hive.integrationtest;
 
-import br.com.systec.hive.agent.impl.converter.AesGcmAttributeConverter;
-import br.com.systec.hive.agent.impl.entity.ProviderCredentialEntity;
-import br.com.systec.hive.agent.impl.repository.ProviderCredentialRepository;
-import br.com.systec.hive.agent.impl.security.ProviderMasterKey;
-import br.com.systec.hive.agent.impl.security.ProviderMasterKey.Source;
-import br.com.systec.hive.agent.impl.startup.CredentialMasterKeyStartupCheck;
+import br.com.systec.hive.assistant.impl.converter.AesGcmAttributeConverter;
+import br.com.systec.hive.assistant.impl.entity.ProviderCredentialEntity;
+import br.com.systec.hive.assistant.impl.repository.ProviderCredentialRepository;
+import br.com.systec.hive.assistant.impl.security.ProviderMasterKey;
+import br.com.systec.hive.assistant.impl.security.ProviderMasterKey.Source;
+import br.com.systec.hive.assistant.impl.startup.CredentialMasterKeyStartupCheck;
 import br.com.systec.hive.integrationtest.support.WebIntegrationTest;
 import br.com.systec.hive.provider.api.AiProvider;
 import ch.qos.logback.classic.Level;

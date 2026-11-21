@@ -1,7 +1,7 @@
 package br.com.systec.hive.integrationtest;
 
-import br.com.systec.hive.agent.impl.converter.AesGcmAttributeConverter;
-import br.com.systec.hive.agent.impl.service.ValidateProbe;
+import br.com.systec.hive.assistant.impl.converter.AesGcmAttributeConverter;
+import br.com.systec.hive.assistant.impl.service.ValidateProbe;
 import br.com.systec.hive.integrationtest.support.WebIntegrationTest;
 import dev.langchain4j.model.chat.ChatModel;
 import org.junit.jupiter.api.AfterAll;
