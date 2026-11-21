@@ -19,26 +19,24 @@
             <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-commons-api</artifactId>
         </dependency>
-        <!-- ADR-017: TurnRequest.history carrega ChatMessage, agora em history/api. -->
+        <!-- ADR-021: TurnPrompts.from converte PromptTemplate em TurnPrompt (ai/api). -->
         <dependency>
             <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-history-api</artifactId>
+            <artifactId>hive-ai-api</artifactId>
             <version>${revision}</version>
         </dependency>
+        <!-- ADR-021: `history-api` saiu quando TurnRequest (com o campo history) mudou para ai/api.
+             Nenhum outro tipo deste modulo usa history/api; os chamadores declaram a dependencia. -->
         <dependency>
             <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-provider-api</artifactId>
             <version>${revision}</version>
         </dependency>
         <!--
-          `provided`, like every other dev.langchain4j artifact in dependencies/pom.xml, and needed
-          only because this module speaks the provider's message type: `TurnRequest` carries a
-          `dev.langchain4j.data.message.ChatMessage` as `conversation`, and `ProviderMessages`
-          builds those very objects; `ModelNotFound` walks
-          `dev.langchain4j.exception.ModelNotFoundException` and `HttpException` to say whether the
-          model was removed. Wrapping any of it in a project type only to unwrap it later would
-          make the block size reported on the diagnostic and the block actually sent two separate
-          facts instead of one.
+          `provided`, like every other dev.langchain4j artifact in dependencies/pom.xml. Depois do
+          move ADR-021 so `ModelNotFound` usa este artifact: ele caminha
+          `dev.langchain4j.exception.ModelNotFoundException` e `HttpException` para dizer se o modelo
+          foi removido. O resto (mensagens do provider, AiService, memoria) vive em ai/api e ai/impl.
         -->
         <dependency>
             <groupId>dev.langchain4j</groupId>

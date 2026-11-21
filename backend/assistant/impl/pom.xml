@@ -35,6 +35,17 @@
             <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-assistant-api</artifactId>
         </dependency>
+        <!-- ADR-021: ChatTurnGateway/TurnRequest/TurnReply/TurnPrompt/AssistantDefault vivem em ai/api. -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-ai-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-ai-impl</artifactId>
+            <version>${revision}</version>
+        </dependency>
         <!-- ADR-017: ChatServiceImpl/TurnOutcomeMapper e seus testes usam ChatMessage,
              ChatMessageService e ProviderMessages — todos em history/api. -->
         <dependency>

@@ -1,8 +1,8 @@
 package br.com.systec.hive.publicapi.impl.service;
 
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
-import br.com.systec.hive.assistant.api.domain.TurnReply;
-import br.com.systec.hive.assistant.api.domain.TurnRequest;
+import br.com.systec.hive.ai.api.domain.TurnReply;
+import br.com.systec.hive.ai.api.domain.TurnRequest;
 import br.com.systec.hive.assistant.api.service.PromptTemplateService;
 import br.com.systec.hive.commons.impl.security.TenantContext;
 import br.com.systec.hive.provider.api.AiProvider;
@@ -46,7 +46,7 @@ class PublicChatServiceImplTest {
     @Mock private PromptTemplateService promptTemplateService;
     @Mock private PromptGrantResolver promptGrantResolver;
     // providerResolution is provided by a subclass override below (avoids mocking final-ish classes on JDK 25)
-    @Mock private br.com.systec.hive.assistant.api.port.ChatTurnGateway turnGateway;
+    @Mock private br.com.systec.hive.ai.api.port.ChatTurnGateway turnGateway;
     @Mock private br.com.systec.hive.assistant.impl.service.TurnOutcomeMapper turnOutcomeMapper;
     @Mock private RedisQuotaGuard quotaGuard;
 

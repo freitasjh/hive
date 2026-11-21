@@ -5,10 +5,11 @@ import br.com.systec.hive.assistant.api.domain.ChatRequest;
 import br.com.systec.hive.assistant.api.domain.ChatResponse;
 import br.com.systec.hive.assistant.api.domain.ChatSession;
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
-import br.com.systec.hive.assistant.api.domain.TurnReply;
-import br.com.systec.hive.assistant.api.domain.TurnRequest;
+import br.com.systec.hive.assistant.api.domain.TurnPrompts;
+import br.com.systec.hive.ai.api.domain.TurnReply;
+import br.com.systec.hive.ai.api.domain.TurnRequest;
 import br.com.systec.hive.assistant.api.exceptions.PromptTemplateNotFoundException;
-import br.com.systec.hive.assistant.api.port.ChatTurnGateway;
+import br.com.systec.hive.ai.api.port.ChatTurnGateway;
 import br.com.systec.hive.history.api.service.ChatMessageService;
 import br.com.systec.hive.assistant.api.service.ChatService;
 import br.com.systec.hive.assistant.api.service.ChatSessionService;
@@ -215,8 +216,8 @@ public class ChatServiceImpl implements ChatService {
         // Measured from here so elapsedMs isolates what the provider is asked to do — a large value
         // here means the provider stalled.
         long startedAt = System.nanoTime();
-        reply = turnGateway.execute(new TurnRequest(sessionId, promptTemplate, resolved.provider(),
-                resolved.model(), resolved.apiKey(), resolved.baseUrl(), history, conversation));
+        reply = turnGateway.execute(new TurnRequest(sessionId, TurnPrompts.from(promptTemplate), resolved.provider(),
+                resolved.model(), resolved.apiKey(), resolved.baseUrl(), conversation));
 
         // Every outcome except "answered" raises inside this call: the trace is recorded and the
         // operator's line is written by the collaborator that decided the outcome, so that the

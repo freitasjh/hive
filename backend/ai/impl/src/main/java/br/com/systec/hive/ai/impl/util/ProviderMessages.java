@@ -1,4 +1,4 @@
-package br.com.systec.hive.assistant.impl.util;
+package br.com.systec.hive.ai.impl.util;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;

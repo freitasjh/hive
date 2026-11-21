@@ -2,9 +2,10 @@ package br.com.systec.hive.assistant.impl.service;
 
 import br.com.systec.hive.assistant.api.domain.InferenceParams;
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
-import br.com.systec.hive.assistant.api.domain.TurnReply;
-import br.com.systec.hive.assistant.api.domain.TurnRequest;
-import br.com.systec.hive.assistant.impl.util.ProviderMessages;
+import br.com.systec.hive.assistant.api.domain.TurnPrompts;
+import br.com.systec.hive.ai.api.domain.TurnReply;
+import br.com.systec.hive.ai.api.domain.TurnRequest;
+import br.com.systec.hive.ai.impl.util.ProviderMessages;
 import br.com.systec.hive.provider.api.AiProvider;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -153,8 +154,8 @@ class AiServiceCharacterizationTest {
         promptTemplate.setInferenceParams(new InferenceParams(0.7, null, null));
         List<dev.langchain4j.data.message.ChatMessage> conversation = List.of(
                 new UserMessage(OLD_USER), new AiMessage(OLD_ANSWER), new UserMessage(USER));
-        return new TurnRequest(UUID.randomUUID(), promptTemplate, AiProvider.OPENAI, "gpt-4o-mini",
-                "sk-test", null, List.of(), conversation);
+        return new TurnRequest(UUID.randomUUID(), TurnPrompts.from(promptTemplate), AiProvider.OPENAI, "gpt-4o-mini",
+                "sk-test", null, conversation);
     }
 
     /** ChatModel concreto mínimo: registra o ChatRequest final, Serve aos dois caminhos (antigo e novo). */

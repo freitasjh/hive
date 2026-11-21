@@ -1,10 +1,10 @@
 package br.com.systec.hive.assistant.impl.service;
 
-import br.com.systec.hive.assistant.api.domain.InferenceParams;
-import br.com.systec.hive.assistant.api.domain.TurnReply;
-import br.com.systec.hive.assistant.api.domain.TurnRequest;
-import br.com.systec.hive.assistant.impl.ai.AssistantDefault;
-import br.com.systec.hive.assistant.impl.util.ProviderMessages;
+import br.com.systec.hive.ai.api.AssistantDefault;
+import br.com.systec.hive.ai.api.domain.TurnReply;
+import br.com.systec.hive.ai.api.domain.TurnRequest;
+import br.com.systec.hive.ai.impl.AbstractLangChain4jTurnGateway;
+import br.com.systec.hive.ai.impl.util.ProviderMessages;
 import br.com.systec.hive.provider.api.LlmClientFactory;
 import br.com.systec.hive.provider.langchain4j.LlmRetryPolicy;
 import dev.langchain4j.data.message.ChatMessage;
@@ -16,6 +16,7 @@ import dev.langchain4j.service.AiServices;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,6 +37,15 @@ import java.util.List;
 @Component
 public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
 
+    /**
+     * Texto exato do seed V6 (`V6__seed_default_prompt.sql:65-67`), preservado byte a byte.
+     * A V8 remove as linhas do banco; esta constante é o fallback obrigatório em código.
+     * Política do assistant — por isso vive aqui e não em {@code ai/api} (ADR-021, ajuste 2).
+     */
+    public static final String PROMPT = "Você é um assistente útil e respeitoso. Responda sempre em português brasileiro, "
+            + "de forma clara, objetiva e correta. Se não tiver certeza, diga que não sabe "
+            + "em vez de inventar. Mantenha o tom profissional e cordial.";
+
     private final LlmClientFactory<ChatModel> llmClientFactory;
     private final LlmRetryPolicy retryPolicy;
 
@@ -51,13 +61,38 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
         this.retryPolicy = retryPolicy;
     }
 
+    /**
+     * Regra de precedência do assistant: texto do turno > {@link #PROMPT}.
+     * Um texto em branco conta como ausente — {@code SystemMessage} vazio instrui o modelo a ser
+     * breve, o que a conversa não pediu. Esta regra é política do assistant: fica aqui, nunca em
+     * {@code ai/impl} (ADR-021, ajuste 3).
+     */
+    protected final String systemFor(String text) {
+        return text == null || text.isBlank() ? PROMPT : text;
+    }
+
+    /** A última mensagem renderizada do turno é o {@code @UserMessage}; o resto é histórico. */
+    protected final String userFor(TurnRequest request) {
+        List<ChatMessage> conversation = request.conversation();
+        if (conversation.isEmpty()) {
+            return "";
+        }
+        String text = ProviderMessages.textOf(conversation.getLast());
+        return text == null ? "" : text;
+    }
+
+    protected final List<ChatMessage> priorHistoryFor(TurnRequest request) {
+        List<ChatMessage> conversation = request.conversation();
+        if (conversation.size() <= 1) {
+            return List.of();
+        }
+        return new ArrayList<>(conversation.subList(0, conversation.size() - 1));
+    }
+
     @Override
     public TurnReply execute(TurnRequest request) {
         // Fora do try, como no gateway anterior: um defeito na montagem não é falha do provider.
-        InferenceParams params = request.promptTemplate().getInferenceParams() != null
-                ? request.promptTemplate().getInferenceParams()
-                : new InferenceParams();
-        String system = systemFor(request.promptTemplate());
+        String system = systemFor(request.promptTemplate().text());
         String user = userFor(request);
         List<ChatMessage> prior = priorHistoryFor(request);
         List<ChatMessage> prompt = telemetryPrompt(system, prior, user);
@@ -68,8 +103,8 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
             // Gate R2: createClientWithSession não tolera sessionId nulo. No fluxo público o campo
             // sessionId do TurnRequest carrega o UUID sintético por requisição; nenhuma coerção aqui.
             ChatModel client = llmClientFactory.createClientWithSession(request.provider(), request.model(),
-                    params.getTemperature(), params.getMaxTokens(),
-                    params.getTopP(), request.apiKey(), request.baseUrl(), request.sessionId());
+                    request.promptTemplate().temperature(), request.promptTemplate().maxTokens(),
+                    request.promptTemplate().topP(), request.apiKey(), request.baseUrl(), request.sessionId());
             AssistantDefault proxy = proxyFor(client);
 
             // A8: uma chamada por vez por @MemoryId. Seed + proxy dentro do mesmo lock, senão dois

@@ -12,7 +12,7 @@ import br.com.systec.hive.assistant.api.exceptions.ChatSessionNotFoundException;
 import br.com.systec.hive.assistant.api.exceptions.ConfigMissingException;
 import br.com.systec.hive.assistant.api.exceptions.ModelReturnedEmptyException;
 import br.com.systec.hive.assistant.api.exceptions.ProviderException;
-import br.com.systec.hive.assistant.api.port.ChatTurnGateway;
+import br.com.systec.hive.ai.api.port.ChatTurnGateway;
 import br.com.systec.hive.history.api.service.ChatMessageService;
 import br.com.systec.hive.assistant.api.service.ChatSessionService;
 import br.com.systec.hive.assistant.impl.diagnostics.FailureClassifier;

@@ -2,8 +2,9 @@ package br.com.systec.hive.assistant.impl.service;
 
 import br.com.systec.hive.assistant.api.domain.InferenceParams;
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
-import br.com.systec.hive.assistant.api.domain.TurnReply;
-import br.com.systec.hive.assistant.api.domain.TurnRequest;
+import br.com.systec.hive.assistant.api.domain.TurnPrompts;
+import br.com.systec.hive.ai.api.domain.TurnReply;
+import br.com.systec.hive.ai.api.domain.TurnRequest;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.LlmClientFactory;
 import dev.langchain4j.data.message.AiMessage;
@@ -86,8 +87,8 @@ class ChatMemorySerializationTest {
         template.setInferenceParams(new InferenceParams(0.7, null, null));
         List<ChatMessage> conversation = new java.util.ArrayList<>(prior);
         conversation.add(new UserMessage(text));
-        return new TurnRequest(sessionId, template, AiProvider.OPENAI, "gpt-4o-mini",
-                "sk-test", null, List.of(), conversation);
+        return new TurnRequest(sessionId, TurnPrompts.from(template), AiProvider.OPENAI, "gpt-4o-mini",
+                "sk-test", null, conversation);
     }
 
     /** Sinaliza sobreposição sem {@code Thread.sleep()}: um latch curto dentro do próprio modelo. */

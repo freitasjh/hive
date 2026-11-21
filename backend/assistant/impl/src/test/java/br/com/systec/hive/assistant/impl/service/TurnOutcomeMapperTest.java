@@ -5,7 +5,7 @@ import br.com.systec.hive.assistant.api.diagnostics.ChatTraceRecorder;
 import br.com.systec.hive.history.api.domain.ChatMessage;
 import br.com.systec.hive.assistant.api.domain.InferenceParams;
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
-import br.com.systec.hive.assistant.api.domain.TurnReply;
+import br.com.systec.hive.ai.api.domain.TurnReply;
 import br.com.systec.hive.assistant.api.exceptions.ConfigMissingException;
 import br.com.systec.hive.assistant.api.exceptions.ModelReturnedEmptyException;
 import br.com.systec.hive.assistant.api.exceptions.ModelUnavailableException;

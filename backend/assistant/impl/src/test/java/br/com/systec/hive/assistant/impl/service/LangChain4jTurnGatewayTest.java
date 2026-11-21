@@ -2,11 +2,11 @@ package br.com.systec.hive.assistant.impl.service;
 
 import br.com.systec.hive.assistant.api.domain.InferenceParams;
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
-import br.com.systec.hive.assistant.api.domain.TurnReply;
-import br.com.systec.hive.assistant.api.domain.TurnRequest;
+import br.com.systec.hive.assistant.api.domain.TurnPrompts;
+import br.com.systec.hive.ai.api.domain.TurnReply;
+import br.com.systec.hive.ai.api.domain.TurnRequest;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.LlmClientFactory;
-import br.com.systec.hive.assistant.impl.ai.AssistantDefault;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -86,8 +86,8 @@ class LangChain4jTurnGatewayTest {
     }
 
     private TurnRequest request() {
-        return new TurnRequest(sessionId, template, AiProvider.OPENAI, "gpt-4o-mini",
-                "sk-test", null, List.of(), List.of(new UserMessage("pergunta")));
+        return new TurnRequest(sessionId, TurnPrompts.from(template), AiProvider.OPENAI, "gpt-4o-mini",
+                "sk-test", null, List.of(new UserMessage("pergunta")));
     }
 
     /**
@@ -120,7 +120,7 @@ class LangChain4jTurnGatewayTest {
 
     /**
      * ADR-020/RF-04: com o seed removido do banco, um template em branco usa
-     * {@link AssistantDefault#PROMPT} como fallback em código — nunca um {@code SystemMessage} vazio
+     * {@link AssistantTurnGateway#PROMPT} como fallback em código — nunca um {@code SystemMessage} vazio
      * (que instruiria o modelo a ser breve) e nunca nenhum system.
      */
     @Test
@@ -132,7 +132,7 @@ class LangChain4jTurnGatewayTest {
         gateway.execute(request());
 
         assertThat(capturedPrompt().get(0)).isInstanceOf(SystemMessage.class);
-        assertThat(((SystemMessage) capturedPrompt().get(0)).text()).isEqualTo(AssistantDefault.PROMPT);
+        assertThat(((SystemMessage) capturedPrompt().get(0)).text()).isEqualTo(AssistantTurnGateway.PROMPT);
     }
 
     @Test
@@ -282,9 +282,9 @@ class LangChain4jTurnGatewayTest {
      */
     @Test
     void when_theRequestIsRendered_then_theCredentialAndTheConversationAreNot() {
-        TurnRequest request = new TurnRequest(sessionId, template, AiProvider.OPENAI, "gpt-4o-mini",
+        TurnRequest request = new TurnRequest(sessionId, TurnPrompts.from(template), AiProvider.OPENAI, "gpt-4o-mini",
                 "sk-super-secret-value", "https://api.example/v1",
-                List.of(), List.of(new UserMessage("PERGUNTA SIGILOSA do usuario")));
+                List.of(new UserMessage("PERGUNTA SIGILOSA do usuario")));
 
         String rendered = request.toString();
 
@@ -328,7 +328,7 @@ class LangChain4jTurnGatewayTest {
     void when_theRequestCarriesNoPromptTemplate_then_itIsRefusedRatherThanPromptedWithoutOne() {
         // Um template nulo sairia sem prompt de sistema e sem limites de geração, sem dizer nada.
         assertThatThrownBy(() -> new TurnRequest(sessionId, null, AiProvider.OPENAI, "gpt-4o-mini",
-                "sk-test", null, List.of(), List.of()))
+                "sk-test", null, List.of()))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("promptTemplate");
     }
