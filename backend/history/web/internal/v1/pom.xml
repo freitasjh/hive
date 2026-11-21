@@ -15,7 +15,7 @@
     <packaging>jar</packaging>
 
     <!-- ADR-017: adapter de entrada de histórico. Espelha agent/web/internal/v1,
-         trocando hive-agent-api por hive-history-api. Sem agent/api e sem agent/impl. -->
+         trocando hive-assistant-api por hive-history-api. Sem agent/api e sem agent/impl. -->
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>

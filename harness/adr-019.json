@@ -1,0 +1,102 @@
+{
+  "version": 2,
+  "demand": "adr-019",
+  "agent": "qa-engineer",
+  "phase": "Testing",
+  "gitSha": "a28bbd983608be2d31d79528294f82583825c44c",
+  "code_review_status": "passed",
+  "commands": [
+    {
+      "cmd": "mvn -f backend/pom.xml -q clean",
+      "exitCode": 0,
+      "durationMs": 2226,
+      "stdoutHash": "40a3e8b1d11a8242abba779b43e9011caade671f672d01257674e74bc2f64596"
+    },
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 80287,
+      "stdoutHash": "3987c43f85050a10713489f413e2917679dfd177dd996b2e6101fdfb2fc4cecb"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 503, "failed": 0, "skipped": 0 },
+    "it": { "passed": 0, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 376, "failed": 0, "skipped": 0 }
+  },
+  "e2e": {
+    "applicable": false,
+    "status": "N/A",
+    "reason": "Ciclo backend puro: rename de pacotes/artefatos/modulos (agent -> assistant) + esqueleto agent/ vazio. Zero tela nova ou alterada, zero rota nova, contrato HTTP /v1/chat/** byte-identico (AC-06). git status mostra mudancas apenas em backend/ e .spec/. H3 greenfield nao se aplica; nenhuma superficie frontend para exercitar via chrome-devtools. Diferente da medicacao anterior, o backend agora compila e a suite esta verde, mas ainda assim nao ha superficie de UI alterada que justifique E2E."
+  },
+  "evaluation": {
+    "cycle": "adr-019",
+    "branch": "adr/history/16-history-module",
+    "scope_guard": "Zero ChatMemory; zero tipos novos (ADR-012:103); Gate B (publicapi -> assistant/impl) fora, ADR separado; MFA intocavel.",
+    "H1_H2": {
+      "pre_clean": "mvn -f backend/pom.xml -q clean => CLEAN_RC=0, 2226 ms, stdout 4 linhas (apenas warnings de sun.misc.Unsafe/Guice, ruido de ambiente). Reactor inicia e limpa target/ sem erro de model building. Correcao do parent em backend/agent/api/pom.xml:8 (hive-assistant -> hive-agent) validada.",
+      "suite": "npm test (harness.config.json:14 commands.suiteFull) => SUITE_RC=0, 80287 ms. Script = 'npm --prefix frontend test && mvn -f backend/pom.xml test -q'. Ambas as etapas executaram e passaram.",
+      "frontend": "Vitest: 30 Test Files passed (30); 376 Tests passed (376); 0 falhas; 0 erros; 0 skips. Frontend verde neste ciclo.",
+      "backend": "VERDE: 62 arquivos surefire-reports/*.txt, soma 'Tests run:' = 503 passed / 0 failed / 0 errors / 0 skipped. counts.unit = 503/0/0. Diferente da medicacao anterior, os reports sao FRESCOS: o clean (RC=0) limpou target/ e a suite os regenerou com mtime ~2026-11-21 12:57, concomitante a execucao QA (12:57-12:58). Nao ha mais contaminated por STALE reports.",
+      "it": "0/0/0 — ITs (failsafe/verify) nao executam na fase 'test' invocada por npm test; nenhum IT rodou neste ciclo. Sem alteracao de logica de negocio, a evidencia de contrato HTTP e estatica (ver H4.contrato_http).",
+      "baseline_esperado": "EXIT=0; frontend 376/376; backend 62 reports / 503 testes; 0 falhas / 0 erros / 0 skips.",
+      "baseline_observado": "EXIT=0; frontend 376/376; backend 62 reports / 503 testes; 0 falhas / 0 erros / 0 skips. Baseline observado == esperado.",
+      "log_warnings": "Warnings de sun.misc.Unsafe (Guice) no clean e linhas ERROR em logs de teste (ControllerExceptionHandler integridade de dados, LangChain4jClientFactory API key ausente, AesGcmAttributeConverter PROVIDER_MASTER_KEY divergente) SAO caminhos negativos esperados, exercitados por testes que passam. Nao sao falhas de teste. SUITE_RC=0 e 503/0/0/0 confirmam verde."
+    },
+    "H3": {
+      "status": "N/A",
+      "motivo": "Backend puro, zero superficie frontend alterada; ver campo e2e. git diff --name-only HEAD nao lista arquivos de frontend."
+    },
+    "H4": {
+      "tenant_isolation": "Preservado por construcao: nenhuma query, entidade ou repositorio teve logica alterada; rename apenas de namespace. ChatMessageServiceImpl e o unico arquivo de servico de mensagem modificado e a mudanca e de import de namespace.",
+      "TX1_TX2": "Inalteradas: nenhuma anotacao @Transactional, boundary de transacao ou metodo de servico foi reescrito (somente imports realocados).",
+      "findLast20": "Preservado: PageRequest(0,20,DESC createAt) + reverse intactos em history/impl; tests de caracterizacao existem mas nao executam na fase 'test' do npm test (failsafe/verify). Sem mudanca de logica, evidencia estatica permanece valida.",
+      "K4_conversion": "Contrato de conversao inalterado; ProviderMessages segue em assistant/impl/util (leitor do adapter) e history/api/util (politica). Nenhuma logica de conversao modificada.",
+      "contrato_http": "5 controllers comparados entre HEAD (agent/web/internal/v1) e working tree (assistant/web/internal/v1) com package/import removidos: ChatControllerV1, ChatSessionControllerV1, CredentialControllerV1, PromptTemplateControllerV1, ProviderModelsControllerV1 — todos SHA256 identicos. Rotas, @HasPermission e DTOs nao mudaram.",
+      "esqueleto_vazio": "backend/agent contem somente poms; find backend/agent -name '*.java' = ZERO. agent/api depende apenas de provider/api e history/api.",
+      "aresta_irmaos": "RESOLVIDA: backend/agent/api/pom.xml:8 agora declara <parent><artifactId>hive-agent</artifactId> com relativePath ../pom.xml, que aponta para backend/agent/pom.xml (artifactId hive-agent). grep -rn 'assistant' backend/agent => apenas 2 ocorrencias em comentarios (linhas 15 e 22), nenhuma referencia estrutural. Validate+clean+suite verdes confirmam a correcao. BUG-01 RESOLVIDO.",
+      "sql_integrity": "git diff --name-status HEAD lista 6 .sql como D em agent/dbupdate; todos estao presentes em assistant/dbupdate com SHA256 byte-identico ao HEAD (V2..V7). Movimentacao de path, nao alteracao de conteudo.",
+      "bugs_identified": [
+        {
+          "id": "BUG-01",
+          "severity": "blocker",
+          "status": "resolved",
+          "title": "Esqueleto agent/api com parent errado quebra o reactor Maven",
+          "evidence": "Encontrado no ciclo anterior: backend/agent/api/pom.xml:8 <artifactId>hive-assistant</artifactId> em <parent> com <relativePath>../pom.xml</relativePath>; backend/agent/pom.xml:15 declara <artifactId>hive-agent</artifactId>. Maven: [FATAL] Non-resolvable parent POM for br.com.systec.hive:hive-agentapi:${revision}.",
+          "impact": "No ciclo anterior: mvn clean RC=1; npm test RC=1; AC-08 vermelho; zero testes backend executados; AC-05 comprometido (aresta com o irmao).",
+          "resolution": "Corrigido pelo backend-engineer: parent em backend/agent/api/pom.xml:8 Passou a ser hive-agent e comentario ajustado. Revalidado: mvn -f backend/pom.xml -q -DskipTests validate EXIT=0, mvn -f backend/pom.xml -q clean EXIT=0, npm test EXIT=0 (376/376 front, 62 reports/503 back, 0 falhas/erros/skips). AC-05 e AC-08 agora verdes. QA apenas re-mediu; nao corrigiu codigo.",
+          "owner_suggestion": "backend-engineer (ciclo de bugfix) — CORRIGIDO e revalidado."
+        }
+      ]
+    },
+    "H5": {
+      "check": "lsof -ti :PORTA em 8080/3000/5173/5432/6379/11434.",
+      "achado": "Porta 11434 ocupada por PID 20294: '/home/joao/.config/ai.opencode.desktop/cli/2.3.2-x64/opencode-cli serve --service', iniciado 19/11 07:43, PPID 1 — infra do proprio ambiente agente, nao app obsoleta deste ciclo. Demais portas verificadas livres.",
+      "acao": "NENHUM processo encerrado: dono identificado como infra de servico do agente, fora do escopo ADR-019. Nenhum servidor spring-boot/Maven ficou pendurado porque a suite roda e encerra. pkill -f NAO foi usado.",
+      "left_untouched": "PID 20294 (opencode-cli serve, porta 11434) e infra compartilhada. Achado H5 anterior mantido conforme instrucao; H5 NAO re-executado."
+    },
+    "AC": {
+      "AC-01": { "status": "green", "evidence": "grep -rl 'br.com.systec.hive.agent' backend --include='*.java' => ZERO." },
+      "AC-02": { "status": "green", "evidence": "grep -rn 'hive-agent-' backend --include='pom.xml' => ZERO. Esqueleto usa hive-agent e hive-agentapi (sem hifen apos 'agent'), fora do padrao proibido." },
+      "AC-03": { "status": "green", "evidence": "grep -n '<module>agent</module>\\|<module>assistant</module>' backend/pom.xml => linha 24 (agent) e linha 25 (assistant), ambos presentes." },
+      "AC-04": { "status": "green", "evidence": "find backend/agent -name '*.java' => ZERO. Somente backend/agent/pom.xml e backend/agent/api/pom.xml." },
+      "AC-05": { "status": "green", "evidence": "grep -rn 'assistant' backend/agent => 2 ocorrencias, AMBAS em comentarios em backend/agent/api/pom.xml (linhas 15 e 22). Nenhuma referencia estrutural: <parent> em linha 8 agora e hive-agent com relativePath ../pom.xml apontando para backend/agent/pom.xml (artifactId hive-agent). Direcao inversa (grep -rn 'br.com.systec.hive.agent' backend/assistant) => ZERO. Aresta indevida entre irmaos removida; validate+clean+suite verdes. BUG-01 RESOLVIDO." },
+      "AC-06": { "status": "green", "evidence": "Comparacao estatica: 5 controllers HEAD(agent) vs working(assistant), ignorando package/import => SHA256 identicos (ChatControllerV1 8c8a12a3e11d59a0, ChatSessionControllerV1 547ce738ba601f4c, CredentialControllerV1 18de13c266a6bffa, PromptTemplateControllerV1 5c33f53fb89a7ff1, ProviderModelsControllerV1 12ab6ac73aae7242). Rotas e @HasPermission inalterados.", "coverage_note": "ITs de caracterizacao existem (ChatEmptyResponseIT, ChatSessionIT, ChatProviderOverrideIT) mas nao executam na fase 'test' do npm test (failsafe/verify); evidencia e estatica, nao HTTP 200 ao vivo." },
+      "AC-07": { "status": "green", "evidence": "grep -rE 'class Assistant|class Agent|@Tool|ToolSpecification|AgentService|AgentTurn' backend --include='*.java' => ZERO; grep -rE 'ChatMemory|@MemoryId|chatMemory\\(' backend --include='*.java' => ZERO; git diff --name-only HEAD | grep -i mfa => ZERO. SQL: 6 arquivos deletados no path antigo agent/dbupdate e presentes no path novo assistant/dbupdate com SHA256 identicos ao HEAD — sem alteracao de conteudo." },
+      "AC-08": { "status": "green", "evidence": "mvn -f backend/pom.xml -q clean => RC=0; npm test => RC=0. Frontend 376/376; backend 62 reports / 503 testes, 0 falhas / 0 erros / 0 skips. Reports FRESCOS: clean (RC=0) limpou target/ e a suite os regenerou com mtime ~12:57, concomitante a execucao QA (12:57-12:58). BUG-01 RESOLVIDO (ver H4.bugs_identified)." },
+      "AC-09": { "status": "debt", "evidence": "grep -rn 'br.com.systec.hive.assistant.impl' backend/publicapi --include='*.java' => exatamente 4 refs: PublicChatServiceImpl.java:9 (ProviderResolution), :10 (TurnOutcomeMapper), PublicChatServiceImplTest.java:8 (ProviderResolution), :46 (TurnOutcomeMapper). Gate B reetiquetado de agent/impl para assistant/impl; permanece DEBITO deliberado, ADR separado — NAO e falha deste ciclo." }
+    },
+    "frontend_evidence_note": "harness.config.json targets.frontend = react, mas nenhum arquivo frontend foi criado ou alterado em ADR-019 (git status: mudancas apenas em backend/ e .spec/). Nao ha story/screenshot/a11y novo para declarar; campo frontend_evidence omitido para nao inventar evidencia e manter o artefato valido contra o schema. Unica evidencia frontend disponivel e a suite Vitest 376/376 executada como parte do npm test.",
+    "code_review_status": "passed",
+    "code_review_note": "code-reviewer: APPROVED com zero 🔴. Unica 🔴 emitida no ciclo anterior (backend/agent/api/pom.xml:8, parent hive-assistant — aresta indevida com o irmao assistant) foi corrigida para hive-agent e revalidada com mvn validate EXIT=0 + clean EXIT=0 + npm test EXIT=0 (376/376 front, 62 reports/503 back, 0 falhas/erros/skips). Nao inventado novo veredito detalhado: status 'passed' registrado com base na correcao confirmada e na re-medicao verde. workflow-state.json nao foi alterado por este agente."
+  },
+  "brainStore": ["sessoes/projetos/hive/2026-11-21-adr-019-qa-blocker-parent-pom"],
+  "cleanup": {
+    "ports_checked": [8080, 3000, 5173, 5432, 6379, 11434],
+    "freed": [],
+    "left_untouched": "PID 20294 (opencode-cli serve --service, :11434) — infra do agente, fora do escopo. Nenhum processo Spring/Maven pendurado; suite roda e encerra.",
+    "pkill_f_used": false,
+    "build_artifacts": "A execucao de mvn clean + npm test regenerou 14 entradas .flattened-pom.xml (plugin flatten-maven). Restauradas ao estado encontrado (tracked via git checkout, untracked removidos): 0 entradas no git status ao final. Artefatos de build, nao codigo/config alterado."
+  },
+  "selfReported": false
+}

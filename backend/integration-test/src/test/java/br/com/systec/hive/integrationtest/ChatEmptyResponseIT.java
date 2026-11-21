@@ -1,6 +1,6 @@
 package br.com.systec.hive.integrationtest;
 
-import br.com.systec.hive.agent.api.exceptions.ModelReturnedEmptyException;
+import br.com.systec.hive.assistant.api.exceptions.ModelReturnedEmptyException;
 import br.com.systec.hive.integrationtest.support.WebIntegrationTest;
 import br.com.systec.hive.provider.api.LlmClientFactory;
 import dev.langchain4j.data.message.AiMessage;

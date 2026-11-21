@@ -10,48 +10,26 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>hive-agent-api</artifactId>
-    <name>Hive Agent API</name>
+    <!-- ADR-019 §3 + AC-02: esqueleto vazio. O módulo agent mantém seus próprios ids
+         (hive-agent / hive-agentapi, sem hífen) para não criar aresta com o irmão;
+         os artefatos do assistant usam hive-assistant-*. Sem src/main/java: zero
+         classes, zero beans, zero @Tool/ToolSpecification. Gatilho para popular:
+         primeira tool real (ADR-012:93). -->
+    <artifactId>hive-agentapi</artifactId>
+    <name>Hive Agent API (v2 reservado)</name>
     <packaging>jar</packaging>
 
+    <!-- ADR-019 §3: depende somente de provider/api e history/api — nunca de assistant/*. -->
     <dependencies>
-        <dependency>
-            <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-commons-api</artifactId>
-        </dependency>
-        <!-- ADR-017: TurnRequest.history carrega ChatMessage, agora em history/api. -->
-        <dependency>
-            <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-history-api</artifactId>
-            <version>${revision}</version>
-        </dependency>
         <dependency>
             <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-provider-api</artifactId>
             <version>${revision}</version>
         </dependency>
-        <!--
-          `provided`, like every other dev.langchain4j artifact in dependencies/pom.xml, and needed
-          only because this module speaks the provider's message type: `TurnRequest` carries a
-          `dev.langchain4j.data.message.ChatMessage` as `conversation`, and `ProviderMessages`
-          builds those very objects; `ModelNotFound` walks
-          `dev.langchain4j.exception.ModelNotFoundException` and `HttpException` to say whether the
-          model was removed. Wrapping any of it in a project type only to unwrap it later would
-          make the block size reported on the diagnostic and the block actually sent two separate
-          facts instead of one.
-        -->
         <dependency>
-            <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.data</groupId>
-            <artifactId>spring-data-commons</artifactId>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-history-api</artifactId>
+            <version>${revision}</version>
         </dependency>
     </dependencies>
-
 </project>

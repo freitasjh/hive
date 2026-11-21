@@ -1,6 +1,6 @@
 package br.com.systec.hive.integrationtest;
 
-import br.com.systec.hive.agent.impl.converter.AesGcmAttributeConverter;
+import br.com.systec.hive.assistant.impl.converter.AesGcmAttributeConverter;
 import br.com.systec.hive.integrationtest.support.WebIntegrationTest;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.DiscoveredModels;

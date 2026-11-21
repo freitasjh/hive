@@ -1,9 +1,9 @@
 package br.com.systec.hive.publicapi.impl.service;
 
-import br.com.systec.hive.agent.api.domain.PromptStatus;
-import br.com.systec.hive.agent.api.domain.PromptTemplate;
-import br.com.systec.hive.agent.api.exceptions.PromptTemplateNotFoundException;
-import br.com.systec.hive.agent.api.service.PromptTemplateService;
+import br.com.systec.hive.assistant.api.domain.PromptStatus;
+import br.com.systec.hive.assistant.api.domain.PromptTemplate;
+import br.com.systec.hive.assistant.api.exceptions.PromptTemplateNotFoundException;
+import br.com.systec.hive.assistant.api.service.PromptTemplateService;
 import br.com.systec.hive.publicapi.api.exceptions.PromptNotActiveException;
 import br.com.systec.hive.publicapi.api.exceptions.PromptNotFoundException;
 import br.com.systec.hive.publicapi.api.exceptions.PromptNotInAllowlistException;

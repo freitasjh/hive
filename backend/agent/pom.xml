@@ -10,13 +10,12 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
+    <!-- ADR-019 §3: namespace reservado para a estratégia de turno autônoma (v2).
+         Somente poms — sem src/main/java, sem classes, sem beans, sem @Tool. -->
     <artifactId>hive-agent</artifactId>
-    <description>Hive Agent</description>
+    <description>Hive Agent (v2 reservado — ADR-019)</description>
+    <packaging>pom</packaging>
     <modules>
         <module>api</module>
-        <module>impl</module>
-        <module>dbupdate</module>
-        <module>web</module>
     </modules>
-    <packaging>pom</packaging>
 </project>

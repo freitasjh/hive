@@ -1,6 +1,6 @@
 package br.com.systec.hive.history.impl.service;
 
-import br.com.systec.hive.agent.api.exceptions.ChatSessionNotFoundException;
+import br.com.systec.hive.assistant.api.exceptions.ChatSessionNotFoundException;
 import br.com.systec.hive.history.api.domain.ChatMessage;
 import br.com.systec.hive.history.api.service.ChatMessageService;
 import br.com.systec.hive.history.impl.entity.ChatMessageEntity;

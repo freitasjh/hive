@@ -22,7 +22,7 @@
         </dependency>
         <dependency>
             <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-agent-api</artifactId>
+            <artifactId>hive-assistant-api</artifactId>
             <version>${revision}</version>
         </dependency>
         <!-- ADR-017: PublicChatServiceImpl usa ProviderMessages/ChatMessage de history/api.
@@ -39,7 +39,7 @@
         </dependency>
         <dependency>
             <groupId>br.com.systec.hive</groupId>
-            <artifactId>hive-agent-impl</artifactId>
+            <artifactId>hive-assistant-impl</artifactId>
             <version>${revision}</version>
         </dependency>
         <dependency>

@@ -20,7 +20,9 @@
         <module>bootstrap</module>
         <module>identity</module>
         <module>security</module>
+        <!-- ADR-019: agent (v2, esqueleto vazio) e assistant (v1, rename) são irmãos. -->
         <module>agent</module>
+        <module>assistant</module>
         <module>history</module>
         <module>provider</module>
         <module>publicapi</module>

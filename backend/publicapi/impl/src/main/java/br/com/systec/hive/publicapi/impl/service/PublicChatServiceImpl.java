@@ -1,13 +1,13 @@
 package br.com.systec.hive.publicapi.impl.service;
 
-import br.com.systec.hive.agent.api.domain.PromptTemplate;
-import br.com.systec.hive.agent.api.domain.TurnReply;
-import br.com.systec.hive.agent.api.domain.TurnRequest;
-import br.com.systec.hive.agent.api.port.ChatTurnGateway;
-import br.com.systec.hive.agent.api.service.PromptTemplateService;
+import br.com.systec.hive.assistant.api.domain.PromptTemplate;
+import br.com.systec.hive.assistant.api.domain.TurnReply;
+import br.com.systec.hive.assistant.api.domain.TurnRequest;
+import br.com.systec.hive.assistant.api.port.ChatTurnGateway;
+import br.com.systec.hive.assistant.api.service.PromptTemplateService;
 import br.com.systec.hive.history.api.util.ProviderMessages;
-import br.com.systec.hive.agent.impl.service.ProviderResolution;
-import br.com.systec.hive.agent.impl.service.TurnOutcomeMapper;
+import br.com.systec.hive.assistant.impl.service.ProviderResolution;
+import br.com.systec.hive.assistant.impl.service.TurnOutcomeMapper;
 import br.com.systec.hive.commons.impl.security.TenantContext;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.publicapi.api.exceptions.PromptNotActiveException;
