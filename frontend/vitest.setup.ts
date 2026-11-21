@@ -37,6 +37,15 @@ if (!window.matchMedia) {
   })
 }
 
+// jsdom não implementa ResizeObserver; Radix Tooltip/Popper depende dele ao abrir em foco.
+if (!globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}
+
 afterEach(() => {
   cleanup()
 })

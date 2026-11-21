@@ -1,8 +1,7 @@
 "use client"
 
-import { LoaderCircle, Lock } from "lucide-react"
+import { LoaderCircle, Lock, Sparkles } from "lucide-react"
 import { Badge } from "@/components/shadcn/ui/badge"
-import { Card, CardContent, CardHeader } from "@/components/shadcn/ui/card"
 import {
   Select,
   SelectContent,
@@ -43,20 +42,17 @@ export function PromptSelector({
   const isDisabled = loading || disabled || locked
 
   return (
-    <Card className="shrink-0 gap-0 rounded-xl py-0">
-      <CardHeader className="flex flex-row items-center justify-between gap-2 px-3 py-2">
-        <label htmlFor="chat-prompt" className="text-xs leading-none font-medium text-muted-foreground">
+    <div className="flex shrink-0 flex-col gap-1.5 border-b border-border/60 bg-card/40 px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+        <label
+          htmlFor="chat-prompt"
+          className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground"
+        >
+          <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
           {t("chat.prompt.label")}
         </label>
-        {locked ? (
-          <Badge role="status" variant="outline" className="gap-1 text-[10px] font-normal">
-            <Lock className="size-3" aria-hidden="true" />
-            {t("chat.prompt.locked")}
-          </Badge>
-        ) : null}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-1 px-3 pb-2">
-        <div className="relative">
+
+        <div className="min-w-0 flex-1 sm:max-w-xs">
           <Select
             value={value ?? EMPTY_VALUE}
             onValueChange={(next) => onChange(next === EMPTY_VALUE ? "" : next)}
@@ -64,10 +60,11 @@ export function PromptSelector({
           >
             <SelectTrigger
               id="chat-prompt"
+              size="sm"
               data-testid="prompt-select"
               aria-label={t("chat.prompt.label")}
               aria-busy={loading}
-              className="w-full min-w-0 pr-9 text-sm"
+              className="w-full min-w-0 border-border/70 bg-background text-xs font-medium"
             >
               <SelectValue placeholder={t("chat.prompt.placeholder")} />
             </SelectTrigger>
@@ -80,24 +77,30 @@ export function PromptSelector({
               ))}
             </SelectContent>
           </Select>
-          {locked ? (
-            <Lock
-              className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
-          ) : null}
         </div>
-        {loading ? (
-          <p data-testid="prompt-loading" aria-busy="true" className="flex items-center gap-2 text-xs text-muted-foreground">
-            <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
-            {t("chat.common.loading")}
-          </p>
+
+        {locked ? (
+          <Badge
+            role="status"
+            variant="secondary"
+            className="gap-1 text-[11px] font-normal text-muted-foreground sm:ml-auto"
+          >
+            <Lock className="size-3" aria-hidden="true" />
+            {t("chat.prompt.locked")}
+          </Badge>
         ) : null}
-        {error ? (
-          <p role="alert" className="text-xs text-destructive">{error}</p>
-        ) : null}
-      </CardContent>
-    </Card>
+      </div>
+
+      {loading ? (
+        <p data-testid="prompt-loading" aria-busy="true" className="flex items-center gap-2 text-xs text-muted-foreground">
+          <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+          {t("chat.common.loading")}
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="text-xs text-destructive">{error}</p>
+      ) : null}
+    </div>
   )
 }
 

@@ -18,18 +18,18 @@ export function ChatView({ state, actions }: ChatViewProps) {
   const { t } = useChatI18n()
 
   return (
-    <div className="flex h-[calc(100svh-9rem)] min-h-[24rem] flex-col gap-3 px-4 pb-2 lg:h-[calc(100svh-10.5rem)] lg:px-6">
-      <header className="flex shrink-0 flex-col gap-1">
+    <div className="flex h-[calc(100svh-8.5rem)] min-h-[24rem] flex-col gap-3 px-4 lg:h-[calc(100svh-7.5rem)] lg:px-6">
+      <header className="flex shrink-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
         <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
           {t("chat.title")}
         </h1>
         <p className="text-xs text-muted-foreground">{t("chat.subtitle")}</p>
       </header>
 
-      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_auto] gap-3 lg:grid-cols-[18rem_minmax(0,1fr)] lg:grid-rows-1">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_auto] gap-3 lg:grid-cols-[18rem_minmax(0,1fr)] lg:grid-rows-1 lg:gap-4">
         <div
           data-chat-pane="conversation"
-          className="order-1 flex min-h-0 min-w-0 flex-col gap-3 lg:order-none lg:col-start-2 lg:row-start-1"
+          className="order-1 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/30 lg:order-none lg:col-start-2 lg:row-start-1"
         >
           <PromptSelector
             prompts={state.prompts}
@@ -42,7 +42,10 @@ export function ChatView({ state, actions }: ChatViewProps) {
           />
 
           {state.sendError ? (
-            <div role="alert" className="flex shrink-0 items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <div
+              role="alert"
+              className="mx-4 mt-3 flex shrink-0 items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+            >
               <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>{state.sendError}</span>
             </div>
@@ -64,23 +67,28 @@ export function ChatView({ state, actions }: ChatViewProps) {
             onStarter={actions.useStarter}
           />
 
-          <ChatComposer
-            value={state.input}
-            onChange={actions.setInput}
-            onSend={actions.send}
-            disabled={state.sending || state.historyLoading}
-            sending={state.sending}
-            warning={state.notice}
-            catalog={state.catalog}
-            selectedModel={state.selectedModel}
-            modelBaseline={state.effectiveModel ?? state.tenantDefault}
-            modelLoading={state.catalogLoading}
-            modelError={state.catalogError}
-            onSelectModel={actions.selectModel}
-          />
+          <div className="shrink-0 px-4 pt-2 pb-3">
+            <ChatComposer
+              value={state.input}
+              onChange={actions.setInput}
+              onSend={actions.send}
+              disabled={state.sending || state.historyLoading}
+              sending={state.sending}
+              warning={state.notice}
+              catalog={state.catalog}
+              selectedModel={state.selectedModel}
+              modelBaseline={state.effectiveModel ?? state.tenantDefault}
+              modelLoading={state.catalogLoading}
+              modelError={state.catalogError}
+              onSelectModel={actions.selectModel}
+            />
+          </div>
         </div>
 
-        <div data-chat-pane="sidebar" className="order-2 max-h-40 min-h-0 lg:order-none lg:col-start-1 lg:row-start-1 lg:max-h-none">
+        <div
+          data-chat-pane="sidebar"
+          className="order-2 max-h-40 min-h-0 lg:order-none lg:col-start-1 lg:row-start-1 lg:max-h-none"
+        >
           <SessionSidebar
             sessions={state.sessions}
             selectedId={state.sessionId}

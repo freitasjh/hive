@@ -87,21 +87,21 @@ export function ModelSelector({
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
             data-testid="model-select"
             aria-label={t("chat.model.label")}
             aria-busy={loading}
             disabled={disabled || loading}
-            className="min-h-9 max-w-52 gap-1.5 px-2 text-xs"
+            className="h-8 max-w-56 justify-between gap-2 rounded-md border-border/70 bg-background px-2.5 text-xs font-medium text-foreground shadow-xs hover:bg-accent dark:bg-input/30 dark:hover:bg-input/50"
           >
             {loading ? (
-              <LoaderCircle className="size-3.5 shrink-0 animate-spin" aria-hidden="true" />
+              <LoaderCircle className="size-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden="true" />
             ) : (
-              <Cpu className="size-3.5 shrink-0" aria-hidden="true" />
+              <Cpu className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
             )}
             <span className="min-w-0 truncate">{label}</span>
-            <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
+            <ChevronDown className="size-3.5 shrink-0 opacity-50" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="max-h-80 w-72">
