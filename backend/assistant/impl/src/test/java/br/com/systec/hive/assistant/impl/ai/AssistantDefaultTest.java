@@ -1,8 +1,10 @@
 package br.com.systec.hive.assistant.impl.ai;
 
+import br.com.systec.hive.ai.api.AssistantDefault;
+import br.com.systec.hive.ai.api.domain.TurnPrompt;
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
-import br.com.systec.hive.assistant.impl.service.AbstractLangChain4jTurnGateway;
-import dev.langchain4j.model.chat.ChatModel;
+import br.com.systec.hive.assistant.api.domain.TurnPrompts;
+import br.com.systec.hive.assistant.impl.service.AssistantTurnGateway;
 import dev.langchain4j.service.Result;
 import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.SystemMessage;
@@ -16,7 +18,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** AI-02 / AC-01, AC-08: contrato congelado do ai service e precedência do prompt. */
+/** AI-02 / AC-01, AC-04, AC-08: contrato congelado do ai service e precedência do prompt. */
 class AssistantDefaultTest {
 
     private static final String SEEDED_TEXT = "Você é um assistente útil e respeitoso. Responda sempre em português brasileiro, "
@@ -25,7 +27,7 @@ class AssistantDefaultTest {
 
     @Test
     void when_promptConstantIsRead_then_itMatchesTheV6SeedByteForByte() {
-        assertThat(AssistantDefault.PROMPT).isEqualTo(SEEDED_TEXT);
+        assertThat(AssistantTurnGateway.PROMPT).isEqualTo(SEEDED_TEXT);
     }
 
     @Test
@@ -48,7 +50,7 @@ class AssistantDefaultTest {
         PromptTemplate template = new PromptTemplate();
         template.setTemplate("prompt escolhido pelo usuario");
 
-        assertThat(lenientGateway().resolve(template)).isEqualTo("prompt escolhido pelo usuario");
+        assertThat(lenientGateway().resolve(TurnPrompts.from(template))).isEqualTo("prompt escolhido pelo usuario");
     }
 
     @Test
@@ -57,8 +59,8 @@ class AssistantDefaultTest {
         empty.setTemplate("   ");
         PromptTemplate absent = new PromptTemplate();
 
-        assertThat(lenientGateway().resolve(empty)).isEqualTo(AssistantDefault.PROMPT);
-        assertThat(lenientGateway().resolve(absent)).isEqualTo(AssistantDefault.PROMPT);
+        assertThat(lenientGateway().resolve(TurnPrompts.from(empty))).isEqualTo(AssistantTurnGateway.PROMPT);
+        assertThat(lenientGateway().resolve(TurnPrompts.from(absent))).isEqualTo(AssistantTurnGateway.PROMPT);
     }
 
     /** Exponha só a regra de precedência; o proxy nunca é chamado nestes testes. */
@@ -66,25 +68,13 @@ class AssistantDefaultTest {
         return new ProbeGateway();
     }
 
-    private static final class ProbeGateway extends AbstractLangChain4jTurnGateway {
-        private String resolve(PromptTemplate template) {
-            return systemFor(template);
+    private static final class ProbeGateway extends AssistantTurnGateway {
+        private ProbeGateway() {
+            super(null);
         }
 
-        @Override
-        public br.com.systec.hive.assistant.api.domain.TurnReply execute(
-                br.com.systec.hive.assistant.api.domain.TurnRequest request) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        protected AssistantDefault proxyFor(ChatModel client) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        protected br.com.systec.hive.assistant.api.domain.TurnReply toReply(Result<String> r, int m, int c) {
-            throw new UnsupportedOperationException();
+        private String resolve(TurnPrompt prompt) {
+            return systemFor(prompt.text());
         }
     }
 }

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>br.com.systec.hive</groupId>
+        <artifactId>hive-ai</artifactId>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>hive-ai-api</artifactId>
+    <name>Hive AI API</name>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-provider-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
+        <!-- ChatMessage em TurnRequest.conversation(). Escopo provided vem do dependencyManagement. -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-core</artifactId>
+        </dependency>
+        <!--
+          AssistantDefault usa @SystemMessage/@UserMessage/@V/@MemoryId/Result, que vivem no
+          agregado `langchain4j` e NAO no core (verificado no jar 1.19.0, 2026-11-21).
+        -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
+        </dependency>
+    </dependencies>
+</project>

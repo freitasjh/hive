@@ -1,7 +1,7 @@
-package br.com.systec.hive.assistant.api.port;
+package br.com.systec.hive.ai.api.port;
 
-import br.com.systec.hive.assistant.api.domain.TurnReply;
-import br.com.systec.hive.assistant.api.domain.TurnRequest;
+import br.com.systec.hive.ai.api.domain.TurnReply;
+import br.com.systec.hive.ai.api.domain.TurnRequest;
 
 /**
  * One turn of chat generation: prompt in, answer out.

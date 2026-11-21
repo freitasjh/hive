@@ -1,9 +1,10 @@
 package br.com.systec.hive.publicapi.impl.service;
 
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
-import br.com.systec.hive.assistant.api.domain.TurnReply;
-import br.com.systec.hive.assistant.api.domain.TurnRequest;
-import br.com.systec.hive.assistant.api.port.ChatTurnGateway;
+import br.com.systec.hive.assistant.api.domain.TurnPrompts;
+import br.com.systec.hive.ai.api.domain.TurnReply;
+import br.com.systec.hive.ai.api.domain.TurnRequest;
+import br.com.systec.hive.ai.api.port.ChatTurnGateway;
 import br.com.systec.hive.assistant.api.service.PromptTemplateService;
 import br.com.systec.hive.history.api.util.ProviderMessages;
 import br.com.systec.hive.assistant.impl.service.ProviderResolution;
@@ -167,8 +168,8 @@ public class PublicChatServiceImpl implements PublicChatService {
 
         UUID turnId = UUID.randomUUID();
         long started = System.nanoTime();
-        TurnReply reply = turnGateway.execute(new TurnRequest(turnId, prompt, resolved.provider(),
-                resolved.model(), resolved.apiKey(), resolved.baseUrl(), List.of(), conversation));
+        TurnReply reply = turnGateway.execute(new TurnRequest(turnId, TurnPrompts.from(prompt), resolved.provider(),
+                resolved.model(), resolved.apiKey(), resolved.baseUrl(), conversation));
         long elapsed = (System.nanoTime() - started) / 1_000_000L;
 
         // outcome mapping (throws on failure/empty)

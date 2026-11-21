@@ -22,6 +22,8 @@
         <module>security</module>
         <!-- ADR-019: agent (v2, esqueleto vazio) e assistant (v1, rename) são irmãos. -->
         <module>agent</module>
+        <!-- ADR-021: ai/ e a camada generica de geracao; assistant/ e a politica do turno. -->
+        <module>ai</module>
         <module>assistant</module>
         <module>history</module>
         <module>provider</module>

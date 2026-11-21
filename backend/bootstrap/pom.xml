@@ -152,6 +152,20 @@
             <artifactId>hive-security-web-internal-v1</artifactId>
             <scope>compile</scope>
         </dependency>
+        <!-- ADR-021: ai/api + ai/impl no classpath de runtime: assistant e publicapi chamam a porta
+             ChatTurnGateway e o proxy AiService/extensoes de memoria precisam do agregado. -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-ai-api</artifactId>
+            <version>${revision}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-ai-impl</artifactId>
+            <version>${revision}</version>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-assistant-api</artifactId>

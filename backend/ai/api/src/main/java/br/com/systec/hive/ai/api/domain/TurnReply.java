@@ -1,4 +1,4 @@
-package br.com.systec.hive.assistant.api.domain;
+package br.com.systec.hive.ai.api.domain;
 
 import java.util.Objects;
 

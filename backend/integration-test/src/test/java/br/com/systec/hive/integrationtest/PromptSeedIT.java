@@ -1,6 +1,6 @@
 package br.com.systec.hive.integrationtest;
 
-import br.com.systec.hive.assistant.impl.ai.AssistantDefault;
+import br.com.systec.hive.assistant.impl.service.AssistantTurnGateway;
 import br.com.systec.hive.integrationtest.support.WebIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * ADR-020 RF-04 (Postgres real, Testcontainers): o seed V6 foi desfeito pela V8 e o texto padrão
- * agora mora em {@link AssistantDefault#PROMPT}. V6 permanece imutável no histórico Flyway — este
+ * agora mora em {@link AssistantTurnGateway#PROMPT}. V6 permanece imutável no histórico Flyway — este
  * teste a reaplica pelo JDBC para provar que a V8 remove exatamente o que a V6 inseriu, sem tocar
  * templates que o usuário escolheu.
  */
@@ -117,7 +117,7 @@ class PromptSeedIT extends WebIntegrationTest {
 
         String reallocatedTemplate = jdbcTemplate.queryForObject(
                 "SELECT template FROM prompt_template WHERE id = ?", String.class, reallocatedId);
-        assertThat(reallocatedTemplate).isEqualTo(AssistantDefault.PROMPT);
+        assertThat(reallocatedTemplate).isEqualTo(AssistantTurnGateway.PROMPT);
 
         Integer fallbackCount = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM prompt_template "
@@ -129,8 +129,8 @@ class PromptSeedIT extends WebIntegrationTest {
 
     @Test
     void when_fallbackIsNeeded_then_codeConstantCarriesTheOldSeedText() {
-        // R-seed: tenants que tinham o prompt semeado passam a usar AssistantDefault.PROMPT.
-        assertThat(AssistantDefault.PROMPT).isEqualTo(SEEDED_TEXT);
+        // R-seed: tenants que tinham o prompt semeado passam a usar AssistantTurnGateway.PROMPT.
+        assertThat(AssistantTurnGateway.PROMPT).isEqualTo(SEEDED_TEXT);
     }
 
     private void apply(String resource) throws IOException {
