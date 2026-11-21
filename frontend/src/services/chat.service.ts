@@ -9,10 +9,10 @@ export interface ChatPayloadDefaults {
 
 /**
  * Regra do turno (bkp/front_bkp/src/services/chat.service.ts:4-15 + decisão canônica):
- * o prompt é parâmetro do PRIMEIRO turno. Depois que a sessão existe, ela é
+ * o prompt é parâmetro do PRIMEIRO turno, mas opcional: ausente, o backend
+ * resolve o `system_fallback` do tenant. Depois que a sessão existe, ela é
  * autoritativa — reenviar o template de um cliente com seleção velha trocaria
- * a conversa silenciosamente. Mensagem vazia/sem prompt no primeiro turno não
- * vira requisição.
+ * a conversa silenciosamente. Mensagem vazia não vira requisição.
  *
  * Provider/model entram no body SOMENTE quando o par escolhido difere do par
  * efetivo (tenant ou sessão). Fonte: ui.shadcn.com/docs/ai-elements/base/model-selector
@@ -25,12 +25,11 @@ export function buildChatPayload(
 ): Record<string, unknown> | null {
   const message = typeof input.message === "string" ? input.message.trim() : ""
   if (!message) return null
-  const payload: Record<string, unknown> | null = input.sessionId
+  const payload: Record<string, unknown> = input.sessionId
     ? { sessionId: input.sessionId, message }
     : input.promptTemplateId
       ? { promptTemplateId: input.promptTemplateId, message }
-      : null
-  if (!payload) return null
+      : { message }
 
   // Sessão existente é autoritativa no backend (ChatServiceImpl.java:182-188):
   // override enviado seria descartado e o seletor ficaria mentindo. Nunca vai na wire.
@@ -55,7 +54,7 @@ export const chatService = {
   ): Promise<ChatResponseDTO> {
     const payload = buildChatPayload(input, defaults)
     if (!payload) {
-      throw new Error("Selecione um prompt e informe uma mensagem antes de enviar.")
+      throw new Error("Informe uma mensagem antes de enviar.")
     }
     const body = await apiRequest<unknown>("/chat", { method: "POST", body: payload })
     return unwrapData<ChatResponseDTO>(body)

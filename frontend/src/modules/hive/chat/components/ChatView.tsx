@@ -59,7 +59,7 @@ export function ChatView({ state, actions }: ChatViewProps) {
             generating={state.sending}
             canLoadOlder={!!state.sessionId && state.messagesTotalPages > 1}
             retryable={!!state.sendError}
-            canUseStarter={!!state.selectedPromptTemplateId && !state.sending}
+            canUseStarter={!state.sending}
             targetMessageId={state.targetMessageId}
             onTargetHandled={actions.clearTargetMessage}
             onLoadOlder={actions.loadOlderMessages}

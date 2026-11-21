@@ -7,15 +7,20 @@ import br.com.systec.hive.assistant.api.domain.ChatRequest;
 import br.com.systec.hive.assistant.api.domain.ChatResponse;
 import br.com.systec.hive.assistant.api.domain.ChatSession;
 import br.com.systec.hive.assistant.api.domain.InferenceParams;
+import br.com.systec.hive.assistant.api.domain.PromptStatus;
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
 import br.com.systec.hive.assistant.api.exceptions.ChatSessionNotFoundException;
 import br.com.systec.hive.assistant.api.exceptions.ConfigMissingException;
 import br.com.systec.hive.assistant.api.exceptions.ModelReturnedEmptyException;
 import br.com.systec.hive.assistant.api.exceptions.ProviderException;
+import br.com.systec.hive.assistant.api.exceptions.PromptTemplateNotFoundException;
 import br.com.systec.hive.ai.api.port.ChatTurnGateway;
 import br.com.systec.hive.history.api.service.ChatMessageService;
 import br.com.systec.hive.assistant.api.service.ChatSessionService;
+import br.com.systec.hive.assistant.api.service.PromptTemplateService;
 import br.com.systec.hive.assistant.impl.diagnostics.FailureClassifier;
+import br.com.systec.hive.assistant.impl.entity.PromptTemplateEntity;
+import br.com.systec.hive.assistant.impl.repository.PromptTemplateRepository;
 import br.com.systec.hive.api.domain.TenantLlmConfig;
 import br.com.systec.hive.api.exceptions.TenantLlmConfigNotFoundException;
 import br.com.systec.hive.api.service.TenantLlmConfigService;
@@ -37,11 +42,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -57,6 +64,14 @@ class ChatServiceImplTest {
 
     @Mock
     private ChatSessionService chatSessionService;
+
+    /** Fallback tenant-scoped: resolvido somente quando o cliente nao escolheu um template. */
+    @Mock
+    private PromptTemplateService promptTemplateService;
+
+    /** Registro técnico `system_fallback` — criado/reusado quando o tenant não tem o seed V8. */
+    @Mock
+    private PromptTemplateRepository promptTemplateRepository;
 
     @Mock
     private ChatMessageService chatMessageService;
@@ -128,8 +143,8 @@ class ChatServiceImplTest {
 
     private ChatServiceImpl newService(ChatTraceRecorder traces) {
         return new ChatServiceImpl(providerResolution, chatSessionService, chatMessageService,
-                chatAssistantTxService, chatRateLimiter, turnGateway,
-                new TurnOutcomeMapper(traces, discoveryService));
+                chatAssistantTxService, chatRateLimiter, turnGateway, promptTemplateService,
+                promptTemplateRepository, new TurnOutcomeMapper(traces, discoveryService));
     }
 
     /** The tenant's one default: vendor and model, verbatim. No fallback is exercised anywhere here. */
@@ -207,6 +222,8 @@ class ChatServiceImplTest {
         verify(chatSessionService).create(eq(promptTemplateId), any(String.class), eq(tenantId), eq(userId));
         verify(chatMessageService).save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), eq("Hello world"));
         verify(chatAssistantTxService).saveAssistantAndTouch(eq(sessionId), eq(tenantId), eq("assistant reply"));
+        // Com prompt escolhido o fallback nem é consultado: fluxo atual intacto.
+        verify(promptTemplateService, never()).findActiveByCode(anyString());
     }
 
     /**
@@ -234,16 +251,162 @@ class ChatServiceImplTest {
     }
 
     @Test
-    void when_chat_with_newSessionAndNoPromptTemplate_then_refusedBeforeAnythingIsPersisted() {
+    void when_chat_with_newSessionAndNoPromptTemplate_then_usesSystemFallbackAndAnswers() {
         ChatRequest request = newRequest();
         request.setPromptTemplateId(null);
+        UUID fallbackId = UUID.randomUUID();
+        PromptTemplate fallback = openAiTemplate();
+        fallback.setId(fallbackId);
+        when(promptTemplateService.findActiveByCode("system_fallback")).thenReturn(fallback);
+
+        ChatSession session = new ChatSession();
+        UUID sessionId = UUID.randomUUID();
+        session.setId(sessionId);
+        session.setPromptTemplateId(fallbackId);
+        session.setTenantId(tenantId);
+        when(chatSessionService.create(eq(fallbackId), any(String.class), eq(tenantId), eq(userId)))
+                .thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(fallback);
+
+        stubTenantConfig(openAiConfig());
+        stubCredential();
+        stubClient("resposta via fallback");
+        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), eq("Hello world")))
+                .thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(sessionId, tenantId)).thenReturn(List.of(messageWithContent()));
+
+        ChatResponse response = service.chat(request, tenantId, userId);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getSessionId()).isEqualTo(sessionId);
+        assertThat(response.getMessage()).isEqualTo("resposta via fallback");
+        verify(promptTemplateService).findActiveByCode("system_fallback");
+        // Seed V8 presente: reuso, nenhum registro técnico é criado.
+        verify(promptTemplateRepository, never()).save(any());
+        // A sessão aponta para o id do fallback — nenhum template é inventado pelo chamador.
+        verify(chatSessionService).create(eq(fallbackId), any(String.class), eq(tenantId), eq(userId));
+        verify(chatMessageService).save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), eq("Hello world"));
+    }
+
+    @Test
+    void when_chat_with_noActiveFallback_then_createsTechnicalRecordAndAnswers() {
+        ChatRequest request = newRequest();
+        request.setPromptTemplateId(null);
+        UUID fallbackId = UUID.randomUUID();
+        when(promptTemplateService.findActiveByCode("system_fallback"))
+                .thenThrow(new PromptTemplateNotFoundException());
+
+        PromptTemplateEntity created = new PromptTemplateEntity();
+        created.setId(fallbackId);
+        when(promptTemplateRepository.findByCodeAndTenantIdAndStatus(
+                eq("system_fallback"), eq(tenantId), eq(PromptStatus.ACTIVE))).thenReturn(Optional.empty());
+        when(promptTemplateRepository.findFirstByCodeAndTenantIdOrderByVersionDesc(
+                eq("system_fallback"), eq(tenantId))).thenReturn(Optional.empty());
+        when(promptTemplateRepository.save(any(PromptTemplateEntity.class))).thenReturn(created);
+
+        ChatSession session = new ChatSession();
+        UUID sessionId = UUID.randomUUID();
+        session.setId(sessionId);
+        session.setPromptTemplateId(fallbackId);
+        session.setTenantId(tenantId);
+        when(chatSessionService.create(eq(fallbackId), any(String.class), eq(tenantId), eq(userId)))
+                .thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
+
+        stubTenantConfig(openAiConfig());
+        stubCredential();
+        stubClient("resposta sem fallback no banco");
+        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), eq("Hello world")))
+                .thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(sessionId, tenantId)).thenReturn(List.of(messageWithContent()));
+
+        ChatResponse response = service.chat(request, tenantId, userId);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getMessage()).isEqualTo("resposta sem fallback no banco");
+        verify(promptTemplateService).findActiveByCode("system_fallback");
+        // Registro técnico tenant-scoped: satisfaz a FK, texto não blank, ACTIVE v1.
+        ArgumentCaptor<PromptTemplateEntity> captor = ArgumentCaptor.forClass(PromptTemplateEntity.class);
+        verify(promptTemplateRepository).save(captor.capture());
+        PromptTemplateEntity saved = captor.getValue();
+        assertThat(saved.getCode()).isEqualTo("system_fallback");
+        assertThat(saved.getTenantId()).isEqualTo(tenantId);
+        assertThat(saved.getStatus()).isEqualTo(PromptStatus.ACTIVE);
+        assertThat(saved.getVersion()).isEqualTo(1);
+        assertThat(saved.getTemplate()).isEqualTo(AssistantTurnGateway.PROMPT);
+        verify(chatSessionService).create(eq(fallbackId), any(String.class), eq(tenantId), eq(userId));
+    }
+
+    @Test
+    void when_chat_with_fallbackOnlyDraft_then_reusesAndActivatesItWithoutDuplicating() {
+        ChatRequest request = newRequest();
+        request.setPromptTemplateId(null);
+        when(promptTemplateService.findActiveByCode("system_fallback"))
+                .thenThrow(new PromptTemplateNotFoundException());
+
+        UUID existingId = UUID.randomUUID();
+        PromptTemplateEntity draft = new PromptTemplateEntity();
+        draft.setId(existingId);
+        draft.setTenantId(tenantId);
+        draft.setCode("system_fallback");
+        draft.setTemplate("texto histórico irrelevante");
+        draft.setVersion(1);
+        draft.setStatus(PromptStatus.DRAFT);
+        when(promptTemplateRepository.findByCodeAndTenantIdAndStatus(
+                eq("system_fallback"), eq(tenantId), eq(PromptStatus.ACTIVE))).thenReturn(Optional.empty());
+        when(promptTemplateRepository.findFirstByCodeAndTenantIdOrderByVersionDesc(
+                eq("system_fallback"), eq(tenantId))).thenReturn(Optional.of(draft));
+        when(promptTemplateRepository.save(any(PromptTemplateEntity.class)))
+                .thenAnswer(i -> i.getArgument(0));
+
+        ChatSession session = new ChatSession();
+        UUID sessionId = UUID.randomUUID();
+        session.setId(sessionId);
+        session.setPromptTemplateId(existingId);
+        session.setTenantId(tenantId);
+        when(chatSessionService.create(eq(existingId), any(String.class), eq(tenantId), eq(userId)))
+                .thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(openAiTemplate());
+
+        stubTenantConfig(openAiConfig());
+        stubCredential();
+        stubClient("resposta reaproveitando registro");
+        when(chatMessageService.save(eq(sessionId), eq(tenantId), eq(ChatRole.USER), eq("Hello world")))
+                .thenReturn(messageWithContent());
+        when(chatMessageService.findLast20(sessionId, tenantId)).thenReturn(List.of(messageWithContent()));
+
+        ChatResponse response = service.chat(request, tenantId, userId);
+
+        assertThat(response.getMessage()).isEqualTo("resposta reaproveitando registro");
+        ArgumentCaptor<PromptTemplateEntity> captor = ArgumentCaptor.forClass(PromptTemplateEntity.class);
+        verify(promptTemplateRepository).save(captor.capture());
+        assertThat(captor.getValue().getId()).isEqualTo(existingId);
+        assertThat(captor.getValue().getStatus()).isEqualTo(PromptStatus.ACTIVE);
+        // Texto antigo não-blank impediria o gateway de aplicar o default em código.
+        assertThat(captor.getValue().getTemplate()).isEqualTo(AssistantTurnGateway.PROMPT);
+        verify(chatSessionService).create(eq(existingId), any(String.class), eq(tenantId), eq(userId));
+    }
+
+    @Test
+    void when_chat_with_selectedPromptMissing_then_throwsForTheClientNotForTheFallback() {
+        ChatRequest request = newRequest();
+        UUID selected = UUID.randomUUID();
+        request.setPromptTemplateId(selected);
+
+        ChatSession session = new ChatSession();
+        UUID sessionId = UUID.randomUUID();
+        session.setId(sessionId);
+        session.setPromptTemplateId(selected);
+        when(chatSessionService.create(eq(selected), any(String.class), eq(tenantId), eq(userId)))
+                .thenReturn(session);
+        when(chatSessionService.resolvePromptTemplate(sessionId, tenantId, userId)).thenReturn(null);
 
         assertThatThrownBy(() -> service.chat(request, tenantId, userId))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("promptTemplateId");
+                .isInstanceOf(PromptTemplateNotFoundException.class);
 
-        // Não há prompt padrão: uma conversa sem template não é criada, não fica "para depois".
-        verify(chatSessionService, never()).create(any(), any(), any(), any());
+        // Prompt escolhido inexistente é erro do cliente; nada de fallback é tocado.
+        verify(promptTemplateService, never()).findActiveByCode(anyString());
+        verify(promptTemplateRepository, never()).save(any());
         verify(chatMessageService, never()).save(any(), any(), any(), any());
     }
 
@@ -671,6 +834,7 @@ class ChatServiceImplTest {
         };
         ChatServiceImpl service = new ChatServiceImpl(providerResolution, chatSessionService,
                 chatMessageService, chatAssistantTxService, chatRateLimiter, turnGateway,
+                promptTemplateService, promptTemplateRepository,
                 new TurnOutcomeMapper(failingTraces, discoveryService));
         stubClient("reply");
         when(chatMessageService.save(any(), any(), any(), any())).thenReturn(messageWithContent());

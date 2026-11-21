@@ -4,6 +4,7 @@ import br.com.systec.hive.history.api.domain.ChatMessage;
 import br.com.systec.hive.assistant.api.domain.ChatRequest;
 import br.com.systec.hive.assistant.api.domain.ChatResponse;
 import br.com.systec.hive.assistant.api.domain.ChatSession;
+import br.com.systec.hive.assistant.api.domain.PromptStatus;
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
 import br.com.systec.hive.assistant.api.domain.TurnPrompts;
 import br.com.systec.hive.ai.api.domain.TurnReply;
@@ -13,8 +14,11 @@ import br.com.systec.hive.ai.api.port.ChatTurnGateway;
 import br.com.systec.hive.history.api.service.ChatMessageService;
 import br.com.systec.hive.assistant.api.service.ChatService;
 import br.com.systec.hive.assistant.api.service.ChatSessionService;
+import br.com.systec.hive.assistant.api.service.PromptTemplateService;
 import br.com.systec.hive.history.api.util.ProviderMessages;
 import br.com.systec.hive.assistant.api.util.ProviderOverrideGuard;
+import br.com.systec.hive.assistant.impl.entity.PromptTemplateEntity;
+import br.com.systec.hive.assistant.impl.repository.PromptTemplateRepository;
 import br.com.systec.hive.assistant.impl.util.ChatTitleUtil;
 import br.com.systec.hive.assistant.impl.util.SecurityUtils;
 import br.com.systec.hive.commons.impl.security.TenantContext;
@@ -23,11 +27,13 @@ import br.com.systec.hive.provider.api.ChatRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -92,12 +98,17 @@ public class ChatServiceImpl implements ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatServiceImpl.class);
 
+    /** Seed V8: fallback por tenant quando o cliente não escolhe um template (ADR-020). */
+    private static final String FALLBACK_PROMPT_CODE = "system_fallback";
+
     private final ProviderResolution providerResolution;
     private final ChatSessionService chatSessionService;
     private final ChatMessageService chatMessageService;
     private final ChatAssistantTxService chatAssistantTxService;
     private final ChatRateLimiter chatRateLimiter;
     private final ChatTurnGateway turnGateway;
+    private final PromptTemplateService promptTemplateService;
+    private final PromptTemplateRepository promptTemplateRepository;
     private final TurnOutcomeMapper turnOutcomeMapper;
 
     @Autowired
@@ -107,6 +118,8 @@ public class ChatServiceImpl implements ChatService {
                            ChatAssistantTxService chatAssistantTxService,
                            ChatRateLimiter chatRateLimiter,
                            ChatTurnGateway turnGateway,
+                           PromptTemplateService promptTemplateService,
+                           PromptTemplateRepository promptTemplateRepository,
                            TurnOutcomeMapper turnOutcomeMapper) {
         this.providerResolution = providerResolution;
         this.chatSessionService = chatSessionService;
@@ -114,6 +127,8 @@ public class ChatServiceImpl implements ChatService {
         this.chatAssistantTxService = chatAssistantTxService;
         this.chatRateLimiter = chatRateLimiter;
         this.turnGateway = turnGateway;
+        this.promptTemplateService = promptTemplateService;
+        this.promptTemplateRepository = promptTemplateRepository;
         this.turnOutcomeMapper = turnOutcomeMapper;
     }
 
@@ -144,11 +159,25 @@ public class ChatServiceImpl implements ChatService {
         String effectiveModel;
 
         if (request.getSessionId() == null) {
-            // A new conversation has to arrive with the prompt it will be answered by. There is no
-            // default prompt and no template-less conversation: the client resolves the template
-            // before it opens the session, exactly as it used to resolve the default agent.
-            if (request.getPromptTemplateId() == null) {
-                throw new IllegalArgumentException("promptTemplateId is required");
+            // Cliente sem prompt escolhido não é bloqueado: a conversa usa o fallback ativo do
+            // tenant (seed V8/ADR-020). A resolução é tenant-scoped e acontece ANTES de criar a
+            // sessão — sem registro ativo, o registro técnico é garantido (nunca erro de fallback).
+            UUID effectivePromptTemplateId = request.getPromptTemplateId();
+            if (effectivePromptTemplateId == null) {
+                // ADR-020 (decisão humana 2026-11-21): o prompt default é código
+                // (AssistantTurnGateway.systemFor), não registro de banco. `system_fallback` existe
+                // só para a FK; ausência do seed V8 NÃO pode virar erro para o cliente.
+                try {
+                    PromptTemplate fallback = promptTemplateService.findActiveByCode(FALLBACK_PROMPT_CODE);
+                    if (fallback != null && fallback.getId() != null) {
+                        effectivePromptTemplateId = fallback.getId();
+                    }
+                } catch (PromptTemplateNotFoundException notSeeded) {
+                    log.info("chat fallback not seeded, ensuring technical record tenantId={}", tenantId);
+                }
+                if (effectivePromptTemplateId == null) {
+                    effectivePromptTemplateId = ensureFallbackPromptTemplateId(tenantId);
+                }
             }
             String title = ChatTitleUtil.truncate(request.getMessage(), 50);
 
@@ -159,14 +188,14 @@ public class ChatServiceImpl implements ChatService {
             effectiveModel = request.getModel();
             if (effectiveProvider != null || effectiveModel != null) {
                 ProviderOverrideGuard.validate(effectiveProvider, effectiveModel);
-                session = chatSessionService.create(request.getPromptTemplateId(), title, tenantId,
+                session = chatSessionService.create(effectivePromptTemplateId, title, tenantId,
                         userId, effectiveProvider, effectiveModel);
             } else {
-                session = chatSessionService.create(request.getPromptTemplateId(), title, tenantId, userId);
+                session = chatSessionService.create(effectivePromptTemplateId, title, tenantId, userId);
             }
             sessionId = session.getId();
             log.info("chat new session sessionId={} userId={} tenantId={} promptTemplateId={} provider={}",
-                    sessionId, userId, tenantId, request.getPromptTemplateId(), effectiveProvider);
+                    sessionId, userId, tenantId, effectivePromptTemplateId, effectiveProvider);
         } else {
             sessionId = request.getSessionId();
             session = chatSessionService.getSession(sessionId, tenantId, userId);
@@ -241,6 +270,54 @@ public class ChatServiceImpl implements ChatService {
             chatResponse.setTimestamp(Instant.now());
         }
         return chatResponse;
+    }
+
+    /**
+     * Garante o registro técnico `system_fallback` do tenant. Idempotente: reusa o ativo (V8),
+     * reativa um registro existente em outra versão/status, e só cria quando não há nenhum.
+     * O texto é `AssistantTurnGateway.PROMPT` (default em código do ADR-020) — o system efetivo
+     * vem do gateway (`systemFor`); aqui o valor apenas satisfaz a coluna `NOT NULL`.
+     */
+    private UUID ensureFallbackPromptTemplateId(UUID tenantId) {
+        Optional<PromptTemplateEntity> active = promptTemplateRepository
+                .findByCodeAndTenantIdAndStatus(FALLBACK_PROMPT_CODE, tenantId, PromptStatus.ACTIVE);
+        if (active.isPresent()) {
+            return active.get().getId();
+        }
+
+        Optional<PromptTemplateEntity> existing = promptTemplateRepository
+                .findFirstByCodeAndTenantIdOrderByVersionDesc(FALLBACK_PROMPT_CODE, tenantId);
+        if (existing.isPresent()) {
+            PromptTemplateEntity reuse = existing.get();
+            // Texto histórico pode ser não-blank; se ficar, o gateway não aplicaria o default
+            // em código. Registro técnico deve sempre carregar o texto padrão (ADR-020).
+            reuse.setTemplate(AssistantTurnGateway.PROMPT);
+            reuse.setStatus(PromptStatus.ACTIVE);
+            return saveFallbackTemplate(reuse);
+        }
+
+        PromptTemplateEntity created = new PromptTemplateEntity();
+        created.setTenantId(tenantId);
+        created.setCode(FALLBACK_PROMPT_CODE);
+        created.setName("Prompt de sistema (fallback)");
+        created.setTemplate(AssistantTurnGateway.PROMPT);
+        created.setVersion(1);
+        created.setStatus(PromptStatus.ACTIVE);
+        return saveFallbackTemplate(created);
+    }
+
+    /** Concorrência: a UNIQUE (tenant, code, version) decide; o perdedor re-lê o vencedor. */
+    private UUID saveFallbackTemplate(PromptTemplateEntity template) {
+        try {
+            return promptTemplateRepository.save(template).getId();
+        } catch (DataIntegrityViolationException concurrentInsert) {
+            return promptTemplateRepository.findByCodeAndTenantIdAndStatus(
+                            FALLBACK_PROMPT_CODE, template.getTenantId(), PromptStatus.ACTIVE)
+                    .or(() -> promptTemplateRepository.findFirstByCodeAndTenantIdOrderByVersionDesc(
+                            FALLBACK_PROMPT_CODE, template.getTenantId()))
+                    .map(PromptTemplateEntity::getId)
+                    .orElseThrow(() -> concurrentInsert);
+        }
     }
 
     private static long elapsedMs(long startedAt) {

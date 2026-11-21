@@ -123,9 +123,10 @@ function statusOf(error: unknown): number | undefined {
 }
 
 /**
- * Toda a lógica do Assistant vive aqui: prompt é escolhido antes do primeiro
- * turno e travado depois; a sessão responde pelo prompt a partir daí. Um seq
- * protege contra resposta atrasada trocar o prompt da conversa corrente.
+ * Toda a lógica do Assistant vive aqui: prompt é opcional no primeiro turno
+ * (backend aplica o fallback `system_fallback`) e, quando informado, fica travado
+ * na sessão; a sessão responde pelo prompt a partir daí. Um seq protege contra
+ * resposta atrasada trocar o prompt da conversa corrente.
  */
 export function useChatController(): {
   state: ChatControllerState
@@ -240,10 +241,6 @@ export function useChatController(): {
       patch({ notice: t("chat.composer.tooLong") })
       return
     }
-    if (!current.selectedPromptTemplateId) {
-      patch({ notice: t("chat.warn.selectPrompt") })
-      return
-    }
 
     const promptTemplateId = current.selectedPromptTemplateId
     const sessionId = current.sessionId
@@ -267,7 +264,9 @@ export function useChatController(): {
     })
 
     try {
-      const request: ChatRequestDTO = { promptTemplateId, message: text }
+      const request: ChatRequestDTO = { message: text }
+      // Prompt ausente: omitir a chave (não enviar undefined/null). Backend resolve o fallback.
+      if (promptTemplateId) request.promptTemplateId = promptTemplateId
       if (sessionId) request.sessionId = sessionId
       // Baseline: sessão aberta é autoritativa; nova conversa usa o default do tenant.
       const baseline = sessionId

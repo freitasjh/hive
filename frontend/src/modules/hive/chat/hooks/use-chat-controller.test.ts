@@ -89,7 +89,7 @@ describe('useChatController', () => {
     expect(mocks.promptList).toHaveBeenCalledWith(expect.objectContaining({ status: 'ACTIVE' }))
   })
 
-  it('bloqueia envio sem prompt selecionado — nenhuma chamada de rede', async () => {
+  it('envia sem prompt selecionado: request sem promptTemplateId e sem aviso de bloqueio', async () => {
     const { result } = renderHook(() => useChatController())
     await waitFor(() => expect(result.current.state.promptsLoading).toBe(false))
 
@@ -98,8 +98,12 @@ describe('useChatController', () => {
       await result.current.actions.send()
     })
 
-    expect(mocks.send).not.toHaveBeenCalled()
-    expect(result.current.state.notice).toMatch(/escolha um prompt/i)
+    expect(mocks.send).toHaveBeenCalledTimes(1)
+    const request = mocks.send.mock.calls[0][0] as Record<string, unknown>
+    expect(request).toMatchObject({ message: 'oi' })
+    expect(request).not.toHaveProperty('promptTemplateId')
+    expect(result.current.state.notice).toBeNull()
+    expect(result.current.state.sendError).toBeNull()
   })
 
   it('primeiro turno: sessão nasce da resposta e o prompt fica travado', async () => {
@@ -116,6 +120,7 @@ describe('useChatController', () => {
       promptTemplateId: P,
       message: 'primeira pergunta',
     }, null)
+    expect(mocks.send.mock.calls[0][0]).toHaveProperty('promptTemplateId', P)
     expect(result.current.state.sessionId).toBe(S)
     expect(result.current.state.messages.map((m) => m.content)).toEqual([
       'primeira pergunta',

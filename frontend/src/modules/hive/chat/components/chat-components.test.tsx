@@ -151,7 +151,7 @@ describe('ChatThread', () => {
         onRetry={vi.fn()}
       />
     )
-    expect(screen.getByText(/escolha um prompt e escreva sua pergunta/i)).toBeTruthy()
+    expect(screen.getByText(/escreva sua pergunta/i)).toBeTruthy()
     const first = screen.getAllByRole('button', { name: STARTER_PROMPTS[0] })[0] as HTMLButtonElement
     expect(first.disabled).toBe(true)
   })

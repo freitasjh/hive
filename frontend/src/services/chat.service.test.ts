@@ -37,8 +37,11 @@ describe('buildChatPayload — regra do primeiro turno', () => {
     expect(buildChatPayload({ promptTemplateId: FIRST, message: '   ' })).toBeNull()
   })
 
-  it('sem prompt no primeiro turno não gera payload', () => {
-    expect(buildChatPayload({ message: 'oi' })).toBeNull()
+  it('sem prompt no primeiro turno gera payload só com message (backend aplica fallback)', () => {
+    const payload = buildChatPayload({ message: 'oi' })
+    expect(payload).toEqual({ message: 'oi' })
+    expect(payload).not.toHaveProperty('promptTemplateId')
+    expect(payload).not.toHaveProperty('sessionId')
   })
 })
 
@@ -71,6 +74,19 @@ describe('chatService.sendMessage', () => {
     expect(JSON.stringify(init.body)).not.toContain('sessionId')
   })
 
+  it('POST /chat sem prompt no primeiro turno envia somente message (fallback no backend)', async () => {
+    fetchMock.mockResolvedValue(json(response))
+
+    const result = await chatService.sendMessage({ message: 'oi' })
+
+    expect(result).toEqual(response)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/hive/v1/chat')
+    expect(JSON.parse(init.body as string)).toEqual({ message: 'oi' })
+    expect(JSON.stringify(init.body)).not.toContain('promptTemplateId')
+  })
+
   it('turno seguinte envia somente sessionId + message', async () => {
     fetchMock.mockResolvedValue(json(response))
 
@@ -91,6 +107,12 @@ describe('chatService.sendMessage', () => {
   it('rejeita sem sair do cliente quando payload é inválido', async () => {
     await expect(chatService.sendMessage({ message: '  ' })).rejects.toThrow(/prompt|mensagem/i)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('mensagem vazia orienta sobre a mensagem, sem exigir prompt', async () => {
+    const error = await chatService.sendMessage({ message: '  ' }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toBe('Informe uma mensagem antes de enviar.')
   })
 
   it('preserva status 404 para a tela orientar sessão inexistente', async () => {
