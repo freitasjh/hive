@@ -1,5 +1,11 @@
 package br.com.systec.hive.publicapi.web.internal.v1.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import br.com.systec.hive.commons.api.tools.controller.RestPath;
 import br.com.systec.hive.commons.api.tools.security.HasPermission;
 import br.com.systec.hive.publicapi.api.exceptions.InvalidClientException;
@@ -14,8 +20,9 @@ import br.com.systec.hive.publicapi.api.exceptions.UnknownModelException;
 import br.com.systec.hive.commons.api.exceptions.BaseException;
 import br.com.systec.hive.publicapi.api.service.PublicChatService;
 import br.com.systec.hive.publicapi.api.dto.ChatCompletionRequestDTO;
+import br.com.systec.hive.publicapi.api.dto.ChatCompletionResponse;
 import br.com.systec.hive.publicapi.impl.quota.QuotaExceededException;
-import br.com.systec.hive.publicapi.web.internal.v1.error.OpenAiErrorResponse;
+import br.com.systec.hive.publicapi.api.dto.OpenAiError;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Tag(name = "Public Chat", description = "Chat completions compatível com OpenAI para clientes públicos")
 @RequestMapping(RestPath.V1 + "/public/v1/chat")
 public class PublicChatControllerV1 {
 
@@ -35,45 +43,58 @@ public class PublicChatControllerV1 {
         this.publicChatService = publicChatService;
     }
 
+    @Operation(summary = "Cria uma chat completion",
+            description = "Resposta com choices, usage e as extensões Hive prompt_code/metadata.hive. "
+                    + "O duplo /v1 do path é preservado por compatibilidade com SDKs OpenAI.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "chat.completion"),
+            @ApiResponse(responseCode = "400", description = "unknown_model | streaming_not_supported | system_role_not_allowed",
+                    content = @Content(schema = @Schema(implementation = OpenAiError.class))),
+            @ApiResponse(responseCode = "403", description = "prompt_not_in_allowlist"),
+            @ApiResponse(responseCode = "404", description = "prompt_not_found"),
+            @ApiResponse(responseCode = "409", description = "prompt_not_active | prompt_version_not_found"),
+            @ApiResponse(responseCode = "429", description = "quota_exceeded (Retry-After)"),
+            @ApiResponse(responseCode = "500", description = "internal_error")
+    })
     @PostMapping(value = "/completions", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @HasPermission("PUBLIC_CHAT_COMPLETE")
-    public ResponseEntity<Object> completions(@RequestBody @Valid ChatCompletionRequestDTO body) {
-        Object resp = publicChatService.complete(body);
+    public ResponseEntity<ChatCompletionResponse> completions(@RequestBody @Valid ChatCompletionRequestDTO body) {
+        ChatCompletionResponse resp = publicChatService.complete(body);
         return ResponseEntity.ok(resp);
     }
 
     @ExceptionHandler({PromptNotInAllowlistException.class})
-    public ResponseEntity<OpenAiErrorResponse> handleAllowlist(PromptNotInAllowlistException ex) {
+    public ResponseEntity<OpenAiError> handleAllowlist(PromptNotInAllowlistException ex) {
         return openAi(403, "prompt_not_in_allowlist", "permission_error");
     }
 
     @ExceptionHandler({PromptNotFoundException.class})
-    public ResponseEntity<OpenAiErrorResponse> handleNotFound(PromptNotFoundException ex) {
+    public ResponseEntity<OpenAiError> handleNotFound(PromptNotFoundException ex) {
         return openAi(404, "prompt_not_found", "invalid_request_error");
     }
 
     @ExceptionHandler({PromptNotActiveException.class})
-    public ResponseEntity<OpenAiErrorResponse> handleNotActive(PromptNotActiveException ex) {
+    public ResponseEntity<OpenAiError> handleNotActive(PromptNotActiveException ex) {
         return openAi(409, "prompt_not_active", "invalid_request_error");
     }
 
     @ExceptionHandler({PromptVersionNotFoundException.class})
-    public ResponseEntity<OpenAiErrorResponse> handleVersionNotFound(PromptVersionNotFoundException ex) {
+    public ResponseEntity<OpenAiError> handleVersionNotFound(PromptVersionNotFoundException ex) {
         return openAi(409, "prompt_version_not_found", "invalid_request_error");
     }
 
     @ExceptionHandler({UnknownModelException.class})
-    public ResponseEntity<OpenAiErrorResponse> handleUnknownModel(UnknownModelException ex) {
+    public ResponseEntity<OpenAiError> handleUnknownModel(UnknownModelException ex) {
         return openAi(400, "unknown_model", "invalid_request_error");
     }
 
     @ExceptionHandler({SystemRoleNotAllowedException.class})
-    public ResponseEntity<OpenAiErrorResponse> handleSystem(SystemRoleNotAllowedException ex) {
+    public ResponseEntity<OpenAiError> handleSystem(SystemRoleNotAllowedException ex) {
         return openAi(400, "system_role_not_allowed", "invalid_request_error");
     }
 
     @ExceptionHandler({IllegalArgumentException.class})
-    public ResponseEntity<OpenAiErrorResponse> handleIllegal(IllegalArgumentException ex) {
+    public ResponseEntity<OpenAiError> handleIllegal(IllegalArgumentException ex) {
         String msg = ex.getMessage();
         String code = "invalid_request";
         int status = 400;
@@ -86,32 +107,32 @@ public class PublicChatControllerV1 {
     @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
             org.springframework.web.bind.MethodArgumentNotValidException.class,
             org.springframework.web.HttpRequestMethodNotSupportedException.class})
-    public ResponseEntity<OpenAiErrorResponse> handleCatchAll(Exception ex) {
+    public ResponseEntity<OpenAiError> handleCatchAll(Exception ex) {
         return openAi(400, "invalid_request", "invalid_request_error");
     }
 
     @ExceptionHandler(QuotaExceededException.class)
-    public ResponseEntity<OpenAiErrorResponse> handleQuota(QuotaExceededException ex) {
+    public ResponseEntity<OpenAiError> handleQuota(QuotaExceededException ex) {
         return ResponseEntity.status(429)
                 .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
-                .body(new OpenAiErrorResponse(new OpenAiErrorResponse.Error("quota_exceeded", "invalid_request_error", null, "quota_exceeded")));
+                .body(new OpenAiError(new OpenAiError.Error("quota_exceeded", "invalid_request_error", null, "quota_exceeded")));
     }
 
     @ExceptionHandler(BaseException.class)
-    public ResponseEntity<OpenAiErrorResponse> handleBase(BaseException ex) {
+    public ResponseEntity<OpenAiError> handleBase(BaseException ex) {
         org.springframework.http.HttpStatus status = ex.getHttpStatus();
         int code = (status == null) ? 500 : status.value();
         String errCode = ex.getMessage() == null ? "error" : ex.getMessage();
-        return ResponseEntity.status(code).body(new OpenAiErrorResponse(new OpenAiErrorResponse.Error(errCode, "invalid_request_error", null, errCode)));
+        return ResponseEntity.status(code).body(new OpenAiError(new OpenAiError.Error(errCode, "invalid_request_error", null, errCode)));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<OpenAiErrorResponse> handleGeneric(Exception ex) {
+    public ResponseEntity<OpenAiError> handleGeneric(Exception ex) {
         return openAi(500, "internal_error", "server_error");
     }
 
-    private ResponseEntity<OpenAiErrorResponse> openAi(int status, String code, String type) {
-        OpenAiErrorResponse.Error err = new OpenAiErrorResponse.Error(code, type, null, code);
-        return ResponseEntity.status(status).body(new OpenAiErrorResponse(err));
+    private ResponseEntity<OpenAiError> openAi(int status, String code, String type) {
+        OpenAiError.Error err = new OpenAiError.Error(code, type, null, code);
+        return ResponseEntity.status(status).body(new OpenAiError(err));
     }
 }

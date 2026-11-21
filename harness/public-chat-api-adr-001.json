@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "demand": "public-chat-api-adr-001",
+  "agent": "qa-engineer",
+  "phase": "Testing",
+  "gitSha": "08f3a2ff2f52dcac04e4c45494d75d762698cdc8",
+  "commands": [
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 100000,
+      "stdoutHash": "c98a783d82363967d10666ddd08dd2df98c9d07e72fbe99d436d6ce79e917604"
+    },
+    {
+      "cmd": "mvn verify -pl integration-test (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 70000,
+      "stdoutHash": "8273d7c696c507fe16447b39a42129b19445440e45401b00721763e7e84f7950"
+    },
+    {
+      "cmd": "mvn install -DskipTests (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 29000,
+      "stdoutHash": "468083f15fc7014d12ac3afe97b11908ce73408f1f837f7e84422628bf337e33"
+    },
+    {
+      "cmd": "npm --prefix frontend run build",
+      "exitCode": 0,
+      "durationMs": 15000,
+      "stdoutHash": "fd4920d97bcca5d5e83fa5e0c2193c09a2d1dc4f320454c246d8f37bd5c9765c"
+    },
+    {
+      "cmd": "node --input-type=module -e \"import { runPrdChecks } from './.opencode/plugins/lib/prd-adr-pipeline/checks.mjs'; const r = runPrdChecks('.'); console.log(JSON.stringify(r,null,2)); process.exit(r.ok?0:1);\" (verificação inicial — 3 achados em public-chat-api)",
+      "exitCode": 1,
+      "durationMs": 200,
+      "stdoutHash": "e70d8ab6f664aa6a6e805926bceed74baeba5e95ef36fb6e5e5f8fe3dba8b607"
+    },
+    {
+      "cmd": "node --input-type=module -e \"import { runPrdChecks } from './.opencode/plugins/lib/prd-adr-pipeline/checks.mjs'; const r = runPrdChecks('.'); console.log(JSON.stringify(r,null,2)); process.exit(r.ok?0:1);\" (re-check final — só órfão fora de escopo)",
+      "exitCode": 1,
+      "durationMs": 200,
+      "stdoutHash": "eab81f73983246180e0f714bc57d6b0623ba7a9f34c0205f908bb9a7f0684944"
+    },
+    {
+      "cmd": "git diff --check",
+      "exitCode": 0,
+      "durationMs": 100,
+      "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 520, "failed": 0, "skipped": 0 },
+    "it": { "passed": 119, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 378, "failed": 0, "skipped": 0 }
+  },
+  "evaluation": {
+    "h1": {
+      "status": "PASS",
+      "detail": "suiteFull do harness.config.json (npm test) exit 0; 378 front + 520 backend; 0 falhas/erros/skips. Reexecução independente válida; sem mudança de código desde então."
+    },
+    "h2": {
+      "status": "PASS",
+      "detail": "zero falhas pre-existentes; surefire 66 relatorios somados: 520 testes, 0/0/0. Nenhum skip não autorizado."
+    },
+    "h3": {
+      "status": "N/A",
+      "detail": "sem UI nesta ADR; nenhuma mudança em riskPaths com superfície visual. chrome-devtools não acionado; screenshot/console/network não exigidos."
+    },
+    "h4": {
+      "status": "PASS",
+      "detail": "telas N/A; negócio = Decisão 6 (spec autenticada, 401 anônimo em /v3/**, swagger-resources, scalar) e Decisão 7 (sem handler 429 no token, 400 invalid_request sem Retry-After) confirmadas por IT; lógica = envelope de erro e duplo /v1 preservados; perf N/A."
+    },
+    "h5": {
+      "status": "PASS",
+      "detail": "portas 8080/5432/5433/6379 verificadas por lsof antes e depois, todas livres; nenhum pkill -f; brain_store gravado (verificação inicial + re-check); achados registrados."
+    },
+    "h6": {
+      "status": "PASS",
+      "detail": "VERDE. Suíte 0 falhas · front test+build 0 erros · backend build 0 erros · H3 N/A · code_review_status passed + veredito escopado da ADR-001 em workflow-state.json.code_reviews_by_adr.ADR-001 apontando CODE-REVIEW.md APPROVED 0/0/0/0 · brain_store + workflow-state registrados · portas livres · esteira PRD-01/ADR-01/ADR-02 sem achados em public-chat-api."
+    },
+    "esteira": {
+      "PRD-01": "PASS para public-chat-api — §5 convertido em tabela com 'Como medir' preenchida para RF1..RF7; §15 com <task> e <context> não vazios. runPrdChecks('.') global reporta apenas órfão pre-existente .spec/prd/chat-model-override/PROPOSAL.md, explicitamente fora de escopo por instrução do operador — não bloqueia.",
+      "ADR-01": "PASS — ADR-INDEX.md 1:1 com ADRs/<dir>/ sem órfãos",
+      "ADR-02": "PASS — sequência e branch conformes",
+      "artefatos": "1:1 ADR-INDEX x ADRs/ADR-001-contrato-openapi; TASKS.md linha 1 = <!-- scope: adr/ADR-001 -->; ADR.md com depende-de e Interface congelada; SPEC.md + TASKS.md presentes; VERIFY.md ausente (correto: só pós-merge); unit: adr com prd_version: 2"
+    },
+    "codeReview": {
+      "artifact": ".spec/prd/public-chat-api/CODE-REVIEW.md",
+      "veredito": "APPROVED — 0 🔴 · 0 🟠 · 0 🟡 · 0 🔵 · must_fix_before_done: []",
+      "reviewer_session": "ses_dffa34effffeZMrCoNwL2t4pqv",
+      "data": "2026-11-21",
+      "guardas": "1..7 todas ✅ (Decisão 7, Decisão 6, springdoc 3.2.0 + deepsearch, DTOs sem drift, duplicata removida, characterization/ITs, higiene)",
+      "estado": "code_reviews_by_adr.ADR-001 conferido por leitura e parse: status passed, approval APPROVED, 0/0/0/0, artifact aponta para o arquivo existente. git diff -- workflow-state.json mostra SOMENTE o bloco adicionado; current_phase, current_feature, code_review (escopo MFA), harness_status, gates, overrides e prompt_assumptions intactos."
+    },
+    "gateFuncional": {
+      "apiDocsBaseline": "GET /v3/api-docs autenticado -> 200; 27 paths, 46 schemas; /v1/public/auth/token e /v1/public/v1/chat/completions presentes; ChatCompletionRequestDTO, ChatCompletionResponse, OpenAiError presentes",
+      "canonicalPublicGroupPath": "GET /v3/api-docs/public -> 200 autenticado (2 paths, schemas ChatCompletionResponse/OpenAiError) e 401 anônimo",
+      "groupQueryAlias": "GET /v3/api-docs?group=public -> 200 exatamente 2 paths; 401 anônimo",
+      "erro": "envelope {message,type,param,code} com param:null serializado",
+      "duploV1": "preservado em /v1/public/v1/chat/completions e no documento gerado",
+      "decisao7": "nenhum @ExceptionHandler(QuotaExceededException) em PublicAuthControllerV1; cota no token -> 400 invalid_request sem Retry-After; 429 do chat intacto",
+      "decisao6": "spec autenticada na chain humana; 401 anônimo em /v3/api-docs, alias ?group=, path canônico, /swagger-resources/** e /scalar/**"
+    },
+    "bugs_identified": [
+      "FORA DE ESCOPO (não bloqueia): .spec/prd/chat-model-override/PROPOSAL.md é órfão pre-existente, sem PRD.md. Único motivo do ok:false global do runPrdChecks; instrução do operador para não bloquear.",
+      "Operacional: mvn verify -pl integration-test falha se executado na raiz (reactor sem módulo integration-test); usar cwd backend/.",
+      "Operacional: mvn install -DskipTests regenera .flattened-pom.xml rastreados; implementador deve reverter artefatos gerados antes do commit (neste ciclo o QA restaurou o estado pré-verificação).",
+      "Informativo: brain note de implementação registra 26 paths no baseline; medição atual após alterações é 27."
+    ],
+    "confirmacoes": {
+      "zeroDiff": "Mfa*/identity Mfa*/ .flattened-pom.xml intactos; git diff --check limpo. workflow-state.json agora difere apenas pelo bloco code_reviews_by_adr.ADR-001.",
+      "semCommit": "branch adr/public-chat-api/01-contrato-openapi, árvore sem commit; nenhum commit ou merge realizado",
+      "escopoEscrita": "somente este arquivo de evidência e notas no Brain; nenhum código-fonte alterado",
+      "suiteReexecucao": "não reexecutada — sem mudança de código desde a verificação independente original (898 testes + 119 ITs + builds limpos)"
+    }
+  },
+  "brainStore": [
+    "arquitetura/projetos/arquitetura/projetos/hive/public-chat-api-adr-001-qa-verificacao-2026-11-21",
+    "arquitetura/projetos/arquitetura/projetos/hive/public-chat-api-adr-001-qa-recheck-governanca-2026-11-21"
+  ],
+  "cleanup": {
+    "ports": ["8080", "5432", "5433", "6379"],
+    "portsStatus": "todas livres após a execução",
+    "killedProcesses": [],
+    "generatedArtifactsRestored": "26+ .flattened-pom.xml gerados por mvn install foram restaurados ao estado pré-verificação (10 rastreados via git checkout, 16 untracked via rm); nenhum fonte tocado"
+  },
+  "selfReported": false
+}

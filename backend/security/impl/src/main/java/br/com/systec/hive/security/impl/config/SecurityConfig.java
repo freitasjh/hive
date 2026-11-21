@@ -76,11 +76,8 @@ public class SecurityConfig {
                         .requestMatchers("/v1/public/**").denyAll()
                         .requestMatchers(
                                 "/**.html",
-                                "/v3/**",
                                 "/webjars/**",
                                 "/configuration/**",
-                                "/swagger-resources/**",
-                                "/scalar/**",
                                 "/actuator/**",
                                 "/manager/**",
                                 "/notification/**"
