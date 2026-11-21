@@ -26,7 +26,7 @@ A superfície pública do assistant já funciona, mas cresceu por camadas: contr
 
 ## 3. Contexto e estado atual
 
-Ver `EXPLORATION.md` §2 e `ARCHITECTURE.md` §1. Fatos verificados no código em 2026-11-21: `PublicChatServiceImpl.java:135` usa `checkClient(clientId, 60)`; `RedisQuotaGuard.java:114-116` já expõe `checkTenant`, sem chamador de produção; `PublicAuthControllerV1.java:81` usa `checkTokenEndpoint(rlClient, ip, 30, 120, 30)`; `V1__public_api_client.sql:28-31` fixa `client_id` globalmente único, `UNIQUE(tenant_id,label)` e `CHECK(rate_limit_per_minute >= 1)`; `PublicClientTokenIssuer.java:111-129` monta `plim = {m,c,t}` — **não existe chave `r` hoje**; `dependencies/pom.xml:33,126-128` declara springdoc `2.8.14`.
+Ver `EXPLORATION.md` §2 e `ARCHITECTURE.md` §1. Fatos verificados no código em 2026-11-21: `PublicChatServiceImpl.java:135` usa `checkClient(clientId, 60)`; `RedisQuotaGuard.java:114-116` já expõe `checkTenant`, sem chamador de produção; `PublicAuthControllerV1.java:81` usa `checkTokenEndpoint(rlClient, ip, 30, 120, 30)`; `V1__public_api_client.sql:28-31` fixa `client_id` globalmente único, `UNIQUE(tenant_id,label)` e `CHECK(rate_limit_per_minute >= 1)`; `PublicClientTokenIssuer.java:111-129` monta `plim = {m,c,t}` — **não existe chave `r` hoje**; `dependencies/pom.xml:33,126-128` declarava springdoc `2.8.14`; o upgrade para `3.2.0` foi concluído e medido na ADR-001 (commit `5177af7`, merge `d0d3890`).
 
 ## 4. Stakeholders
 
@@ -60,7 +60,7 @@ Operador (aprovação de §16 e das premissas de cota); times de backend e front
 
 > ❓ Validação: premissas de `client_id`, tenant e cota confirmadas pelo operador em 2026-11-21.
 
-PICCO confirmado em 2026-11-21 (`CONSTRAINTS.md` §1): somente `.md` nesta fase; escrita em `.spec/prd/**`; não tocar MFA nem `workflow-state.json`; teto de 5 ADRs; toda recomendação de lib/versão exige URL + data. Premissas do operador (`CONSTRAINTS.md` §7): `client_id` globalmente único, tenant vem da linha, um tenant pode ter N clients; limite por tenant compartilhado, 100 req/min; origem em migration em `publicapi_db`; crédito fora; token endpoint mantém 30/120/30 separados.
+PICCO confirmado em 2026-11-21 (`CONSTRAINTS.md` §1): somente `.md` **na fase de estudo**; escrita em `.spec/prd/**`; não tocar MFA nem `workflow-state.json`; teto de 5 ADRs; toda recomendação de lib/versão exige URL + data. Marco histórico: a implementação da ADR-001 foi executada depois, por `backend-engineer` sob autorização do operador, dentro das regras da esteira. Premissas do operador (`CONSTRAINTS.md` §7): `client_id` globalmente único, tenant vem da linha, um tenant pode ter N clients; limite por tenant compartilhado, 100 req/min; origem em migration em `publicapi_db`; crédito fora; token endpoint mantém 30/120/30 separados.
 
 ## 8. Alternativas consideradas
 
@@ -83,12 +83,12 @@ Resumo em `DESIGN-DECISIONS.md`; comparativo com fontes e recomendação em `RES
 
 | Risco | Mitigação |
 |---|---|
-| springdoc 2.8.14 fora da matriz gera spec vazia | upgrade para 3.2.0 na primeira tarefa do ADR 1 + gate de spec antes de anotar |
+| springdoc 2.8.14 fora da matriz gera spec vazia — **RESOLVIDO na ADR-001** | upgrade para 3.2.0 aplicado; gate medido com 27 paths e 46 schemas; evidência em `ADRs/ADR-001-contrato-openapi/VERIFY.md` |
 | Staleness do limite no JWT (TTL ≤ 3600 s) | aceito; estratégia de propagação por reemissão/revogação documentada na UI |
 | Coluna genérica de cota trava crédito futuro | nome explícito `chat_requests_per_minute` na tabela de tenant |
 | Aumento de latência por leitura de DB por turno | rejeitada; limite via claim |
 | K12 (custo de ocupação) não resolvido | registrado como débito de produto |
-| Mudança de exposição da spec quebre Scalar | teste de `/v3/**` + `/scalar/**` na chain humana no ADR 1 |
+| Mudança de exposição da spec quebre Scalar — **RESOLVIDO na ADR-001** | 401 anônimo e 200 com sessão humana testados em `/v3/**`, `/swagger-resources/**` e `/scalar/**` |
 
 ## 11. Impacto em módulos e dados
 
@@ -100,11 +100,11 @@ Ver `ARCHITECTURE.md` §5 e `CONSTRAINTS.md` §6. Portão de conclusão H6: suí
 
 ## 13. Sequenciamento
 
-Pré-condição springdoc → ADR 1 (contrato/OpenAPI) → ADR 2 (conversão/trace) → ADR 3 (UI admin) → ADR 4 (cota) → ADR 5 (fronteira de módulos, adiável). Teto de 5 ADRs respeitado.
+Pré-condição springdoc → ADR 1 (contrato/OpenAPI) — **concluída: `merged`, PR #4, `d0d3890`, `VERIFY.md`** → ADR 2 (conversão/trace) → ADR 3 (UI admin) → ADR 4 (cota) → ADR 5 (fronteira de módulos, adiável). Teto de 5 ADRs respeitado.
 
 ## 14. Débitos registrados (fora do PRD)
 
-K12, SEC-02, gate externo ERP, `application-dev.properties` sujo, crédito, Ai Services/`ChatMemoryStore`. Ver `ADR-INDEX.md` §"Fora deste PRD".
+K12, SEC-02, gate externo ERP, `application-dev.properties` sujo, crédito, Ai Services/`ChatMemoryStore`. Bugfix do `429` com `Retry-After` no token endpoint (Decisão 7 da ADR-001) — comportamento real é 400 `invalid_request`; correção destinada à ADR-004, não mesclada neste ciclo. Ver `ADR-INDEX.md` §"Fora deste PRD".
 
 ## 15. Fontes consultadas
 
@@ -131,4 +131,6 @@ Veredito: APROVADO
 - [X] Premissas de cota confirmadas (tenant compartilhado, 100 req/min, crédito fora)
 - [X] `prd_version: 2` — toda linha `in-progress`/`merged` exige `unit: adr` (`SPEC.md` + `TASKS.md`; `VERIFY.md` após merge), conforme `.agents/rules/prd-adr-pipeline.md:28-33`.
 
-**Trava levantada:** campos marcados pelo operador em 2026-11-21; `prd_version: 2`. Próximo passo: converter `ADR-INDEX.md` em índice canônico (colunas `order`, `id`, `title`, `status`, `depends_on`, `dir`, `branch`, `merge`, `unit`) e abrir o branch do ADR 1. Com `unit: adr`, linhas `in-progress`/`merged` exigem `SPEC.md` + `TASKS.md` (e `VERIFY.md` após merge) — `.agents/rules/prd-adr-pipeline.md:28-33`.
+**Trava levantada:** campos marcados pelo operador em 2026-11-21; `prd_version: 2`. Com `unit: adr`, linhas `in-progress`/`merged` exigem `SPEC.md` + `TASKS.md` (e `VERIFY.md` após merge) — `.agents/rules/prd-adr-pipeline.md:28-33`.
+
+**Marcos concluídos (2026-11-21):** índice convertido ao formato canônico; ADR-001 aberta, implementada, revisada e mesclada (PR #4, merge `d0d3890`); `VERIFY.md` publicado em `5658264`. Próximo: ADR-002.
