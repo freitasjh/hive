@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "demand": "public-chat-api-adr-002",
+  "agent": "qa-engineer",
+  "phase": "Testing",
+  "gitSha": "bd77b6e0f9f724d33b85a5e16b0ccf7f943e014d",
+  "commands": [
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 68000,
+      "stdoutHash": "5539b4e5ee1ee1b37c4d8b5a757d0965a3d122947c62517d59dfbaf9d8526eeb"
+    },
+    {
+      "cmd": "mvn verify -pl integration-test (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 63000,
+      "stdoutHash": "3e986d1956a72e0e81e68ada2b3788e3548ae6196c9eda792d77661eab11ba52"
+    },
+    {
+      "cmd": "mvn install -DskipTests (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 24000,
+      "stdoutHash": "96e5691c6ba0ae6aab179654493d73f28d7cda8539bb762efe93aa84e75c910e"
+    },
+    {
+      "cmd": "npm --prefix frontend run build",
+      "exitCode": 0,
+      "durationMs": 14000,
+      "stdoutHash": "db2afa9f13801a4471d7eddf755aedc587983854645f6966f3bc78b43715c79b"
+    },
+    {
+      "cmd": "node --input-type=module -e \"import { runPrdChecks } from './.opencode/plugins/lib/prd-adr-pipeline/checks.mjs'; console.log(JSON.stringify(runPrdChecks('.'),null,2));\"",
+      "exitCode": 0,
+      "durationMs": 200,
+      "stdoutHash": "eab81f73983246180e0f714bc57d6b0623ba7a9f34c0205f908bb9a7f0684944"
+    },
+    {
+      "cmd": "git diff --check",
+      "exitCode": 0,
+      "durationMs": 100,
+      "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 522, "failed": 0, "skipped": 0 },
+    "it": { "passed": 119, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 378, "failed": 0, "skipped": 0 }
+  },
+  "evaluation": {
+    "h1": {
+      "status": "PASS",
+      "detail": "suiteFull do harness.config.json (npm test) reexecutada: exit 0; front 378/378, backend 522/522 (era 520, +2 testes), 0 falhas/erros/skips."
+    },
+    "h2": {
+      "status": "PASS",
+      "detail": "zero falhas pre-existentes; surefire 66 relatorios somados: 522 testes, 0/0/0. Nenhum skip nao autorizado."
+    },
+    "h3": {
+      "status": "N/A",
+      "detail": "sem UI nesta ADR; namespace browser nao existe e nao foi usado; nenhuma mudanca em riskPaths visuais. chrome-devtools nao acionado."
+    },
+    "h4": {
+      "status": "PASS",
+      "detail": "negocio = K6/K11 e telemetria: ChatCallerParityIT 1/1 afirma ordem System/User/Ai/User e tokens 120/340/460/STOP nos dois chamadores; trace publica com turnId/clientId reais, humana null/null. logica = TurnOutcomeMapper.resolve propaga ids em EMPTY_RESPONSE/FAILED/ANSWERED; gateway, TurnRequest, TurnReply, history/api e poms reais sem diff; nenhum new SystemMessage/UserMessage/AiMessage nos chamadores. ADR-001 intacta (OpenApiSpecIT 9/9, PublicApiErrorContractIT 3/3, PublicAuthQuotaContractIT 2/2). perf N/A."
+    },
+    "h5": {
+      "status": "PASS",
+      "detail": "portas 8080/5432/5433/6379 verificadas por lsof antes e depois, todas livres; nenhum pkill -f; brain_store gravado; 26 flattened poms gerados pelas execucoes restaurados ao estado pre-verificacao."
+    },
+    "h6": {
+      "status": "PASS",
+      "detail": "VERDE. Suite 0 falhas · front test+build 0 erros · backend build 0 erros · H3 N/A · code_reviews_by_adr.ADR-002 APPROVED 0/0/0/0 com artefato CODE-REVIEW.md persistido · brain_store + workflow-state · portas livres · esteira ADR-01/ADR-02 PASS e PRD-01 sem achados em public-chat-api."
+    },
+    "esteira": {
+      "PRD-01": "PASS para public-chat-api. runPrdChecks('.') global reporta apenas o orfao pre-existente .spec/prd/chat-model-override/PROPOSAL.md (sem PRD.md) — fora de escopo, nao bloqueia (precedente ADR-001).",
+      "ADR-01": "PASS — ADR-INDEX.md 1:1 com ADRs/<dir>/ sem orfaos",
+      "ADR-02": "PASS — sequencia e branch conformes",
+      "artefatos": "ADR-INDEX linha 2: order 2 sem pulo, ADR-001 merged (d0d3890 · PR #4), depends_on ADR-001, unit adr, branch adr/public-chat-api/02-centralizacao-chat; 1:1 com ADRs/ADR-002-centralizacao-chat/; TASKS.md linha 1 = <!-- scope: adr/ADR-002 -->; ADR.md com depende-de e Interface congelada; SPEC.md + TASKS.md presentes; VERIFY.md AUSENTE (correto: so pos-merge)."
+    },
+    "codeReview": {
+      "artifact": ".spec/prd/public-chat-api/ADRs/ADR-002-centralizacao-chat/CODE-REVIEW.md",
+      "veredito": "APPROVED — 0 🔴 · 0 🟠 · 0 🟡 · 0 🔵 · must_fix_before_done: []",
+      "reviewer_session": "ses_dffa34effffeZMrCoNwL2t4pqv",
+      "data": "2026-11-22",
+      "estado": "workflow-state.json.code_reviews_by_adr.ADR-002 conferido: status passed, approval APPROVED, 0/0/0/0, artifact existente. git diff -- workflow-state.json mostra SOMENTE o bloco ADR-002 adicionado ao lado do bloco ADR-001; current_phase, current_feature, code_review (MFA), harness_status, gates, overrides e prompt_assumptions intactos."
+    },
+    "gatesFuncionais": {
+      "paridade": "ChatCallerParityIT 1/1: prompt de 4 mensagens System/User/Ai/User identico nos dois chamadores; promptTokens=120, completionTokens=340, totalTokens=460, finishReason=STOP em ambos",
+      "trace": "humano turnId=null e clientId=null; publico turnId nao nulo e clientId = cliente autenticado; mapper preenche os ids tambem nos ramos EMPTY_RESPONSE e FAILED",
+      "semDiff": "ChatTurnGateway/TurnRequest/TurnReply, history/api (ProviderMessages.java), poms reais, Mfa*/identity Mfa*, .flattened-pom.xml (restaurados)",
+      "adr001": "envelope {message,type,param,code} com param:null, duplo /v1, model/stream/role:system e Decisao 7 (nenhum handler 429 no token) preservados",
+      "higieneTestes": "nenhum teste apagado ou @Disabled nos arquivos tocados; zero new SystemMessage/UserMessage/AiMessage em ChatServiceImpl e PublicChatServiceImpl"
+    },
+    "bugs_identified": [
+      "FORA DE ESCOPO (nao bloqueia): .spec/prd/chat-model-override/PROPOSAL.md e orfao pre-existente, sem PRD.md. Unico motivo do ok:false global do runPrdChecks.",
+      "Operacional: mvn -pl integration-test e mvn install exigem cwd backend/; na raiz o reactor nao encontra o modulo.",
+      "Operacional: mvn install regenera .flattened-pom.xml rastreados; restaurados ao estado pre-verificacao (10 tracked + 16 untracked).",
+      "Informativo: CODE-REVIEW guarda 5 registra zero diff em workflow-state.json no momento do review; apos a governanca o arquivo passou a conter o bloco code_reviews_by_adr.ADR-002 — mudanca esperada, nao regressao."
+    ],
+    "confirmacoes": {
+      "semCommit": "branch adr/public-chat-api/02-centralizacao-chat, HEAD bd77b6e (commit de abertura), arvore sem commit de implementacao; nenhum commit, merge ou checkout realizado",
+      "escopoEscrita": "somente este arquivo de evidencia e nota no Brain; nenhum codigo-fonte alterado",
+      "zeroDiffEsperado": "6 arquivos de codigo da ADR-002 + workflow-state.json (bloco ADR-002) + CODE-REVIEW.md; nenhum outro arquivo tocado no estado final"
+    }
+  },
+  "brainStore": [
+    "arquitetura/projetos/arquitetura/projetos/hive/public-chat-api-adr-002-qa-verificacao-2026-11-22"
+  ],
+  "cleanup": {
+    "ports": ["8080", "5432", "5433", "6379"],
+    "portsStatus": "todas livres apos a execucao",
+    "killedProcesses": [],
+    "generatedArtifactsRestored": "26 .flattened-pom.xml regenerados por mvn test/verify/install foram restaurados ao estado pre-verificacao (10 rastreados via git checkout, 16 untracked via rm); nenhum fonte tocado"
+  },
+  "selfReported": false
+}

@@ -68,6 +68,22 @@ class ProviderMessagesTest {
                 .isEqualTo("unica com texto");
     }
 
+    /**
+     * ADR-002/CZ02: regra congelada — o conversor descarta somente conteúdo nulo nas duas colunas.
+     * Conteúdo {@code blank} NÃO é descartado aqui: o caminho público já rejeita branco a montante.
+     */
+    @Test
+    void when_conteudoBlank_entao_nao_e_descartado_peloConversor() {
+        List<dev.langchain4j.data.message.ChatMessage> result =
+                ProviderMessages.toProviderMessages(List.of(
+                        message(ChatRole.USER, "   ", null),
+                        message(ChatRole.USER, "pergunta", null)));
+
+        assertThat(result).hasSize(2);
+        assertThat(((dev.langchain4j.data.message.UserMessage) result.get(0)).singleText()).isEqualTo("   ");
+        assertThat(((dev.langchain4j.data.message.UserMessage) result.get(1)).singleText()).isEqualTo("pergunta");
+    }
+
     @Test
     void when_converte_historico_com_tres_papeis_entao_ordem_de_entrada_e_preservada() {
         List<dev.langchain4j.data.message.ChatMessage> result =

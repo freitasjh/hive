@@ -64,7 +64,7 @@ class TurnOutcomeMapperTest {
         TurnReply reply = TurnReply.emptyResponse(2, 42, null, null, null, "LENGTH");
 
         assertThatThrownBy(() -> mapper.resolve(sessionId, tenantId, promptTemplateId,
-                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 12L))
+                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 12L, null, null))
                 .isInstanceOf(ModelReturnedEmptyException.class)
                 .hasMessageContaining("gpt-4o-mini");
 
@@ -81,7 +81,7 @@ class TurnOutcomeMapperTest {
         TurnReply reply = TurnReply.failed(2, 42, alreadyClassified);
 
         assertThatThrownBy(() -> mapper.resolve(sessionId, tenantId, promptTemplateId,
-                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 12L))
+                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 12L, null, null))
                 .isSameAs(alreadyClassified);
 
         verifyNoInteractions(traceRecorder);
@@ -99,7 +99,7 @@ class TurnOutcomeMapperTest {
                 new dev.langchain4j.exception.ModelNotFoundException("model_not_found: mimo-v2.5"));
 
         assertThatThrownBy(() -> mapper.resolve(sessionId, tenantId, promptTemplateId,
-                AiProvider.OPENCODE_GO, "mimo-v2.5", template(), history(), reply, 900L))
+                AiProvider.OPENCODE_GO, "mimo-v2.5", template(), history(), reply, 900L, null, null))
                 .isInstanceOf(ModelUnavailableException.class)
                 .hasMessageContaining("mimo-v2.5")
                 .hasMessageContaining("OPENCODE_GO");
@@ -119,7 +119,7 @@ class TurnOutcomeMapperTest {
                 "<!DOCTYPE html><html><body>opencode.ai</body></html>"));
 
         assertThatThrownBy(() -> mapper.resolve(sessionId, tenantId, promptTemplateId,
-                AiProvider.OPENCODE_GO, "mimo-v2.5", template(), history(), reply, 5L))
+                AiProvider.OPENCODE_GO, "mimo-v2.5", template(), history(), reply, 5L, null, null))
                 .isInstanceOf(ProviderException.class)
                 .isNotInstanceOf(ModelUnavailableException.class);
 
@@ -134,7 +134,7 @@ class TurnOutcomeMapperTest {
         TurnReply reply = TurnReply.failed(2, 42, failure);
 
         assertThatThrownBy(() -> mapper.resolve(sessionId, tenantId, promptTemplateId,
-                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 7L))
+                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 7L, null, null))
                 .isInstanceOf(ProviderException.class)
                 .getCause().isSameAs(failure);
 
@@ -148,14 +148,37 @@ class TurnOutcomeMapperTest {
         TurnReply reply = TurnReply.answered("assistant reply", 2, 42, 120, 340, 460, "STOP");
 
         assertThatCode(() -> mapper.resolve(sessionId, tenantId, promptTemplateId,
-                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 11L)).doesNotThrowAnyException();
+                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 11L, null, null)).doesNotThrowAnyException();
 
         ChatTrace trace = recordedTrace();
+        // ADR-002/CZ04: humano passa null/null explicitamente.
+        assertThat(trace.turnId()).isNull();
+        assertThat(trace.clientId()).isNull();
         assertThat(trace.failure()).isNull();
         assertThat(trace.promptChars()).isEqualTo(42);
         assertThat(trace.promptMessages()).isEqualTo(2);
         assertThat(trace.elapsedMs()).isEqualTo(11L);
         verify(discoveryService, never()).evict(any());
+    }
+
+    @Test
+    void when_publicTurnIdsAreProvided_then_traceCarriesBothWithoutTouchingTheGateway() {
+        TurnOutcomeMapper mapper = new TurnOutcomeMapper(traceRecorder, discoveryService);
+        TurnReply reply = TurnReply.answered("resposta publica", 2, 42, 120, 340, 460, "STOP");
+        UUID turnId = UUID.randomUUID();
+        String clientId = "public-client";
+
+        assertThatCode(() -> mapper.resolve(null, tenantId, promptTemplateId, AiProvider.OPENAI,
+                "gpt-4o-mini", template(), List.of(), reply, 13L, turnId, clientId))
+                .doesNotThrowAnyException();
+
+        ChatTrace trace = recordedTrace();
+        assertThat(trace.turnId()).isEqualTo(turnId);
+        assertThat(trace.clientId()).isEqualTo(clientId);
+        assertThat(trace.promptTokens()).isEqualTo(120);
+        assertThat(trace.completionTokens()).isEqualTo(340);
+        assertThat(trace.totalTokens()).isEqualTo(460);
+        assertThat(trace.finishReason()).isEqualTo("STOP");
     }
 
     /**
@@ -171,7 +194,7 @@ class TurnOutcomeMapperTest {
         when(reply.status()).thenReturn(null);
 
         assertThatThrownBy(() -> mapper.resolve(sessionId, tenantId, promptTemplateId,
-                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 0L))
+                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 0L, null, null))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("unreachable turn status");
     }
@@ -188,7 +211,7 @@ class TurnOutcomeMapperTest {
         TurnReply reply = TurnReply.answered("resposta", 2, 42, null, null, null, null);
 
         assertThatCode(() -> mapper.resolve(sessionId, tenantId, promptTemplateId,
-                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 1L)).doesNotThrowAnyException();
+                AiProvider.OPENAI, "gpt-4o-mini", template(), history(), reply, 1L, null, null)).doesNotThrowAnyException();
     }
 
     private PromptTemplate template() {

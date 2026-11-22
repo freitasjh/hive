@@ -178,8 +178,9 @@ public class PublicChatServiceImpl implements PublicChatService {
         long elapsed = (System.nanoTime() - started) / 1_000_000L;
 
         // outcome mapping (throws on failure/empty)
+        // ADR-002/K6: turno e cliente autenticado entram na trace (sessionId não existe no caminho público).
         turnOutcomeMapper.resolve(null, tenantId, prompt.getId(), resolved.provider(),
-                resolved.model(), prompt, List.of(), reply, elapsed);
+                resolved.model(), prompt, List.of(), reply, elapsed, turnId, clientId);
 
         String text = reply.text();
         String fingerprint = "sha256:" + sha256(prompt.getTemplate() == null ? "" : prompt.getTemplate());
