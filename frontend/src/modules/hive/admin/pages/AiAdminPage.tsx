@@ -7,12 +7,13 @@ import { AtlasAdminTemplate } from "@/layouts"
 import { CredentialsContainer } from "../credentials/CredentialsContainer"
 import { useAdminI18n, type AdminMessageKey } from "../i18n"
 import { LlmConfigContainer } from "../llm/LlmConfigContainer"
+import { PublicClientsContainer } from "../public-clients/PublicClientsContainer"
 
 export interface AdminPageProps {
   onSelectView?: (view: DashboardViewId) => void
 }
 
-type AiTab = "credentials" | "models"
+type AiTab = "credentials" | "models" | "public-clients"
 
 export interface AiAdminPageProps extends AdminPageProps {
   /** Aba controlada pela URL. */
@@ -25,6 +26,7 @@ export interface AiAdminPageProps extends AdminPageProps {
 const TAB_KEY: Record<AiTab, AdminMessageKey> = {
   credentials: "admin.tab.credentials",
   models: "admin.tab.models",
+  "public-clients": "admin.tab.publicClients",
 }
 
 /** Abriga credenciais + configuração de credencial/modelo do tenant da view providers. */
@@ -36,10 +38,12 @@ export function AiAdminPage({
 }: AiAdminPageProps) {
   const { t } = useAdminI18n()
   const activeTab: AiTab = tab ?? initialTab ?? "credentials"
-  // A aba models é Config LLM: título vem da aba, não de uma view "agents" separada.
+  // Abas com domínio próprio definem seu título; 'credentials' mantém o legado.
   const title = activeTab === "models"
     ? t("admin.tab.models")
-    : t("admin.credentials.title")
+    : activeTab === "public-clients"
+      ? t("admin.publicClients.title")
+      : t("admin.credentials.title")
 
   useEffect(() => {
     document.title = t("admin.document.title", {
@@ -62,12 +66,16 @@ export function AiAdminPage({
           <TabsList>
             <TabsTrigger value="credentials">{t("admin.tab.credentials")}</TabsTrigger>
             <TabsTrigger value="models">{t("admin.tab.models")}</TabsTrigger>
+            <TabsTrigger value="public-clients">{t("admin.tab.publicClients")}</TabsTrigger>
           </TabsList>
           <TabsContent value="credentials">
             <CredentialsContainer />
           </TabsContent>
           <TabsContent value="models">
             <LlmConfigContainer />
+          </TabsContent>
+          <TabsContent value="public-clients">
+            <PublicClientsContainer />
           </TabsContent>
         </Tabs>
       </div>

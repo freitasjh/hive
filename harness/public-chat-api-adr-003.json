@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "demand": "public-chat-api-adr-003",
+  "agent": "qa-engineer",
+  "phase": "Testing",
+  "gitSha": "217e919a9b1925f037fc01c233b7d9cabb4f3025",
+  "commands": [
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 88000,
+      "stdoutHash": "81557021d8f6cae48090476a7e2c7f9f3a8677a9e6a5289f6d2a57c742c3a9c6"
+    },
+    {
+      "cmd": "mvn verify -pl integration-test (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 82000,
+      "stdoutHash": "c8b252768cedaca1703aef82eb2b11bd66b4dc90eca7da04d29498846e3516c0"
+    },
+    {
+      "cmd": "npm --prefix frontend run build",
+      "exitCode": 0,
+      "durationMs": 13000,
+      "stdoutHash": "e952508fd198e6f84d98f95096db508c3c6658b01f2c910f249c8665eb85a957"
+    },
+    {
+      "cmd": "mvn install -DskipTests (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 26000,
+      "stdoutHash": "1a9f7d68ef026d5a0063f9c12d739a381b6e8caecf034ccb15633645cbe8ce60"
+    },
+    {
+      "cmd": "node --input-type=module -e \"import { runPrdChecks } from './.opencode/plugins/lib/prd-adr-pipeline/checks.mjs'; console.log(JSON.stringify(runPrdChecks('.'),null,2));\"",
+      "exitCode": 0,
+      "durationMs": 200,
+      "stdoutHash": "eab81f73983246180e0f714bc57d6b0623ba7a9f34c0205f908bb9a7f0684944"
+    },
+    {
+      "cmd": "git diff --check",
+      "exitCode": 0,
+      "durationMs": 100,
+      "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 523, "failed": 0, "skipped": 0 },
+    "it": { "passed": 129, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 411, "failed": 0, "skipped": 0 }
+  },
+  "evaluation": {
+    "h1": {
+      "status": "PASS",
+      "detail": "suiteFull do harness.config.json (npm test) reexecutada: exit 0; front 411/411 (34 arquivos), backend 523/523; 0 falhas/erros/skips."
+    },
+    "h2": {
+      "status": "PASS",
+      "detail": "zero falhas pre-existentes; 66 arquivos surefire somados: 523 testes, 0/0/0."
+    },
+    "h3": {
+      "status": "VERDE",
+      "detail": "H3 REFETA com fixture estendida (frontend/scripts/h3-mock-api.mjs alterado apenas pelo frontend-engineer). Login humano na UI (qualquer credencial) via POST /auth/login do fixture, JWT dev com tenant-id e AGENT_MANAGE. chrome-devtools MCP: rota #providers/public-clients em browser real, 1280x800 e 375x812 mobile/touch. Provados em sequencia: listagem com os 2 seeds (Chat do site ativo e Integracao parceira (revogada)); POST criacao 201 com secret one-shot visivel somente no dialog, ausente do DOM apos 'Guardei, fechar'; rotacao 200 com novo secret one-shot e janela refletida na tabela; revogacao 204 com estado 'Revogado' e acoes desabilitadas; estados vazio (tenant sem clients), carregando (Slow 3G CDP), erro com 'Tentar novamente' (Offline CDP); 403 esperado com JWT permissions:[] e mensagem de AGENT_MANAGE; console 0 [ERROR]/0 [WARN] no fluxo admin normal e 0 4xx/5xx nao esperados; sem overflow em 375; foco visivel por ring de box-shadow 3px. Sem stub de fetch nesta rodada — todas as requests foram para a fixture real."
+    },
+    "h4": {
+      "status": "PASS",
+      "detail": "PublicApiClientAdminIT 10/10 cobre 401/403/404, paginacao, 400 para client_id/tenantId, 201 com client_secret one-shot, rotate com janela, revoke 204 imediato, 409 label duplicado, zero secret/hash em list/get e puts de grants/prompts.ittle ADR-001/002 intactas: OpenApiSpecIT 9/9, PublicApiErrorContractIT 3/3, PublicAuthQuotaContractIT 2/2 (Decisao 7), ChatCallerParityIT 1/1. Zero diff em poms reais, migrations, Mfa*, gateway/history; nenhum @Disabled/skip nos arquivos tocados. N+1 (1+2N) registrado como debito nao-bloqueante no CODE-REVIEW."
+    },
+    "h5": {
+      "status": "PASS",
+      "detail": "portas 8080/5432/5433/6379 livres; portas temporarias 8099 (fixture) e 5183 (vite) encerradas por PID verificado via lsof + kill, sem pkill -f; browser page fechada; 26 flattened poms restaurados; brain_store gravado."
+    },
+    "h6": {
+      "status": "PASS",
+      "detail": "VERDE. Suite 0 falhas (front 411, backend 523, ITs 129) · builds 0 erros · H3 VERDE com fixture estendida (fluxo completo de credenciais, estados, 403, console/rede limpos, screenshots 1280/375) · code_reviews_by_adr.ADR-003 APPROVED 0/0/0/0 · esteira conforme · portas/liberacao e zero diff proibido."
+    },
+    "testCountResolution": {
+      "frontend": "411 medidos (378 baseline + 33 novos testes frontend)",
+      "backend": "523 medidos. Baseline real medido por este QA na ADR-002 foi 522; o diff da ADR-003 adiciona exatamente 1 @Test em PublicApiClientServiceImplTest (HEAD 2 -> worktree 3: when_rotateSecret_then_returnsPlaintextOnceAndKeepsPreviousWindow). O '520 -> 521?' do reviewer usava baseline ADR-001 desatualizado; 523 e o numero correto.",
+      "it": "129 medidos (119 baseline + 10 PublicApiClientAdminIT)"
+    },
+    "esteira": {
+      "PRD-01": "PASS para public-chat-api. Unico achado global e o orfao pre-existente .spec/prd/chat-model-override/PROPOSAL.md — fora de escopo, nao bloqueia.",
+      "ADR-01": "PASS",
+      "ADR-02": "PASS",
+      "artefatos": "ADR-INDEX linha 3: order 3 sem pulo, ADR-001 merged d0d3890/PR#4, ADR-002 merged c71081e/PR#5, depends_on ADR-001, unit adr, branch adr/public-chat-api/03-credenciais-admin; 1:1 com ADRs/ADR-003-credenciais-admin/; TASKS.md linha 1 = <!-- scope: adr/ADR-003 -->; ADR.md com depende-de e Interface congelada; SPEC.md + TASKS.md presentes; VERIFY.md AUSENTE (correto pre-merge)."
+    },
+    "codeReview": {
+      "artifact": ".spec/prd/public-chat-api/ADRs/ADR-003-credenciais-admin/CODE-REVIEW.md",
+      "veredito": "APPROVED — 0 🔴 · 0 🟠 · 0 🟡 · 0 🔵",
+      "reviewer_session": "ses_dffa34effffeZMrCoNwL2t4pqv",
+      "data": "2026-11-22",
+      "estado": "workflow-state.json.code_reviews_by_adr.ADR-003 conferido: status passed, APPROVED, 0/0/0/0, artifact existente; blocos ADR-001/002 intactos; demais campos do estado inalterados. CODE-REVIEW registra observacao sobre a divergencia de contagem backend, resolvida acima."
+    },
+    "h3Evidence": {
+      "browser": "chrome-devtools MCP",
+      "url": "http://localhost:5183/#providers/public-clients",
+      "fixture": "frontend/scripts/h3-mock-api.mjs (estendida pelo frontend-engineer) na porta 8099 + npm run dev na 5183; login humano na UI com qualquer credencial; JWT dev com tenant-id e permissions [AGENT_MANAGE,...]",
+      "viewports": ["1280x800", "375x812 mobile/touch"],
+      "screenshots": [
+        {
+          "path": "/tmp/opencode/qa3b-clients-list-1280.png",
+          "sha256": "fddfdf87723e2173997bc8a398f9755c9ad329bc744989760fb42584506b3233"
+        },
+        {
+          "path": "/tmp/opencode/qa3b-clients-final-1280.png",
+          "sha256": "c5c98f245d57597076522ca31b0625ccdbb6fc34d3c76fe32a67016243094e46"
+        },
+        {
+          "path": "/tmp/opencode/qa3b-clients-375.png",
+          "sha256": "4a820787045564769fada6c6bba346626195f9d2ebfe1e6c5967e927d71e62ad"
+        }
+      ],
+      "sequence": {
+        "login": "POST /auth/login do fixture -> 200, redirect #overview; navegacao para #providers/public-clients",
+        "listar": "2 seeds: 'Chat do site' (Ativo, Secret anterior valido) e 'Integracao parceira (revogada)' (Revogado, acoes desabilitadas); contador '2 clients'",
+        "criar": "dialog 'Novo client' -> POST 201; secret h3_sk_... aparece somente no dialog 'Guarde o secret agora'; apos 'Guardei, fechar' body.nao contem o secret e dialogCount=0; tabela mostra 'QA H3 client' (3 clients)",
+        "rotacionar": "POST /{id}/rotate -> 200; novo secret h3_sk_... somente no dialog 'Novo secret gerado'; janela 'Secret anterior valido ate...' refletida na tabela; apos dismiss secret ausente do DOM",
+        "revogar": "confirmacao -> POST /{id}/revoke [204]; linha passa a 'Revogado' e botoes Rotacionar/Revogar desabilitados",
+        "vazio": "JWT com tenant-id sem clients -> 'Nenhum client cadastrado' + 'Criar primeiro client'",
+        "carregando": "CDP Slow 3G + reload -> generic busy 'Carregando…'",
+        "erro": "CDP Offline + troca de abas -> alert 'Falha ao carregar os clients da API pública.' + 'Tentar novamente'",
+        "403": "localStorage.hive_token trocado por JWT com permissions:[] -> GET /public-api/clients [403] (esperado) e alert 'Você não tem permissão para gerenciar a API pública. Solicite a permissão AGENT_MANAGE.'"
+      },
+      "console1280": "0 ERROR, 0 WARN no fluxo admin normal (debug/info/issue apenas). No cenario 403 ha [error] de browser pelo 403 esperado; nenhum erro de aplicacao.",
+      "console375": "0 ERROR, 0 WARN (debug/info/issue apenas)",
+      "network": "fluxo admin: 0 request 4xx/5xx; criacao 201, rotacao 200, revogacao 204; unica 4xx foi o 403 induzido e esperado no teste de permissao",
+      "vazamento": "apos dismiss de criacao e rotacao, document.body.innerText nao continha o plaintext h3_sk_...; listagem nunca mostrou secret/hash",
+      "layout375": "scrollWidth 375 = innerWidth 375 (sem overflow horizontal); foco no searchbox com ring de box-shadow 3px (outlineStyle none, porem box-shadow visivel)"
+    },
+    "bugs_identified": [
+      "[issue] de a11y no console: 'A form field element should have an id or name attribute' no searchbox da tela de clients; nao e ERROR/WARN, nao bloqueia H3, mas deve ser corrigido.",
+      "Debito de performance (registrado no CODE-REVIEW, nao bloqueante): PublicApiClientAdminServiceImpl.list() executa 1+2N queries (41 com size=20, 201 com size=100).",
+      "FORA DE ESCOPO: orfao pre-existente .spec/prd/chat-model-override/PROPOSAL.md — unico motivo do ok:false global do runPrdChecks.",
+      "Operacional: mvn -pl exige cwd backend/; mvn install regenera .flattened-pom.xml (26 restaurados na rodada anterior)."
+    ],
+    "confirmacoes": {
+      "semCommit": "branch adr/public-chat-api/03-credenciais-admin, HEAD 217e919 (commit de abertura), arvore sem commit de implementacao; nenhum commit, merge ou checkout",
+      "escopoEscrita": "somente este arquivo de evidencia e nota no Brain; nenhum codigo-fonte alterado nesta rodada (fixture alterada previamente pelo frontend-engineer)",
+      "cleanup": "processos 3900551 (fixture), 3900653 (npm) e 3900666 (vite) encerrados por PID apos conferencia de dono via lsof/ps; pagina do browser fechada; porta 5183 sem listener (restam apenas sockets CLOSE_WAIT do chrome, nao foram mortos)"
+    }
+  },
+  "brainStore": [
+    "arquitetura/projetos/arquitetura/projetos/hive/public-chat-api-adr-003-qa-verificacao-2026-11-22",
+    "arquitetura/projetos/arquitetura/projetos/hive/public-chat-api-adr-003-qa-h3-refit-2026-11-22"
+  ],
+  "cleanup": {
+    "ports": ["8080", "5432", "5433", "6379", "8099", "5183"],
+    "portsStatus": "8099 livre; 5183 sem LISTENER (apenas sockets CLOSE_WAIT do chrome-devtools, nao sao processos do QA); 8080/5432/5433/6379 livres",
+    "killedProcesses": [3900551, 3900653, 3900666],
+    "generatedArtifactsRestored": "nenhum artefato gerado nesta rodada H3; 26 .flattened-pom.xml da rodada anterior ja estavam restaurados; git diff --check limpo"
+  },
+  "selfReported": false
+}

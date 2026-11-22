@@ -40,6 +40,17 @@
       "scope": "ADR-002 public-chat-api — centralizacao e telemetria; branch adr/public-chat-api/02-centralizacao-chat; review com 0/0/0",
       "artifact": ".spec/prd/public-chat-api/ADRs/ADR-002-centralizacao-chat/CODE-REVIEW.md",
       "date": "2026-11-22"
+    },
+    "ADR-003": {
+      "status": "passed",
+      "approval_status": "APPROVED",
+      "critical_issues_count": 0,
+      "severity_counts": { "🔴": 0, "🟠": 0, "🟡": 0, "🔵": 0 },
+      "must_fix_before_done": [],
+      "reviewer_session": "ses_dffa34effffeZMrCoNwL2t4pqv",
+      "scope": "ADR-003 public-chat-api — gestao de credenciais com UI admin; branch adr/public-chat-api/03-credenciais-admin; review backend+frontend com 0/0/0",
+      "artifact": ".spec/prd/public-chat-api/ADRs/ADR-003-credenciais-admin/CODE-REVIEW.md",
+      "date": "2026-11-22"
     }
   },
   "harness_status": "passed",

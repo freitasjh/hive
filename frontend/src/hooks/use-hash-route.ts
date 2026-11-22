@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import type { DashboardViewId } from "@/components/shadcn/navigation"
 
 /** Abas que participam do deep-link de admin. */
-export type RouteTab = "credentials" | "models" | "templates" | "editor"
+export type RouteTab = "credentials" | "models" | "public-clients" | "templates" | "editor"
 
 /** Espelho da URL: view canônica + aba (quando houver) + id do prompt (quando editor). */
 export interface Route {
@@ -28,7 +28,7 @@ const VIEW_IDS = {
 
 /** Abas válidas por view. View sem aba (overview, placeholders) não entra no mapa. */
 const TABS_BY_VIEW: Partial<Record<DashboardViewId, readonly RouteTab[]>> = {
-  providers: ["credentials", "models"],
+  providers: ["credentials", "models", "public-clients"],
   prompts: ["templates", "editor"],
 }
 
