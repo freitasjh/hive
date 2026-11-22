@@ -1,6 +1,6 @@
 # ADR-003 — Gestão de credenciais com UI admin sobre `client_credentials`
 
-**Status:** in-progress · **Data:** 2026-11-22 · **PRD:** `public-chat-api` · **Branch:** `adr/public-chat-api/03-credenciais-admin`
+**Status:** merged · **Data:** 2026-11-22 · **PRD:** `public-chat-api` · **Branch:** `adr/public-chat-api/03-credenciais-admin` · **Merge:** `431150e` (PR #6)
 
 **depende-de:** ADR-001 (merged — contrato público tipado e spec OpenAPI estáveis). Paralela à ADR-004.
 
