@@ -107,8 +107,13 @@ export default function App() {
   } else if (view === "providers") {
     shell = (
       <AiAdminPage
-        tab={tab === "models" ? "models" : "credentials"}
-        onTabChange={(next: RouteTab) => replaceRoute("providers", next === "models" ? "models" : "credentials")}
+        tab={tab === "models" || tab === "public-clients" ? tab : "credentials"}
+        onTabChange={(next: RouteTab) =>
+          replaceRoute(
+            "providers",
+            next === "models" || next === "public-clients" ? next : "credentials"
+          )
+        }
         onSelectView={navigate}
       />
     )

@@ -5,10 +5,6 @@ import br.com.systec.hive.publicapi.api.domain.ProvisioningPayload;
 import br.com.systec.hive.publicapi.api.exceptions.InvalidTenantIdException;
 import br.com.systec.hive.publicapi.api.service.PublicApiClientService;
 import br.com.systec.hive.publicapi.impl.entity.PublicApiClientEntity;
-import br.com.systec.hive.publicapi.impl.entity.PublicApiClientGrantEntity;
-import br.com.systec.hive.publicapi.impl.entity.PublicApiClientPromptEntity;
-import br.com.systec.hive.publicapi.impl.repository.PublicApiClientGrantRepository;
-import br.com.systec.hive.publicapi.impl.repository.PublicApiClientPromptRepository;
 import br.com.systec.hive.publicapi.impl.repository.PublicApiClientRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,12 +21,11 @@ import java.util.UUID;
 public class PublicApiProvisioningRunner implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(PublicApiProvisioningRunner.class);
-    private static final String GRANT = "PUBLIC_CHAT_COMPLETE";
+    private static final String GRANT = PublicApiClientAccessWriter.PUBLIC_CHAT_GRANT;
 
     private final PublicApiClientService clientService;
     private final PublicApiClientRepository clientRepository;
-    private final PublicApiClientGrantRepository grantRepository;
-    private final PublicApiClientPromptRepository promptRepository;
+    private final PublicApiClientAccessWriter accessWriter;
 
     @Value("${hive.publicapi.provision.enabled:false}")
     private boolean enabled;
@@ -54,12 +49,10 @@ public class PublicApiProvisioningRunner implements CommandLineRunner {
 
     public PublicApiProvisioningRunner(PublicApiClientService clientService,
                                       PublicApiClientRepository clientRepository,
-                                      PublicApiClientGrantRepository grantRepository,
-                                      PublicApiClientPromptRepository promptRepository) {
+                                      PublicApiClientAccessWriter accessWriter) {
         this.clientService = clientService;
         this.clientRepository = clientRepository;
-        this.grantRepository = grantRepository;
-        this.promptRepository = promptRepository;
+        this.accessWriter = accessWriter;
     }
 
     @Override
@@ -101,27 +94,20 @@ public class PublicApiProvisioningRunner implements CommandLineRunner {
         }
         ProvisionedClient pc = clientService.provision(tenantId, label);
 
-        // grant
-        PublicApiClientGrantEntity g = new PublicApiClientGrantEntity();
-        g.setTenantId(tenantId);
-        g.setClientRef(findClientRef(pc.getClientId()));
-        g.setPermission(GRANT);
-        grantRepository.save(g);
-
-        // prompt codes
+        // grant + prompts: mesma regra da API admin (ADR-003, Decisão 2c).
         List<String> codes = new ArrayList<>();
         for (String c : promptCodesRaw.split(",")) {
             String code = c.trim();
-            if (code.isEmpty()) continue;
-            codes.add(code);
-            PublicApiClientPromptEntity pe = new PublicApiClientPromptEntity();
-            pe.setTenantId(tenantId);
-            pe.setClientRef(g.getClientRef());
-            pe.setPromptCode(code);
-            pe.setPinMode(pinMode);
-            pe.setPinnedVersion(null);
-            promptRepository.save(pe);
+            if (!code.isEmpty()) {
+                codes.add(code);
+            }
         }
+        final List<String> codeList = List.copyOf(codes);
+        final String effectivePinMode = pinMode;
+        List<PublicApiClientAccessWriter.PromptBinding> bindings = codeList.stream()
+                .map(code -> new PublicApiClientAccessWriter.PromptBinding(code, effectivePinMode, null))
+                .toList();
+        accessWriter.write(tenantId, findClientRef(pc.getClientId()), List.of(GRANT), bindings);
 
         ProvisioningPayload payload = ProvisioningPayloadBuilder.build(
                 pc.getClientId(), pc.getClientSecret(), baseUrl, codes, pinMode,

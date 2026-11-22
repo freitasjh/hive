@@ -110,3 +110,64 @@ export interface PromptTemplateUpdateDTO {
 export function maskKey(last4: string | null | undefined): string {
   return last4 ? `••••${last4}` : "••••"
 }
+
+/* -------------------------------------------------------------------------- */
+/* ADR-003 — clients da API pública                                            */
+/* Espelha os DTOs reais entregues pelo backend em 2026-11-22:                 */
+/* PublicApiClientResponseDTO / PageDTO / CreateDTO / CreatedDTO / RotatedDTO / */
+/* PromptBindingDTO. Nenhum campo de secret ou hash entra nestes contratos.    */
+/* -------------------------------------------------------------------------- */
+
+export type PublicClientPinMode = "FOLLOW_ACTIVE" | "PINNED"
+
+export interface PublicClientPromptBinding {
+  promptCode: string
+  pinMode: PublicClientPinMode
+  pinnedVersion: number | null
+}
+
+/**
+ * Item seguro de listagem/get. Campos snake_case espelham o JSON do backend.
+ * Não existe `client_secret`, `secret_hash`, `previous_secret_hash` nem
+ * `rate_limit_per_minute` — cota por client pertence à ADR-004.
+ */
+export interface PublicApiClient {
+  clientId: string
+  label: string
+  tenantId: string
+  grants: string[]
+  prompts: PublicClientPromptBinding[]
+  token_ttl_seconds: number | null
+  max_messages: number | null
+  max_message_chars: number | null
+  max_total_chars: number | null
+  revoked_at: string | null
+  expires_at: string | null
+  previous_secret_expires_at: string | null
+}
+
+export interface PublicApiClientPage {
+  content: PublicApiClient[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+/** Request de criação: `clientId`/`tenantId` são do servidor e NÃO são enviados. */
+export interface PublicApiClientCreate {
+  label: string
+  grants: string[]
+  prompts: PublicClientPromptBinding[]
+  tokenTtlSeconds?: number
+  maxMessages?: number
+  maxMessageChars?: number
+  maxTotalChars?: number
+}
+
+/** Plaintext one-shot de rotação — sem o item completo. */
+export interface PublicApiClientRotation {
+  clientId: string
+  secret: string
+  previousSecretExpiresAt: string | null
+}

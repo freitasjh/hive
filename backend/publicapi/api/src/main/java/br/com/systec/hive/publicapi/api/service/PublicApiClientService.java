@@ -5,7 +5,8 @@ import java.util.UUID;
 
 public interface PublicApiClientService {
     ProvisionedClient provision(UUID tenantId, String label);
-    void rotateSecret(String clientId);
+    /** Rotaciona e devolve o plaintext uma única vez; a janela do secret anterior é preservada. */
+    String rotateSecret(String clientId);
     void revoke(String clientId);
     boolean verifySecret(String rawSecret, String storedHash);
     String hashSecret(String rawSecret);

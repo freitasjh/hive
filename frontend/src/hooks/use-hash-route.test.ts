@@ -71,6 +71,15 @@ describe('parseRoute', () => {
     expect(isTabbedView('mfa')).toBe(false)
   })
 
+  it('deep-link da área de clients da API pública', () => {
+    expect(parseRoute('#providers/public-clients')).toEqual({
+      view: 'providers',
+      tab: 'public-clients',
+    })
+    expect(buildHash('providers', 'public-clients')).toBe('#providers/public-clients')
+    expect(isTabbedView('providers')).toBe(true)
+  })
+
   it('deep-link de aba nas views admin', () => {
     expect(parseRoute('#providers/models')).toEqual({
       view: 'providers',

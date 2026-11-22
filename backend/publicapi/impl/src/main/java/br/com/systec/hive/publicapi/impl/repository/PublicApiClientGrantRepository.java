@@ -9,4 +9,6 @@ import java.util.UUID;
 @Repository
 public interface PublicApiClientGrantRepository extends JpaRepository<PublicApiClientGrantEntity, UUID> {
     java.util.List<PublicApiClientGrantEntity> findByClientRef(java.util.UUID clientRef);
+
+    void deleteAllByClientRef(java.util.UUID clientRef);
 }

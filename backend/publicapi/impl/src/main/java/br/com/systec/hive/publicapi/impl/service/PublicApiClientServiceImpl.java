@@ -70,7 +70,7 @@ public class PublicApiClientServiceImpl implements PublicApiClientService {
 
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
-    public void rotateSecret(String clientId) {
+    public String rotateSecret(String clientId) {
         PublicApiClientEntity entity = repository.findByClientId(clientId)
                 .orElseThrow(() -> new BaseException("Public API client not found", HttpStatus.NOT_FOUND));
         byte[] secretBytes = new byte[32];
@@ -81,7 +81,7 @@ public class PublicApiClientServiceImpl implements PublicApiClientService {
         entity.setPreviousSecretExpiresAt(LocalDateTime.now().plusMinutes(10));
         entity.setSecretHash(hashSecret(rawSecret));
         repository.save(entity);
-        // raw secret not returned (not recoverable); caller must use provision flow for new raw
+        return rawSecret;
     }
 
     @Override

@@ -27,6 +27,7 @@ function anonymize() {
 const mocks = vi.hoisted(() => ({
   listCredentials: vi.fn(),
   getLlmConfig: vi.fn(),
+  publicClientList: vi.fn(),
   promptList: vi.fn(),
   getPromptById: vi.fn(),
   sessionList: vi.fn(),
@@ -41,6 +42,18 @@ vi.mock('@/services/agent-admin.service', () => ({
     deleteCredential: vi.fn(),
     saveLlmConfig: vi.fn(),
     listProviderModels: vi.fn(),
+  },
+}))
+
+vi.mock('@/services/public-api-admin.service', () => ({
+  publicApiAdminService: {
+    list: mocks.publicClientList,
+    get: vi.fn(),
+    create: vi.fn(),
+    rotate: vi.fn(),
+    revoke: vi.fn(),
+    updateGrants: vi.fn(),
+    updatePrompts: vi.fn(),
   },
 }))
 
@@ -125,6 +138,7 @@ describe('App', () => {
     setHash('')
     mocks.promptList.mockResolvedValue(EMPTY_PAGE)
     mocks.sessionList.mockResolvedValue(EMPTY_PAGE)
+    mocks.publicClientList.mockResolvedValue({ ...EMPTY_PAGE, page: 0 })
   })
 
   afterEach(() => {
@@ -237,6 +251,17 @@ describe('App', () => {
     expect(tabSelected(/Credenciais/)).toBe(true)
     expect(tabSelected(/Provedor e modelo/)).toBe(false)
     expect(await screen.findByTestId('credentials-loading')).toBeTruthy()
+  })
+
+  it('#providers/public-clients abre a área de clients da API pública', async () => {
+    setHash('#providers/public-clients')
+    render(<App />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1, name: 'Clients da API pública' })).toBeTruthy()
+    )
+    expect(tabSelected(/API pública/)).toBe(true)
+    expect(mocks.publicClientList).toHaveBeenCalledWith(0, 20)
   })
 
   it('#providers/models abre a aba Provedor e modelo sem item de menu separado', () => {

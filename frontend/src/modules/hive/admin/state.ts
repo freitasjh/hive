@@ -3,6 +3,8 @@ import type {
   CredentialStatus,
   PromptStatus,
   PromptTemplateDTO,
+  PublicApiClient,
+  PublicClientPinMode,
   ValidateResponse,
 } from "@/services/admin.types"
 
@@ -122,4 +124,72 @@ export interface PromptEditorActions {
   onSave: () => void
   onBack: () => void
   onRetry: () => void
+}
+
+/* ------------------------- ADR-003 / public-clients ------------------------ */
+
+export interface PublicClientPromptDraft {
+  promptCode: string
+  pinMode: PublicClientPinMode
+  pinnedVersion: number | null
+}
+
+export interface PublicClientsFormState {
+  label: string
+  grantsText: string
+  prompts: PublicClientPromptDraft[]
+  tokenTtlSeconds: string
+  maxMessages: string
+  maxMessageChars: string
+  maxTotalChars: string
+}
+
+export interface PublicClientsState {
+  items: PublicApiClient[]
+  total: number
+  page: number
+  size: number
+  q: string
+  loading: boolean
+  error: string | null
+  actionError: string | null
+  notice: string | null
+  createOpen: boolean
+  form: PublicClientsFormState
+  validationError: string | null
+  creating: boolean
+  revokeTarget: PublicApiClient | null
+  revoking: boolean
+  rotatingClientId: string | null
+}
+
+/**
+ * Secret em plaintext one-shot. Vive APENAS num useState do Container e é
+ * descartado ao fechar o diálogo — nunca entra em `PublicClientsState`,
+ * lista, localStorage ou URL.
+ */
+export interface OneShotSecret {
+  secret: string
+  scope: "create" | "rotate"
+  clientId: string
+  label: string
+  previousSecretExpiresAt: string | null
+}
+
+export interface PublicClientsActions {
+  onQueryChange: (value: string) => void
+  onPageChange: (page: number, size: number) => void
+  onRetry: () => void
+  onOpenCreate: () => void
+  onCloseCreate: () => void
+  onFormChange: (patch: Partial<PublicClientsFormState>) => void
+  onPromptChange: (index: number, patch: Partial<PublicClientPromptDraft>) => void
+  onAddPrompt: () => void
+  onRemovePrompt: (index: number) => void
+  onCreate: () => void
+  onRotate: (client: PublicApiClient) => void
+  onAskRevoke: (client: PublicApiClient) => void
+  onCancelRevoke: () => void
+  onConfirmRevoke: () => void
+  onDismissSecret: () => void
 }

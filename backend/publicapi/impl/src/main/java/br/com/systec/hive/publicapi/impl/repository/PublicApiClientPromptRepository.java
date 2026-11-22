@@ -9,4 +9,6 @@ import java.util.UUID;
 @Repository
 public interface PublicApiClientPromptRepository extends JpaRepository<PublicApiClientPromptEntity, UUID> {
     java.util.List<PublicApiClientPromptEntity> findByClientRef(java.util.UUID clientRef);
+
+    void deleteAllByClientRef(java.util.UUID clientRef);
 }
