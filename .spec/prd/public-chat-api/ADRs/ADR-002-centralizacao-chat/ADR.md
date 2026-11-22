@@ -1,6 +1,6 @@
 # ADR-002 — Centralizar conversação, precedência do system message e telemetria
 
-**Status:** in-progress · **Data:** 2026-11-22 · **PRD:** `public-chat-api` · **Branch:** `adr/public-chat-api/02-centralizacao-chat`
+**Status:** merged · **Data:** 2026-11-22 · **PRD:** `public-chat-api` · **Branch:** `adr/public-chat-api/02-centralizacao-chat` · **Merge:** `c71081e` (PR #5)
 
 **depende-de:** ADR-001 (merged — contrato tipado e spec OpenAPI estáveis).
 

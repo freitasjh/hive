@@ -4,6 +4,22 @@
   "agent": "qa-engineer",
   "phase": "Testing",
   "gitSha": "bd77b6e0f9f724d33b85a5e16b0ccf7f943e014d",
+  "mergeVerification": {
+    "status": "MERGE_CONFIRMADO",
+    "data": "2026-11-22",
+    "mergeCommitOriginMain": "c71081eafd3aa452849ae6e6511a65c187299c86",
+    "mergeCommitSubject": "Merge pull request #5 from freitasjh/adr/public-chat-api/02-centralizacao-chat",
+    "adrsCommit": "d39a3e9ea2ef2144ce262572505e979b92381808",
+    "ancestryExit": 0,
+    "provas": [
+      "git fetch origin main: e67346c..c71081e main -> origin/main (exit 0)",
+      "git merge-base --is-ancestor d39a3e9... origin/main: exit 0",
+      "git log --oneline -4 origin/main: c71081e Merge PR #5 -> d39a3e9 -> bd77b6e -> e67346c",
+      "git ls-tree -r --name-only origin/main -- .spec/prd/public-chat-api/ADRs/ADR-002-centralizacao-chat: ADR.md, CODE-REVIEW.md, SPEC.md, TASKS.md presentes",
+      "git show -s c71081e: pais e67346c (main) e d39a3e9 (ADR-002), 2026-11-22 12:35:47 -0300"
+    ],
+    "observacoes": "branch local permanece; main local ainda em e67346c (fetch atualizou apenas origin/main); VERIFY.md ainda ausente em origin/main — geracao fica com o orquestrador. Nenhum checkout/commit/merge executado pelo QA."
+  },
   "commands": [
     {
       "cmd": "npm test",
