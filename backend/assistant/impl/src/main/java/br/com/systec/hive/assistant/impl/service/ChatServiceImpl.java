@@ -251,8 +251,9 @@ public class ChatServiceImpl implements ChatService {
         // Every outcome except "answered" raises inside this call: the trace is recorded and the
         // operator's line is written by the collaborator that decided the outcome, so that the
         // classification is stated once. Reaching TX2 therefore means the turn was answered.
+        // ADR-002/K6: o fluxo humano não tem turnId nem clientId — null/null explícitos (ChatTrace:26-27).
         turnOutcomeMapper.resolve(sessionId, tenantId, promptTemplateId, resolved.provider(),
-                resolved.model(), promptTemplate, history, reply, elapsedMs(startedAt));
+                resolved.model(), promptTemplate, history, reply, elapsedMs(startedAt), null, null);
 
         // TX2: save assistant + touch atomically
         var assistantMsg = chatAssistantTxService.saveAssistantAndTouch(sessionId, tenantId, reply.text());

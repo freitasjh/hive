@@ -105,17 +105,19 @@ public class TurnOutcomeMapper {
      * @param reply            what the generation produced, measured
      * @param elapsedMs        wall time of the provider generation call — a large value here means the
      *                         provider stalled, which is exactly the signal a chat timeout needs
+     * @param turnId           public turn id; {@code null} for the human chat flow (ADR-002/K6)
+     * @param clientId         authenticated public client id; {@code null} for the human chat flow
      */
     public void resolve(UUID sessionId, UUID tenantId, UUID promptTemplateId, AiProvider provider,
                         String model, PromptTemplate promptTemplate, List<ChatMessage> history,
-                        TurnReply reply, long elapsedMs) {
+                        TurnReply reply, long elapsedMs, UUID turnId, String clientId) {
         if (reply.status() == TurnReply.Status.EMPTY_RESPONSE) {
             // Verified empty BEFORE persisting: chat_message.content is NOT NULL, so saving this
             // turned a provider quirk into a 409 data-integrity error that told the user nothing.
             // Reasoning models are the trigger — mimo-v2.5 with max_tokens=32 spends the whole
             // budget on reasoning and returns content=null; glm-5.2 returns "". Both are covered.
             recordTurn(sessionId, tenantId, promptTemplateId, provider, model, promptTemplate, history,
-                    reply, elapsedMs, EMPTY_MODEL_RESPONSE);
+                    reply, elapsedMs, EMPTY_MODEL_RESPONSE, turnId, clientId);
             log.warn("chat empty model response sessionId={} tenantId={} promptTemplateId={} provider={} model={} maxTokens={}",
                     sessionId, tenantId, promptTemplateId, provider, model, maxTokensOf(promptTemplate));
             throw new ModelReturnedEmptyException(model);
@@ -132,7 +134,7 @@ public class TurnOutcomeMapper {
                 throw base;
             }
             recordTurn(sessionId, tenantId, promptTemplateId, provider, model, promptTemplate, history,
-                    reply, elapsedMs, FailureClassifier.causeOf(failure));
+                    reply, elapsedMs, FailureClassifier.causeOf(failure), turnId, clientId);
             if (ModelNotFound.isModelNotFound(failure)) {
                 if (discoveryService != null) {
                     discoveryService.evict(provider);
@@ -156,7 +158,7 @@ public class TurnOutcomeMapper {
         }
 
         recordTurn(sessionId, tenantId, promptTemplateId, provider, model, promptTemplate, history,
-                reply, elapsedMs, null);
+                reply, elapsedMs, null, turnId, clientId);
     }
 
     /**
@@ -170,16 +172,21 @@ public class TurnOutcomeMapper {
      * rebuilt them would be a second opinion about a call that already happened.
      *
      * @param failureText already-classified failure label, or {@code null} for a healthy turn
+     * @param turnId      public turn id, or {@code null} in the human flow
+     * @param clientId    authenticated public client, or {@code null} in the human flow
      */
     private void recordTurn(UUID sessionId, UUID tenantId, UUID promptTemplateId, AiProvider provider,
                             String model, PromptTemplate promptTemplate, List<ChatMessage> history,
-                            TurnReply reply, long elapsedMs, String failureText) {
+                            TurnReply reply, long elapsedMs, String failureText,
+                            UUID turnId, String clientId) {
         try {
             // A linha de trace não tem campo de retrieval: o produto não recupera nada, e um campo
             // que não pode ser verdadeiro ensina o operador a ler um vocabulário que não descreve mais
             // o sistema. Ver o javadoc de ChatTrace.
             traceRecorder.record(ChatTrace.builder(sessionId, promptTemplateId, provider, model)
                     .tenantId(tenantId)
+                    .turnId(turnId)
+                    .clientId(clientId)
                     .agentLimits(maxTokensOf(promptTemplate), topPOf(promptTemplate), temperatureOf(promptTemplate))
                     .prompt(history.size(), reply.promptMessages(), reply.promptChars())
                     .elapsedMs(elapsedMs)

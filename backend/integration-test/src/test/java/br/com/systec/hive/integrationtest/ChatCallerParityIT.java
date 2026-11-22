@@ -1,5 +1,7 @@
 package br.com.systec.hive.integrationtest;
 
+import br.com.systec.hive.assistant.api.diagnostics.ChatTrace;
+import br.com.systec.hive.assistant.api.diagnostics.ChatTraceRecorder;
 import br.com.systec.hive.assistant.api.domain.ChatRequest;
 import br.com.systec.hive.assistant.api.domain.ChatResponse;
 import br.com.systec.hive.assistant.api.service.ChatService;
@@ -13,6 +15,8 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.output.FinishReason;
+import dev.langchain4j.model.output.TokenUsage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,8 +56,16 @@ class ChatCallerParityIT extends WebIntegrationTest {
     private static final String REPLY = "resposta do stub";
     private static final String FIRST = "pergunta antiga";
     private static final String LAST = "pergunta";
+    private static final String PUBLIC_CLIENT_ID = "public-parity-client";
+
+    /** Baseline ADR-002/CZ01 (2026-11-21): tokens e finish reason caracterizados no gateway. */
+    private static final int BASELINE_PROMPT_TOKENS = 120;
+    private static final int BASELINE_COMPLETION_TOKENS = 340;
+    private static final int BASELINE_TOTAL_TOKENS = 460;
+    private static final String BASELINE_FINISH_REASON = "STOP";
 
     static final List<List<ChatMessage>> CAPTURED = new CopyOnWriteArrayList<>();
+    static final List<ChatTrace> TRACES = new CopyOnWriteArrayList<>();
 
     @Autowired
     private ChatService chatService;
@@ -63,6 +75,12 @@ class ChatCallerParityIT extends WebIntegrationTest {
 
     @TestConfiguration
     static class CapturingFactoryConfig {
+        @Bean
+        @Primary
+        ChatTraceRecorder capturingTraceRecorder() {
+            return TRACES::add;
+        }
+
         @Bean
         @Primary
         @SuppressWarnings("unchecked")
@@ -79,6 +97,9 @@ class ChatCallerParityIT extends WebIntegrationTest {
                             CAPTURED.add(chatRequest.messages());
                             return dev.langchain4j.model.chat.response.ChatResponse.builder()
                                     .aiMessage(AiMessage.from(REPLY))
+                                    .tokenUsage(new TokenUsage(BASELINE_PROMPT_TOKENS,
+                                            BASELINE_COMPLETION_TOKENS, BASELINE_TOTAL_TOKENS))
+                                    .finishReason(FinishReason.STOP)
                                     .build();
                         }
                     };
@@ -90,6 +111,7 @@ class ChatCallerParityIT extends WebIntegrationTest {
     @BeforeEach
     void resetCapture() {
         CAPTURED.clear();
+        TRACES.clear();
     }
 
     @Test
@@ -117,6 +139,11 @@ class ChatCallerParityIT extends WebIntegrationTest {
         chatService.chat(second, tenantId, userId);
 
         List<ChatMessage> humanPrompt = lastCaptured();
+        ChatTrace humanTrace = lastTrace();
+        // CZ04: o chamador humano não tem turnId/clientId — javadoc ChatTrace:26-27 exige null/null.
+        assertThat(humanTrace.turnId()).isNull();
+        assertThat(humanTrace.clientId()).isNull();
+        assertBaselineTelemetry(humanTrace);
 
         // ---- caminho público: mesmo histórico vem no payload; mesma ordem de papéis.
         ChatCompletionRequestDTO dto = new ChatCompletionRequestDTO();
@@ -131,7 +158,7 @@ class ChatCallerParityIT extends WebIntegrationTest {
         MockHttpServletRequest http = new MockHttpServletRequest();
         http.setAttribute("publicapi.pcode", List.of(code));
         SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken("public-parity-client", null));
+                new UsernamePasswordAuthenticationToken(PUBLIC_CLIENT_ID, null));
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(http));
         try {
             TenantContext.runWithTenant(tenantId, () -> {
@@ -144,6 +171,11 @@ class ChatCallerParityIT extends WebIntegrationTest {
         }
 
         List<ChatMessage> publicPrompt = lastCaptured();
+        ChatTrace publicTrace = lastTrace();
+        // CZ04: turno público carrega o turnId calculado e o clientId autenticado.
+        assertThat(publicTrace.turnId()).isNotNull();
+        assertThat(publicTrace.clientId()).isEqualTo(PUBLIC_CLIENT_ID);
+        assertBaselineTelemetry(publicTrace);
 
         // Ordem K4 + convergência: as duas listas são byte a byte iguais, sem conversão divergente.
         assertExactBaseline(humanPrompt);
@@ -169,6 +201,19 @@ class ChatCallerParityIT extends WebIntegrationTest {
     private static List<ChatMessage> lastCaptured() {
         assertThat(CAPTURED).isNotEmpty();
         return CAPTURED.get(CAPTURED.size() - 1);
+    }
+
+    private static ChatTrace lastTrace() {
+        assertThat(TRACES).isNotEmpty();
+        return TRACES.get(TRACES.size() - 1);
+    }
+
+    /** CZ01: os números vêm do ChatResponse do stub e chegam idênticos nos dois chamadores. */
+    private static void assertBaselineTelemetry(ChatTrace trace) {
+        assertThat(trace.promptTokens()).isEqualTo(BASELINE_PROMPT_TOKENS);
+        assertThat(trace.completionTokens()).isEqualTo(BASELINE_COMPLETION_TOKENS);
+        assertThat(trace.totalTokens()).isEqualTo(BASELINE_TOTAL_TOKENS);
+        assertThat(trace.finishReason()).isEqualTo(BASELINE_FINISH_REASON);
     }
 
     private static String text(ChatMessage message) {
