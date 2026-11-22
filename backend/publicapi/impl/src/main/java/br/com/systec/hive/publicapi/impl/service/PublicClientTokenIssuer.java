@@ -5,12 +5,12 @@ import br.com.systec.hive.publicapi.api.exceptions.InvalidGrantException;
 import br.com.systec.hive.publicapi.api.exceptions.InvalidScopeException;
 import br.com.systec.hive.publicapi.api.service.PublicApiClientService;
 import br.com.systec.hive.publicapi.impl.entity.PublicApiClientEntity;
-import br.com.systec.hive.publicapi.impl.entity.PublicApiClientEntity;
 import br.com.systec.hive.publicapi.impl.entity.PublicApiClientGrantEntity;
 import br.com.systec.hive.publicapi.impl.entity.PublicApiClientPromptEntity;
 import br.com.systec.hive.publicapi.impl.repository.PublicApiClientGrantRepository;
 import br.com.systec.hive.publicapi.impl.repository.PublicApiClientPromptRepository;
 import br.com.systec.hive.publicapi.impl.repository.PublicApiClientRepository;
+import br.com.systec.hive.publicapi.impl.repository.PublicApiTenantQuotaRepository;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
@@ -45,13 +45,15 @@ public class PublicClientTokenIssuer {
     private final PublicApiClientPromptRepository promptRepository;
     private final PublicApiClientService clientService;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final PublicApiTenantQuotaRepository tenantQuotaRepository;
 
     public PublicClientTokenIssuer(@Value("${api.security.public.token.secret}") String secret,
                                   PublicApiClientRepository clientRepository,
                                   PublicApiClientGrantRepository grantRepository,
                                   PublicApiClientPromptRepository promptRepository,
                                   PublicApiClientService clientService,
-                                  RedisTemplate<String, Object> redisTemplate) {
+                                  RedisTemplate<String, Object> redisTemplate,
+                                  PublicApiTenantQuotaRepository tenantQuotaRepository) {
         if (secret == null || secret.trim().isEmpty()) {
             throw new IllegalStateException("api.security.public.token.secret must not be blank");
         }
@@ -61,6 +63,7 @@ public class PublicClientTokenIssuer {
         this.promptRepository = promptRepository;
         this.clientService = clientService;
         this.redisTemplate = redisTemplate;
+        this.tenantQuotaRepository = tenantQuotaRepository;
     }
 
     public String issueToken(String clientId, String rawSecret, String requestedScope) {
@@ -112,6 +115,10 @@ public class PublicClientTokenIssuer {
         plim.put("m", client.getMaxMessages());
         plim.put("c", client.getMaxMessageChars());
         plim.put("t", client.getMaxTotalChars());
+        // ADR-004/QT02: snapshot aditivo; tenant sem linha usa fallback 100, nunca erro de emissão.
+        plim.put("r", tenantQuotaRepository.findById(client.getTenantId())
+                .map(q -> q.getChatRequestsPerMinute() == null ? 100 : q.getChatRequestsPerMinute())
+                .orElse(100));
 
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(client.getTokenTtlSeconds() == null ? 600 : client.getTokenTtlSeconds());

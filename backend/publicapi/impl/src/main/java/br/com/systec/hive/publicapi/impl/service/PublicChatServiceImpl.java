@@ -18,6 +18,7 @@ import br.com.systec.hive.publicapi.api.exceptions.PromptVersionNotFoundExceptio
 import br.com.systec.hive.publicapi.api.exceptions.SystemRoleNotAllowedException;
 import br.com.systec.hive.publicapi.api.exceptions.UnknownModelException;
 import br.com.systec.hive.publicapi.api.service.PublicChatService;
+import br.com.systec.hive.publicapi.impl.quota.QuotaDecision;
 import br.com.systec.hive.publicapi.impl.quota.RedisQuotaGuard;
 import br.com.systec.hive.publicapi.api.dto.ChatCompletionChoice;
 import br.com.systec.hive.publicapi.api.dto.ChatCompletionMessage;
@@ -136,8 +137,13 @@ public class PublicChatServiceImpl implements PublicChatService {
             throw new IllegalArgumentException("request_too_large");
         }
 
-        // quota before prompt
-        quotaGuard.checkClient(clientId, 60);
+        // ADR-004/QT03: contador compartilhado por tenant; m/c/t inalterados e r com fallback 100.
+        QuotaDecision decision = quotaGuard.acquireTenant(tenantId, limit(limits, "r", 100));
+        if (decision.measured() && httpRequest != null) {
+            httpRequest.setAttribute("publicapi.quota.limit", decision.limit());
+            httpRequest.setAttribute("publicapi.quota.remaining", decision.remaining());
+            httpRequest.setAttribute("publicapi.quota.reset", decision.resetEpochSeconds());
+        }
 
         // allowlist before lookup
         if (!allowlist.contains(request.getPrompt_code())) {
