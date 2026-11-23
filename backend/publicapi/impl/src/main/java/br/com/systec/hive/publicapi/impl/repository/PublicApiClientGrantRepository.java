@@ -10,5 +10,8 @@ import java.util.UUID;
 public interface PublicApiClientGrantRepository extends JpaRepository<PublicApiClientGrantEntity, UUID> {
     java.util.List<PublicApiClientGrantEntity> findByClientRef(java.util.UUID clientRef);
 
+    /** Bugfix N+1: uma query para todos os clients da página. */
+    java.util.List<PublicApiClientGrantEntity> findByClientRefIn(java.util.Collection<java.util.UUID> clientRefs);
+
     void deleteAllByClientRef(java.util.UUID clientRef);
 }
