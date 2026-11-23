@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "demand": "public-chat-api-adr-004",
+  "agent": "qa-engineer",
+  "phase": "Testing",
+  "gitSha": "147a3efe9b40f477d6e4087be2cd6439b0c2fb9c",
+  "commands": [
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 55000,
+      "stdoutHash": "5ce4061099d7164833370228356a83f64f9a27bcf02502312b8a605295d9bb53"
+    },
+    {
+      "cmd": "mvn verify -pl integration-test (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 44000,
+      "stdoutHash": "2f6bbb81606c2d642e2cfe3c38722037b14bfe95478d2035808a9de83dea8daf"
+    },
+    {
+      "cmd": "npm --prefix frontend run build",
+      "exitCode": 0,
+      "durationMs": 13000,
+      "stdoutHash": "37cb8f01f65e4ad505f5ea8b5832af409385ab960a77f4656827d9cd3b257b03"
+    },
+    {
+      "cmd": "mvn install -DskipTests (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 13000,
+      "stdoutHash": "fd7683b302f5f02f74fbf82d59f60b1fa3df2e92abd48a1d31dcbaf5d1e860b7"
+    },
+    {
+      "cmd": "node --input-type=module -e \"import { runPrdChecks } from './.opencode/plugins/lib/prd-adr-pipeline/checks.mjs'; console.log(JSON.stringify(runPrdChecks('.'),null,2));\"",
+      "exitCode": 0,
+      "durationMs": 200,
+      "stdoutHash": "eab81f73983246180e0f714bc57d6b0623ba7a9f34c0205f908bb9a7f0684944"
+    },
+    {
+      "cmd": "git diff --check",
+      "exitCode": 0,
+      "durationMs": 100,
+      "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 526, "failed": 0, "skipped": 0 },
+    "it": { "passed": 133, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 411, "failed": 0, "skipped": 0 }
+  },
+  "evaluation": {
+    "h1": {
+      "status": "PASS",
+      "detail": "suiteFull do harness.config.json (npm test) reexecutada: exit 0; front 411/411 (34 arquivos), backend 526/526 (era 523, +3 testes do guard), 0/0/0."
+    },
+    "h2": {
+      "status": "PASS",
+      "detail": "zero falhas pre-existentes; 66 arquivos surefire somados: 526 testes, 0/0/0."
+    },
+    "h3": {
+      "status": "N/A",
+      "detail": "sem UI nesta ADR e nenhuma mudanca na UI da ADR-003; namespace browser nao foi usado. chrome-devtools nao acionado."
+    },
+    "h4": {
+      "status": "PASS",
+      "detail": "V2 aplicada em banco real; plim.r com fallback; competicao entre clients do mesmo tenant e isolamento; checkClient fora do chat; checkTokenEndpoint 30/120/30 intacto; headers medidos/no fail-open; 429 local no token com envelope quota_exceeded; Lua byte-identico; ADR-001/002/003 e UI ADR-003 intactas; nenhum @Disabled/skip."
+    },
+    "h5": {
+      "status": "PASS",
+      "detail": "portas 8080/5432/5433/6379 verificadas por lsof, todas livres; nenhum pkill -f; 26 flattened poms restaurados; brain_store gravado."
+    },
+    "h6": {
+      "status": "PASS",
+      "detail": "VERDE. Suite 0 falhas · builds 0 erros · H3 N/A · code_reviews_by_adr.ADR-004 APPROVED 0/0/0/0 com CODE-REVIEW.md persistido · brain_store + workflow-state (somente bloco ADR-004) · portas livres · esteira conforme · zero diff proibido."
+    },
+    "esteira": {
+      "PRD-01": "PASS para public-chat-api. Unico achado global e o orfao pre-existente .spec/prd/chat-model-override/PROPOSAL.md — fora de escopo, nao bloqueia.",
+      "ADR-01": "PASS",
+      "ADR-02": "PASS",
+      "artefatos": "ADR-INDEX linha 4: order 4 sem pulo, ADR-001 d0d3890/PR#4, ADR-002 c71081e/PR#5, ADR-003 431150e/PR#6 merged; depends_on ADR-001; unit adr; 1:1 com ADRs/ADR-004-cota-tenant/; TASKS.md linha 1 = <!-- scope: adr/ADR-004 -->; ADR.md com depende-de e Interface congelada; SPEC.md + TASKS.md presentes; VERIFY.md AUSENTE (correto pre-merge)."
+    },
+    "codeReview": {
+      "artifact": ".spec/prd/public-chat-api/ADRs/ADR-004-cota-tenant/CODE-REVIEW.md",
+      "veredito": "APPROVED — 0 🔴 · 0 🟠 · 0 🟡 · 0 🔵",
+      "reviewer_session": "ses_dffa34effffeZMrCoNwL2t4pqv",
+      "data": "2026-11-22",
+      "estado": "workflow-state.json.code_reviews_by_adr.ADR-004 conferido: status passed, APPROVED, 0/0/0/0, artifact existente. git diff mostra SOMENTE o bloco ADR-004 adicionado; demais campos intactos.",
+      "superscricao": "CODE-REVIEW registra que os 2 testes de PublicAuthQuotaContractIT foram invertidos de 400 -> 429. Confirmado no diff: mudanca de contrato planejada na Decisao 6 desta ADR, nao remocao de teste."
+    },
+    "gatesFuncionais": {
+      "migration": "Flyway publicapi aplicou V2 em banco real (IT: flyway_schema_history_publicapi version=2 success=true count=1); tabela public_api_tenant_quota(tenant_id PK, chat_requests_per_minute INT DEFAULT 100, CHECK BETWEEN 1 AND 10000); backfill SELECT DISTINCT tenant_id,100 FROM public_api_client ON CONFLICT DO NOTHING; coluna antiga sem DROP; V1 e PublicApiDbUpdateConfig sem diff.",
+      "jwt": "IT prova plim.r=250 com linha e fallback 100 sem linha; plim mantem m/c/t; aud=hive.public e tenant-id inalterados.",
+      "competicao": "IT com dois clients do mesmo tenant e limite 1: primeiro 200 com X-RateLimit-{Limit,Remaining,Reset}-Requests medidos e sem Retry-After; segundo 429 com envelope error.code=quota_exceeded, Retry-After e os mesmos headers; tenants diferentes isolados.",
+      "chamadores": "PublicChatServiceImpl usa quotaGuard.acquireTenant(tenantId, limit(limits,'r',100)) na linha 141; checkClient nao aparece no chat; PublicAuthControllerV1 mantem checkTokenEndpoint(rlClient,ip,30,120,30).",
+      "headers": "chat 200 e 429 com headers somente quando QuotaDecision.measured()==true; fail-open devolve measured=false e omite X-RateLimit-*; Retry-After preservado nos 429.",
+      "token429": "handler local @ExceptionHandler(QuotaExceededException) em PublicAuthControllerV1 -> 429 + Retry-After + Cache-Control no-store/Pragma no-cache + envelope OpenAI quota_exceeded; IT de reflexao afirma existencia do handler; X-RateLimit-* ausentes no token; ADR-001 nao editada.",
+      "lua": "Bloco Java 'private static final String LUA_SCRIPT = ...;' com 1265 bytes tem SHA256 7f02dd6f433abdb0 identico em HEAD e worktree; payload Lua decodificado isolado = 794 bytes / bee23ee30de9 (o SHA declarado no CODE-REVIEW refere-se ao bloco de atribuicao). Sufixo aleatorio preservado; diff de RedisQuotaGuard restrito a acquireDecision/acquireTenant."
+    },
+    "bugs_identified": [
+      "DEBITO NAO BLOQUEANTE (CODE-REVIEW): falta IT de omissao dos X-RateLimit-* no HTTP quando Redis cai (unitario RedisQuotaGuardTest ja prova measured=false).",
+      "DEBITO NAO BLOQUEANTE (CODE-REVIEW): falta IT de staleness do plim.r (token antigo mantem limite ate reemissao).",
+      "FORA DE ESCOPO: orfao pre-existente .spec/prd/chat-model-override/PROPOSAL.md — unico motivo do ok:false global do runPrdChecks.",
+      "Operacional: mvn -pl exige cwd backend/; mvn install regenera .flattened-pom.xml (26 restaurados)."
+    ],
+    "confirmacoes": {
+      "numerosMedidos": "front 411, backend 526, ITs 133 — conferem com a evidencia declarada; backend 523 -> 526 sao +3 testes do guard",
+      "zeroDiff": "poms reais, migrations antigas, PublicApiDbUpdateConfig, ADR-001/002/003, UI da ADR-003, Mfa*, .flattened-pom.xml: zero diff. workflow-state.json difere somente pelo bloco ADR-004.",
+      "semCommit": "branch adr/public-chat-api/04-cota-tenant, HEAD 147a3ef (commit de abertura), arvore sem commit de implementacao; nenhum commit, merge ou checkout",
+      "escopoEscrita": "somente este arquivo de evidencia e nota no Brain; nenhum codigo-fonte alterado"
+    }
+  },
+  "brainStore": [
+    "arquitetura/projetos/arquitetura/projetos/hive/public-chat-api-adr-004-qa-verificacao-2026-11-22"
+  ],
+  "cleanup": {
+    "ports": ["8080", "5432", "5433", "6379"],
+    "portsStatus": "todas livres apos a execucao",
+    "killedProcesses": [],
+    "generatedArtifactsRestored": "26 .flattened-pom.xml regenerados por mvn test/verify/install restaurados ao estado pre-verificacao (10 rastreados via git checkout, 16 untracked via rm)"
+  },
+  "selfReported": false
+}

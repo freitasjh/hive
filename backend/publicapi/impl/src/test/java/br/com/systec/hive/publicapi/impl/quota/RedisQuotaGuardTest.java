@@ -79,6 +79,49 @@ class RedisQuotaGuardTest {
     }
 
     @Test
+    void when_underLimit_then_decisionIsMeasuredAndCarriesReset() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class)))
+                .thenReturn(List.of(1L, 5L));
+        long before = System.currentTimeMillis() / 1000L + 60L;
+
+        QuotaDecision decision = guard.acquireDecision(RedisQuotaGuard.tenantKey(UUID.randomUUID()), 100);
+
+        assertThat(decision.limit()).isEqualTo(100);
+        assertThat(decision.remaining()).isEqualTo(5L);
+        assertThat(decision.retryAfterSeconds()).isZero();
+        assertThat(decision.measured()).isTrue();
+        assertThat(decision.resetEpochSeconds()).isBetween(before, before + 2L);
+    }
+
+    @Test
+    void when_denied_then_exceptionCarriesMeasuredDecision() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class)))
+                .thenReturn(List.of(0L, 42L));
+
+        assertThatThrownBy(() -> guard.acquireDecision(RedisQuotaGuard.tenantKey(UUID.randomUUID()), 100))
+                .isInstanceOf(QuotaExceededException.class)
+                .satisfies(e -> {
+                    QuotaDecision decision = ((QuotaExceededException) e).getDecision();
+                    assertThat(decision.limit()).isEqualTo(100);
+                    assertThat(decision.remaining()).isZero();
+                    assertThat(decision.retryAfterSeconds()).isEqualTo(42L);
+                    assertThat(decision.measured()).isTrue();
+                });
+    }
+
+    @Test
+    void when_redisDown_then_decisionIsNotMeasuredAndNoValuesInvented() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class)))
+                .thenThrow(new RuntimeException("redis down"));
+
+        QuotaDecision decision = guard.acquireDecision(RedisQuotaGuard.tenantKey(UUID.randomUUID()), 100);
+
+        assertThat(decision.measured()).isFalse();
+        assertThat(decision.remaining()).isEqualTo(100L);
+        assertThat(decision.retryAfterSeconds()).isZero();
+    }
+
+    @Test
     void when_tokenEndpoint_then_threeChecks() {
         when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class)))
                 .thenReturn(List.of(1L, 1L));

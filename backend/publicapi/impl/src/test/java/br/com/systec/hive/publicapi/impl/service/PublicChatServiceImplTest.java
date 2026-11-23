@@ -18,6 +18,7 @@ import br.com.systec.hive.publicapi.api.exceptions.PromptNotInAllowlistException
 import br.com.systec.hive.publicapi.api.exceptions.PromptVersionNotFoundException;
 import br.com.systec.hive.publicapi.api.exceptions.SystemRoleNotAllowedException;
 import br.com.systec.hive.publicapi.api.exceptions.UnknownModelException;
+import br.com.systec.hive.publicapi.impl.quota.QuotaDecision;
 import br.com.systec.hive.publicapi.impl.quota.QuotaExceededException;
 import br.com.systec.hive.publicapi.impl.quota.RedisQuotaGuard;
 import org.junit.jupiter.api.AfterEach;
@@ -39,7 +40,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -73,6 +76,12 @@ class PublicChatServiceImplTest {
         if (plock != null) req.setAttribute("publicapi.plock", plock);
         if (plim != null) req.setAttribute("publicapi.plim", plim);
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+    }
+
+    @org.junit.jupiter.api.BeforeEach
+    void stubQuotaDecision() {
+        lenient().when(quotaGuard.acquireTenant(any(), anyInt()))
+                .thenReturn(new QuotaDecision(100, 99, 0, 0, false));
     }
 
     @AfterEach
@@ -159,7 +168,7 @@ class PublicChatServiceImplTest {
     void when_quotaExceeded_then_quotaException() throws Exception {
         auth("c");
         requestAttrs(List.of("p"), Map.of(), Map.of("m", 200, "c", 32000, "t", 256000));
-        doThrow(new QuotaExceededException("q", 5)).when(quotaGuard).checkClient(any(), any(Integer.class));
+        doThrow(new QuotaExceededException("q", 5)).when(quotaGuard).acquireTenant(any(), anyInt());
         TenantContext.runWithTenant(UUID.randomUUID(), () -> {
             assertThatThrownBy(() -> svc().complete(req("user", "hi", "p", null, null)))
                     .isInstanceOf(QuotaExceededException.class);

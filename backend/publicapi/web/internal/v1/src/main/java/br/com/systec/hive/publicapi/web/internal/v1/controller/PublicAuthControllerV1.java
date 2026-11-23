@@ -10,6 +10,7 @@ import br.com.systec.hive.commons.api.tools.controller.RestPath;
 import br.com.systec.hive.publicapi.api.exceptions.InvalidClientException;
 import br.com.systec.hive.publicapi.api.exceptions.InvalidGrantException;
 import br.com.systec.hive.publicapi.api.exceptions.InvalidScopeException;
+import br.com.systec.hive.publicapi.impl.quota.QuotaExceededException;
 import br.com.systec.hive.publicapi.impl.quota.RedisQuotaGuard;
 import br.com.systec.hive.publicapi.impl.service.PublicClientTokenIssuer;
 import br.com.systec.hive.publicapi.web.internal.v1.dto.TokenRequestDTO;
@@ -45,13 +46,14 @@ public class PublicAuthControllerV1 {
     }
 
     @Operation(summary = "Emite token client_credentials (JSON)",
-            description = "Basic preferido; corpo legado aceito. Erros locais: 400 invalid_request e 401 invalid_client. "
-                    + "Não há 429 neste endpoint neste ciclo (bugfix separado, ADR-004).")
+            description = "Basic preferido; corpo legado aceito. Erros locais: 400 invalid_request, 401 invalid_client e 429 quota_exceeded (Retry-After, ADR-004).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Token emitido; Cache-Control: no-store, Pragma: no-cache"),
             @ApiResponse(responseCode = "400", description = "invalid_request",
                     content = @Content(schema = @Schema(implementation = OpenAiError.class))),
             @ApiResponse(responseCode = "401", description = "invalid_client",
+                    content = @Content(schema = @Schema(implementation = OpenAiError.class))),
+            @ApiResponse(responseCode = "429", description = "quota_exceeded (Retry-After)",
                     content = @Content(schema = @Schema(implementation = OpenAiError.class)))
     })
     @PostMapping(value = "/token", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -61,12 +63,14 @@ public class PublicAuthControllerV1 {
     }
 
     @Operation(summary = "Emite token client_credentials (form-urlencoded)",
-            description = "Mesmo contrato da variante JSON. Erros locais: 400 invalid_request e 401 invalid_client.")
+            description = "Mesmo contrato da variante JSON. Erros locais: 400 invalid_request, 401 invalid_client e 429 quota_exceeded (ADR-004).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Token emitido; Cache-Control: no-store, Pragma: no-cache"),
             @ApiResponse(responseCode = "400", description = "invalid_request",
                     content = @Content(schema = @Schema(implementation = OpenAiError.class))),
             @ApiResponse(responseCode = "401", description = "invalid_client",
+                    content = @Content(schema = @Schema(implementation = OpenAiError.class))),
+            @ApiResponse(responseCode = "429", description = "quota_exceeded (Retry-After)",
                     content = @Content(schema = @Schema(implementation = OpenAiError.class)))
     })
     @PostMapping(value = "/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -149,6 +153,21 @@ public class PublicAuthControllerV1 {
         return ResponseEntity.status(400)
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .header("Pragma", "no-cache")
+                .body(new OpenAiError(err));
+    }
+
+    /**
+     * ADR-004/QT04: superscreve o 400 invalid_request que a ADR-001 registrava como comportamento
+     * real. Handler local tem precedência sobre o advice global (problem+json). Limites 30/120/30
+     * permanecem fixos e sem agregação — apenas Retry-After, sem headers X-RateLimit-*.
+     */
+    @ExceptionHandler(QuotaExceededException.class)
+    public ResponseEntity<OpenAiError> handleQuota(QuotaExceededException ex) {
+        OpenAiError.Error err = new OpenAiError.Error("quota_exceeded", "invalid_request_error", null, "quota_exceeded");
+        return ResponseEntity.status(429)
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .header("Pragma", "no-cache")
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
                 .body(new OpenAiError(err));
     }
 

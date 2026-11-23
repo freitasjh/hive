@@ -128,27 +128,46 @@ public class RedisQuotaGuard {
     }
 
     private void acquire(String key, int limit) {
+        acquireDecision(key, limit);
+    }
+
+    /**
+     * ADR-004/QT04: mesma chamada Lua e mesmo fail-open, mas devolvendo a decisão medida.
+     * O {@code reset} é derivado em Java em epoch seconds — o script continua intocável.
+     */
+    public QuotaDecision acquireDecision(String key, int limit) {
+        long now = System.currentTimeMillis();
+        long nowEpoch = now / 1000L;
         try {
-            long now = System.currentTimeMillis();
             String suffix = Long.toHexString(ThreadLocalRandom.current().nextLong());
             List<?> result = redisTemplate.execute(script, Collections.singletonList(key),
                     String.valueOf(now), String.valueOf(windowSeconds), String.valueOf(limit), suffix);
             if (result == null || result.isEmpty()) {
                 // No answer from Redis: treat as allowed (fail-open on ambiguous response).
                 log.warn("Redis quota check returned no result for key {}; failing open", key);
-                return;
+                return new QuotaDecision(limit, limit, 0, nowEpoch + windowSeconds, false);
             }
             int status = ((Number) result.get(0)).intValue();
+            long second = result.size() > 1 && result.get(1) != null
+                    ? ((Number) result.get(1)).longValue() : windowSeconds;
             if (status == 0) {
-                long retryAfter = result.size() > 1 && result.get(1) != null
-                        ? ((Number) result.get(1)).longValue() : windowSeconds;
-                throw new QuotaExceededException("rate limit exceeded for key " + key, retryAfter);
+                long retryAfter = Math.max(1L, second);
+                throw new QuotaExceededException("rate limit exceeded for key " + key,
+                        new QuotaDecision(limit, 0, retryAfter, nowEpoch + retryAfter, true));
             }
+            return new QuotaDecision(limit, second, 0, nowEpoch + windowSeconds, true);
         } catch (QuotaExceededException e) {
             throw e;
         } catch (Exception e) {
             log.error("Redis unavailable during quota check for key {}; failing open", key, e);
+            return new QuotaDecision(limit, limit, 0, nowEpoch + windowSeconds, false);
         }
+    }
+
+    /** ADR-004/QT03/QT04: decisão por tenant, com a mesma chave do {@code checkTenant}. */
+    public QuotaDecision acquireTenant(UUID tenantId, int tenantLimitPerMinute) {
+        int limit = tenantLimitPerMinute <= 0 ? 1 : tenantLimitPerMinute;
+        return acquireDecision(tenantKey(tenantId), limit);
     }
 
     public static String clientKey(String clientId) {

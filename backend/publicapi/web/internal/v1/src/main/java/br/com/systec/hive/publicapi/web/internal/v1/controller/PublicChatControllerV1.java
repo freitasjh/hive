@@ -24,6 +24,7 @@ import br.com.systec.hive.publicapi.api.dto.ChatCompletionResponse;
 import br.com.systec.hive.publicapi.impl.quota.QuotaExceededException;
 import br.com.systec.hive.publicapi.api.dto.OpenAiError;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -60,7 +61,7 @@ public class PublicChatControllerV1 {
     @HasPermission("PUBLIC_CHAT_COMPLETE")
     public ResponseEntity<ChatCompletionResponse> completions(@RequestBody @Valid ChatCompletionRequestDTO body) {
         ChatCompletionResponse resp = publicChatService.complete(body);
-        return ResponseEntity.ok(resp);
+        return ResponseEntity.ok().headers(measuredHeaders()).body(resp);
     }
 
     @ExceptionHandler({PromptNotInAllowlistException.class})
@@ -113,8 +114,13 @@ public class PublicChatControllerV1 {
 
     @ExceptionHandler(QuotaExceededException.class)
     public ResponseEntity<OpenAiError> handleQuota(QuotaExceededException ex) {
-        return ResponseEntity.status(429)
-                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Retry-After", String.valueOf(ex.getRetryAfterSeconds()));
+        br.com.systec.hive.publicapi.impl.quota.QuotaDecision decision = ex.getDecision();
+        if (decision != null && decision.measured()) {
+            addRateLimitHeaders(headers, decision.limit(), decision.remaining(), decision.resetEpochSeconds());
+        }
+        return ResponseEntity.status(429).headers(headers)
                 .body(new OpenAiError(new OpenAiError.Error("quota_exceeded", "invalid_request_error", null, "quota_exceeded")));
     }
 
@@ -129,6 +135,33 @@ public class PublicChatControllerV1 {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<OpenAiError> handleGeneric(Exception ex) {
         return openAi(500, "internal_error", "server_error");
+    }
+
+    /** Headers só existem quando o guard mediu valores — fail-open nunca inventa limit/remaining. */
+    private static HttpHeaders measuredHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        try {
+            var attrs = org.springframework.web.context.request.RequestContextHolder.currentRequestAttributes();
+            if (!(attrs instanceof org.springframework.web.context.request.ServletRequestAttributes servletAttrs)) {
+                return headers;
+            }
+            var request = servletAttrs.getRequest();
+            Object limit = request.getAttribute("publicapi.quota.limit");
+            Object remaining = request.getAttribute("publicapi.quota.remaining");
+            Object reset = request.getAttribute("publicapi.quota.reset");
+            if (limit instanceof Number l && remaining instanceof Number r && reset instanceof Number t) {
+                addRateLimitHeaders(headers, l.intValue(), r.longValue(), t.longValue());
+            }
+        } catch (IllegalStateException ignored) {
+            // sem request attributes: omitir headers
+        }
+        return headers;
+    }
+
+    private static void addRateLimitHeaders(HttpHeaders headers, int limit, long remaining, long resetEpoch) {
+        headers.set("X-RateLimit-Limit-Requests", String.valueOf(limit));
+        headers.set("X-RateLimit-Remaining-Requests", String.valueOf(remaining));
+        headers.set("X-RateLimit-Reset-Requests", String.valueOf(resetEpoch));
     }
 
     private ResponseEntity<OpenAiError> openAi(int status, String code, String type) {
