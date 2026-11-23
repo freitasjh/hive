@@ -1,6 +1,6 @@
 # ADR-005 — Fronteira de módulos: eliminar aresta `publicapi/impl → assistant/impl` (K3)
 
-**Status:** in-progress · **Data:** 2026-11-23 · **PRD:** `public-chat-api` · **Branch:** `adr/public-chat-api/05-fronteira-modulos`
+**Status:** merged · **Data:** 2026-11-23 · **PRD:** `public-chat-api` · **Branch:** `adr/public-chat-api/05-fronteira-modulos` · **Merge:** `58c8c9d` (PR #8)
 
 **depende-de:** ADR-002 (merged — conversão e trace centralizadas sem reabrir o gateway).
 

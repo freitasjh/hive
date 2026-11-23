@@ -4,6 +4,22 @@
   "agent": "qa-engineer",
   "phase": "Testing",
   "gitSha": "0e59bda874bc4430c364248a25bdc0f646da5d9e",
+  "mergeVerification": {
+    "status": "MERGE_CONFIRMADO",
+    "data": "2026-11-23",
+    "mergeCommitOriginMain": "58c8c9dede599b6d156642f87f274f862ffc1c84",
+    "mergeCommitSubject": "Merge pull request #8 from freitasjh/adr/public-chat-api/05-fronteira-modulos",
+    "adrsCommit": "871fef453900db8a960aa937e20e56006fbeacd5",
+    "ancestryExit": 0,
+    "provas": [
+      "git fetch origin main: 2cdfebb..58c8c9d main -> origin/main (exit 0)",
+      "git merge-base --is-ancestor 871fef4... origin/main: exit 0",
+      "git log --oneline -5 origin/main: 58c8c9d Merge PR #8 -> 871fef4 -> 0e59bda -> 2cdfebb -> 948fc42",
+      "git ls-tree -r --name-only origin/main -- .spec/prd/public-chat-api/ADRs/ADR-005-fronteira-modulos: ADR.md, CODE-REVIEW.md, SPEC.md, TASKS.md presentes",
+      "git show -s 58c8c9d: pais 2cdfebb (main) e 871fef4 (ADR-005), 2026-11-23 19:21:48 -0300"
+    ],
+    "observacoes": "branch local permanece; main local ainda em 2cdfebb (fetch atualizou apenas origin/main); VERIFY.md ainda ausente em origin/main — geracao fica com o orquestrador. Nenhum checkout/commit/merge executado pelo QA."
+  },
   "commands": [
     {
       "cmd": "npm test",
