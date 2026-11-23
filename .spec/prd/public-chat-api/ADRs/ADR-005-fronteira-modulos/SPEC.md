@@ -50,7 +50,7 @@ ADRs afetados: ADR-019 (rename), ADR-021 (gateway em `ai/api`), ADR-002 (paridad
 
 - **RF1** — remover a dependência `hive-assistant-impl` de `publicapi/impl`.
 - **RF2** — declarar `TurnPolicyResolver` e `TurnOutcomeReporter` em `assistant/api` (com o record `Resolved`), fazer os impls existentes implementá-las e injetar as portas em `publicapi/impl` — sem duplicar regra.
-- **RF3** — preservar diagnóstico e telemetria do turno (`ChatTrace`, 9 parâmetros do reporter).
+- **RF3** — preservar diagnóstico e telemetria do turno (`ChatTrace`, 11 parâmetros do reporter).
 
 ## 9. Requisitos Não-Funcionais
 
@@ -75,7 +75,7 @@ ADRs afetados: ADR-019 (rename), ADR-021 (gateway em `ai/api`), ADR-002 (paridad
 | Arrastar infra para a API (opção 1) | forma escolhida foi portas; impls e `CredentialResolver`/repo permanecem na impl |
 | Refactor muda ordem do prompt ou tokens | baseline congelado + `ChatCallerParityIT` reexecutado |
 | Bean duplo ou ambiguidade de injeção | uma `@Service` por porta, sem `@Qualifier`; teste de startup/contexto |
-| Assinatura do reporter perder `turnId`/`clientId` | port com os 9 parâmetros atuais; IT de trace da ADR-002 |
+| Assinatura do reporter perder `turnId`/`clientId` | port com os 11 parâmetros atuais; IT de trace da ADR-002 |
 | Nova aresta `assistant/api → history/api` virar ciclo | `history/api` não depende de `assistant/api`; verificado nos poms |
 
 ## 12. Fontes

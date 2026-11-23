@@ -41,7 +41,7 @@
 - **Arquivos:** `assistant/api` (2 portas + record; pom com `hive-history-api`), `assistant/impl` (`ProviderResolution implements TurnPolicyResolver`, `TurnOutcomeMapper implements TurnOutcomeReporter`), `publicapi/impl` (imports/campo/construtor para as portas; `ProviderResolution.Resolved` → `TurnPolicyResolver.Resolved`), `PublicChatServiceImplTest`.
 - **Teste primeiro:** `ChatCallerParityIT` falha se ordem/tokens divergirem; teste de startup falha se houver bean ambíguo.
 - **Cenários:**
-  - Sucesso: impls mantidos como único dono da regra; `ChatServiceImpl` continua com classes concretas; os 9 parâmetros do reporter preservam `turnId`/`clientId`.
+  - Sucesso: impls mantidos como único dono da regra; `ChatServiceImpl` continua com classes concretas; os 11 parâmetros do reporter preservam `turnId`/`clientId`.
   - Falha: lógica duplicada ou `ChatTrace` divergente → corrigir antes de seguir.
   - Borda: `ChatTurnGateway`, `TurnRequest`/`TurnReply` e `ChatTrace` sem diff; anônimo `new ProviderResolution(null,null){...}` do teste passa a retornar o record da porta.
 - **DoD:** baseline idêntico; suíte verde.

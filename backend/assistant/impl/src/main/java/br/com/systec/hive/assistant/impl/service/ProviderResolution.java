@@ -1,5 +1,6 @@
 package br.com.systec.hive.assistant.impl.service;
 
+import br.com.systec.hive.assistant.api.service.TurnPolicyResolver;
 import br.com.systec.hive.assistant.api.util.ProviderOverrideGuard;
 import br.com.systec.hive.api.domain.TenantLlmConfig;
 import br.com.systec.hive.api.service.TenantLlmConfigService;
@@ -47,7 +48,7 @@ import java.util.UUID;
  * @see Resolved
  */
 @Service
-public class ProviderResolution {
+public class ProviderResolution implements TurnPolicyResolver {
 
     private final TenantLlmConfigService tenantLlmConfigService;
     private final CredentialResolver credentialResolver;
@@ -65,6 +66,7 @@ public class ProviderResolution {
      * operator about which screen to visit, and a silent default would turn it into a conversation
      * answered by a model nobody chose and nobody is paying for.
      */
+    @Override
     public Resolved resolve(UUID tenantId) {
         return resolve(tenantId, null, null);
     }
@@ -82,6 +84,7 @@ public class ProviderResolution {
      * the catalog (400) BEFORE resolving the credential (422). A typo in the model must never read —
      * and possibly create — a credential row for a vendor that would never be asked to use it.
      */
+    @Override
     public Resolved resolve(UUID tenantId, AiProvider providerOverride, String modelOverride) {
         AiProvider provider;
         String model;
@@ -107,12 +110,4 @@ public class ProviderResolution {
         return new Resolved(provider, model, credential.apiKey(), credential.baseUrl());
     }
 
-    /**
-     * @param provider effective vendor: the tenant's default or the conversation's override
-     * @param model    effective model, already validated against the catalog
-     * @param apiKey   resolved credential, or {@code null} for a vendor that needs none
-     * @param baseUrl  resolved base URL, or {@code null} for the vendor's own default
-     */
-    public record Resolved(AiProvider provider, String model, String apiKey, String baseUrl) {
-    }
 }

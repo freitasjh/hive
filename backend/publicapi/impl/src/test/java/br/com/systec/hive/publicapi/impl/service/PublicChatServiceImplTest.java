@@ -8,7 +8,8 @@ import br.com.systec.hive.ai.api.domain.TurnRequest;
 import br.com.systec.hive.assistant.api.service.PromptTemplateService;
 import br.com.systec.hive.commons.impl.security.TenantContext;
 import br.com.systec.hive.provider.api.AiProvider;
-import br.com.systec.hive.assistant.impl.service.ProviderResolution;
+import br.com.systec.hive.assistant.api.service.TurnOutcomeReporter;
+import br.com.systec.hive.assistant.api.service.TurnPolicyResolver;
 import br.com.systec.hive.publicapi.api.dto.ChatCompletionRequestDTO;
 import br.com.systec.hive.publicapi.api.dto.ChatCompletionResponse;
 import br.com.systec.hive.publicapi.api.exceptions.InvalidClientException;
@@ -53,14 +54,19 @@ class PublicChatServiceImplTest {
     @Mock private PromptGrantResolver promptGrantResolver;
     // providerResolution is provided by a subclass override below (avoids mocking final-ish classes on JDK 25)
     @Mock private br.com.systec.hive.ai.api.port.ChatTurnGateway turnGateway;
-    @Mock private br.com.systec.hive.assistant.impl.service.TurnOutcomeMapper turnOutcomeMapper;
+    @Mock private TurnOutcomeReporter turnOutcomeMapper;
     @Mock private RedisQuotaGuard quotaGuard;
 
     private PublicChatServiceImpl svc() {
-        ProviderResolution providerResolution = new ProviderResolution(null, null) {
+        TurnPolicyResolver providerResolution = new TurnPolicyResolver() {
             @Override
             public Resolved resolve(java.util.UUID tenantId) {
                 return new Resolved(br.com.systec.hive.provider.api.AiProvider.OPENAI, "gpt-4", "key", "url");
+            }
+
+            @Override
+            public Resolved resolve(java.util.UUID tenantId, AiProvider providerOverride, String modelOverride) {
+                return resolve(tenantId);
             }
         };
         return new PublicChatServiceImpl(promptTemplateService, promptGrantResolver, providerResolution, turnGateway, turnOutcomeMapper, quotaGuard);
