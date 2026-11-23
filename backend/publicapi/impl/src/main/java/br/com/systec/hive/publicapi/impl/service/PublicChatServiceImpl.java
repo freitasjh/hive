@@ -7,8 +7,8 @@ import br.com.systec.hive.ai.api.domain.TurnRequest;
 import br.com.systec.hive.ai.api.port.ChatTurnGateway;
 import br.com.systec.hive.assistant.api.service.PromptTemplateService;
 import br.com.systec.hive.history.api.util.ProviderMessages;
-import br.com.systec.hive.assistant.impl.service.ProviderResolution;
-import br.com.systec.hive.assistant.impl.service.TurnOutcomeMapper;
+import br.com.systec.hive.assistant.api.service.TurnOutcomeReporter;
+import br.com.systec.hive.assistant.api.service.TurnPolicyResolver;
 import br.com.systec.hive.commons.impl.security.TenantContext;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.publicapi.api.exceptions.PromptNotActiveException;
@@ -48,16 +48,16 @@ public class PublicChatServiceImpl implements PublicChatService {
 
     private final PromptTemplateService promptTemplateService;
     private final PromptGrantResolver promptGrantResolver;
-    private final ProviderResolution providerResolution;
+    private final TurnPolicyResolver providerResolution;
     private final ChatTurnGateway turnGateway;
-    private final TurnOutcomeMapper turnOutcomeMapper;
+    private final TurnOutcomeReporter turnOutcomeMapper;
     private final RedisQuotaGuard quotaGuard;
 
     public PublicChatServiceImpl(PromptTemplateService promptTemplateService,
                                  PromptGrantResolver promptGrantResolver,
-                                 ProviderResolution providerResolution,
+                                 TurnPolicyResolver providerResolution,
                                  ChatTurnGateway turnGateway,
-                                 TurnOutcomeMapper turnOutcomeMapper,
+                                 TurnOutcomeReporter turnOutcomeMapper,
                                  RedisQuotaGuard quotaGuard) {
         this.promptTemplateService = promptTemplateService;
         this.promptGrantResolver = promptGrantResolver;
@@ -154,7 +154,7 @@ public class PublicChatServiceImpl implements PublicChatService {
         PromptTemplate prompt = promptGrantResolver.resolve(request.getPrompt_code(), allowlist, pinned);
 
         // unknown model check
-        ProviderResolution.Resolved resolved = providerResolution.resolve(tenantId);
+        TurnPolicyResolver.Resolved resolved = providerResolution.resolve(tenantId);
         if (request.getModel() != null && !request.getModel().isBlank()
                 && !request.getModel().equals(resolved.model())) {
             throw new UnknownModelException();

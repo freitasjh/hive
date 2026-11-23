@@ -2,6 +2,7 @@ package br.com.systec.hive.assistant.impl.service;
 
 import br.com.systec.hive.assistant.api.diagnostics.ChatTrace;
 import br.com.systec.hive.assistant.api.diagnostics.ChatTraceRecorder;
+import br.com.systec.hive.assistant.api.service.TurnOutcomeReporter;
 import br.com.systec.hive.history.api.domain.ChatMessage;
 import br.com.systec.hive.assistant.api.domain.InferenceParams;
 import br.com.systec.hive.assistant.api.domain.PromptTemplate;
@@ -68,7 +69,7 @@ import java.util.UUID;
  * this class sees a turn in isolation.
  */
 @Service
-public class TurnOutcomeMapper {
+public class TurnOutcomeMapper implements TurnOutcomeReporter {
 
     /**
      * Failure label written to the trace when the provider answered 200 with no usable text. It is a
@@ -108,6 +109,7 @@ public class TurnOutcomeMapper {
      * @param turnId           public turn id; {@code null} for the human chat flow (ADR-002/K6)
      * @param clientId         authenticated public client id; {@code null} for the human chat flow
      */
+    @Override
     public void resolve(UUID sessionId, UUID tenantId, UUID promptTemplateId, AiProvider provider,
                         String model, PromptTemplate promptTemplate, List<ChatMessage> history,
                         TurnReply reply, long elapsedMs, UUID turnId, String clientId) {

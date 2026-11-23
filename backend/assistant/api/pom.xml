@@ -27,6 +27,12 @@
         </dependency>
         <!-- ADR-021: `history-api` saiu quando TurnRequest (com o campo history) mudou para ai/api.
              Nenhum outro tipo deste modulo usa history/api; os chamadores declaram a dependencia. -->
+        <!-- ADR-005: TurnOutcomeReporter usa history.api.domain.ChatMessage (api → api, sem ciclo). -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-history-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
         <dependency>
             <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-provider-api</artifactId>

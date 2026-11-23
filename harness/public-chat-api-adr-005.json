@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "demand": "public-chat-api-adr-005",
+  "agent": "qa-engineer",
+  "phase": "Testing",
+  "gitSha": "0e59bda874bc4430c364248a25bdc0f646da5d9e",
+  "commands": [
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 86000,
+      "stdoutHash": "7e5f526aa5c315dea50f6d45ebc9b320995490507324c2d94150c30c1f3196cb"
+    },
+    {
+      "cmd": "mvn verify -pl integration-test (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 61000,
+      "stdoutHash": "e29a3559cac875cd14add16da78e721c8d3d95e0fd950fb0a8a6d84145becf12"
+    },
+    {
+      "cmd": "npm --prefix frontend run build",
+      "exitCode": 0,
+      "durationMs": 19000,
+      "stdoutHash": "9aa2f88a2dfdef249df283b220e96a44c305939eca9455910310e2cdfd2b27e5"
+    },
+    {
+      "cmd": "mvn install -DskipTests (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 14000,
+      "stdoutHash": "755f90c88ad8a845764702bf200840d2f6ede9d60b7bf27a0210317fd655321a"
+    },
+    {
+      "cmd": "node --input-type=module -e \"import { runPrdChecks } from './.opencode/plugins/lib/prd-adr-pipeline/checks.mjs'; console.log(JSON.stringify(runPrdChecks('.'),null,2));\"",
+      "exitCode": 0,
+      "durationMs": 200,
+      "stdoutHash": "eab81f73983246180e0f714bc57d6b0623ba7a9f34c0205f908bb9a7f0684944"
+    },
+    {
+      "cmd": "mvn dependency:tree -pl assistant/api -Dincludes=br.com.systec.hive (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 5000,
+      "stdoutHash": "4967b290d741be2d5686756bfdf0eb27627c9e536567050f994f43353bc57721"
+    },
+    {
+      "cmd": "mvn dependency:tree -pl publicapi/impl -Dincludes=br.com.systec.hive (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 5000,
+      "stdoutHash": "cf055ed790d152e893a662682089c7264b765bee3503c91fff4b77"
+    },
+    {
+      "cmd": "mvn dependency:tree -pl history/api -Dincludes=br.com.systec.hive (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 5000,
+      "stdoutHash": "7e26196acfec70a342008528bddb09ecb7ed6c5dffed0a35b176d743d2edd648"
+    },
+    {
+      "cmd": "git diff --check",
+      "exitCode": 0,
+      "durationMs": 100,
+      "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 526, "failed": 0, "skipped": 0 },
+    "it": { "passed": 133, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 411, "failed": 0, "skipped": 0 }
+  },
+  "evaluation": {
+    "h1": {
+      "status": "PASS",
+      "detail": "suiteFull do harness.config.json (npm test) reexecutada: exit 0; front 411/411, backend 526/526, 0/0/0 — refactor sem testes novos, numeros declarados confirmados."
+    },
+    "h2": {
+      "status": "PASS",
+      "detail": "zero falhas pre-existentes; 66 arquivos surefire somados: 526 testes, 0/0/0."
+    },
+    "h3": {
+      "status": "N/A",
+      "detail": "sem UI nesta ADR e nenhuma mudanca na UI da ADR-003; namespace browser nao foi usado; chrome-devtools nao acionado."
+    },
+    "h4": {
+      "status": "PASS",
+      "detail": "aresta publicapi/impl -> assistant/impl eliminada; unica aresta nova assistant/api -> history/api sem ciclo; uma @Service por porta sem @Qualifier; startup real do contexto Spring nos ITs sem NoUniqueBeanDefinitionException; TurnOutcomeReporter com 11 parametros; ChatCallerParityIT e contratos ADR-001/003/004 intactos."
+    },
+    "h5": {
+      "status": "PASS",
+      "detail": "portas 8080/5432/5433/6379 livres; nenhum pkill -f; 26 flattened poms restaurados; brain_store gravado."
+    },
+    "h6": {
+      "status": "PASS",
+      "detail": "VERDE. Suite 0 falhas · builds 0 erros · H3 N/A · code_reviews_by_adr.ADR-005 APPROVED 0/0/0/0 com CODE-REVIEW.md · brain_store + workflow-state (somente bloco ADR-005) · portas livres · esteira conforme · zero diff proibido."
+    },
+    "esteira": {
+      "PRD-01": "PASS para public-chat-api. Unico achado global e o orfao pre-existente .spec/prd/chat-model-override/PROPOSAL.md — fora de escopo, nao bloqueia.",
+      "ADR-01": "PASS",
+      "ADR-02": "PASS",
+      "artefatos": "ADR-INDEX linha 5: order 5 sem pulo, ADR-001..004 merged (d0d3890/c71081e/431150e/37f0cab), depends_on ADR-002, unit adr; 1:1 com ADRs/ADR-005-fronteira-modulos/; TASKS.md linha 1 = <!-- scope: adr/ADR-005 -->; ADR.md com depende-de e Interface congelada; SPEC.md + TASKS.md presentes; CODE-REVIEW.md APPROVED; VERIFY.md AUSENTE (correto pre-merge). Correcao documental 9 -> 11 parametros conferida em ADR.md/SPEC.md/TASKS.md."
+    },
+    "codeReview": {
+      "artifact": ".spec/prd/public-chat-api/ADRs/ADR-005-fronteira-modulos/CODE-REVIEW.md",
+      "veredito": "APPROVED — 0 🔴 · 0 🟠 · 0 🟡 · 0 🔵",
+      "reviewer_session": "ses_dffa34effffeZMrCoNwL2t4pqv",
+      "data": "2026-11-23",
+      "estado": "workflow-state.json.code_reviews_by_adr.ADR-005 conferido: status passed, APPROVED, 0/0/0/0, artifact existente. git diff mostra SOMENTE o bloco ADR-005 adicionado ao lado dos blocos ADR-001..004.",
+      "riscoResolvido": "CODE-REVIEW registrou que o reviewer nao reexecutou o startup; QA confirmou nos ITs: contexto Spring subiu e nenhum NoUniqueBeanDefinitionException apareceu no log."
+    },
+    "gatesFuncionais": {
+      "aresta": "grep -R 'assistant.impl' em publicapi/impl/src/main/java: limpo. pom de publicapi/impl declara apenas hive-assistant-api (nao hive-assistant-impl).",
+      "grafo": "dependency:tree: assistant/api -> commons-api, ai-api, history-api, provider-api; publicapi/impl -> publicapi-api, assistant-api, ai-api, history-api, tenant-api, provider-api, provider-langchain4j, commons-impl, commons-api; history/api -> commons-api, provider-api (nao assistant-api). Unica aresta nova assistant/api -> history/api, api->api, sem ciclo.",
+      "beans": "ProviderResolution implements TurnPolicyResolver (@Service) e TurnOutcomeMapper implements TurnOutcomeReporter (@Service); nenhum @Qualifier em assistant/impl nem publicapi/impl; uma implementacao por porta; ChatServiceImpl segue com concretos.",
+      "startup": "mvn verify -pl integration-test subiu o contexto Spring em todos os ITs; log nao contem NoUniqueBeanDefinitionException.",
+      "reporter": "TurnOutcomeReporter.resolve tem 11 parametros: sessionId, tenantId, promptTemplateId, provider, model, promptTemplate, history, reply, elapsedMs, turnId, clientId — telemetria e trace preservados.",
+      "paridade": "ChatCallerParityIT 1/1: ordem SystemMessage -> conversacao, tokens 120/340/460/STOP, trace com turnId/clientId. ChatTurnGateway/TurnRequest/TurnReply/ChatTrace sem diff.",
+      "contratos": "OpenApiSpecIT 9/9, PublicApiClientAdminIT 10/10, PublicApiTenantQuotaIT 4/4; ADR-001/002/003/004 sem diff de arquivos.",
+      "higiene": "zero diff em skills, AGENTS.md, Mfa*, UI, configs, .flattened-pom.xml (restaurados); nenhum teste apagado ou @Disabled (unico hit de 'skips' e javadoc em ProviderResolution:39)."
+    },
+    "bugs_identified": [
+      "FORA DE ESCOPO: orfao pre-existente .spec/prd/chat-model-override/PROPOSAL.md — unico motivo do ok:false global do runPrdChecks.",
+      "Operacional: mvn -pl exige cwd backend/; mvn install regenera .flattened-pom.xml (26 restaurados).",
+      "Informativo: reviewer nao reexecutou startup; QA confirmou por IT que o contexto sobe sem bean ambiguo."
+    ],
+    "confirmacoes": {
+      "numerosMedidos": "front 411, backend 526, ITs 133 — identicos ao pre-refactor, conforme evidencia declarada",
+      "semCommit": "branch adr/public-chat-api/05-fronteira-modulos, HEAD 0e59bda (commit de abertura), arvore sem commit de implementacao; nenhum commit, merge ou checkout",
+      "escopoEscrita": "somente este arquivo de evidencia e nota no Brain; nenhum codigo-fonte alterado",
+      "documentacao": "ADR.md/SPEC.md/TASKS.md da propria ADR-005 foram modificadas para corrigir 9 -> 11 parametros, conforme autorizacao; nenhum artefato de ADR anterior alterado"
+    }
+  },
+  "brainStore": [
+    "arquitetura/projetos/arquitetura/projetos/hive/public-chat-api-adr-005-qa-verificacao-2026-11-23"
+  ],
+  "cleanup": {
+    "ports": ["8080", "5432", "5433", "6379"],
+    "portsStatus": "todas livres apos a execucao",
+    "killedProcesses": [],
+    "generatedArtifactsRestored": "26 .flattened-pom.xml regenerados por mvn test/verify/install restaurados ao estado pre-verificacao (10 rastreados via git checkout, 16 untracked via rm)"
+  },
+  "selfReported": false
+}
