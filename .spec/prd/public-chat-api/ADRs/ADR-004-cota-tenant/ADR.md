@@ -1,6 +1,6 @@
 # ADR-004 — Cota por tenant (100 req/min compartilhado) e bugfix do 429 no token
 
-**Status:** in-progress · **Data:** 2026-11-22 · **PRD:** `public-chat-api` · **Branch:** `adr/public-chat-api/04-cota-tenant`
+**Status:** merged · **Data:** 2026-11-22 · **PRD:** `public-chat-api` · **Branch:** `adr/public-chat-api/04-cota-tenant` · **Merge:** `37f0cab` (PR #7)
 
 **depende-de:** ADR-001 (merged — contrato público tipado e spec OpenAPI). ADR-003 (merged) trata credenciais/admin; sem acoplamento com esta ADR.
 

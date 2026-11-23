@@ -4,6 +4,22 @@
   "agent": "qa-engineer",
   "phase": "Testing",
   "gitSha": "147a3efe9b40f477d6e4087be2cd6439b0c2fb9c",
+  "mergeVerification": {
+    "status": "MERGE_CONFIRMADO",
+    "data": "2026-11-23",
+    "mergeCommitOriginMain": "37f0cab4b5f597286f5241c5bf2eed866837a32b",
+    "mergeCommitSubject": "Merge pull request #7 from freitasjh/adr/public-chat-api/04-cota-tenant",
+    "adrsCommit": "c15fbabade055a842b63f95daddf6806aee795a6",
+    "ancestryExit": 0,
+    "provas": [
+      "git fetch origin main: 289172b..37f0cab main -> origin/main (exit 0)",
+      "git merge-base --is-ancestor c15fbab... origin/main: exit 0",
+      "git log --oneline -5 origin/main: 37f0cab Merge PR #7 -> c15fbab -> 147a3ef -> 289172b -> 431150e",
+      "git ls-tree -r --name-only origin/main -- .spec/prd/public-chat-api/ADRs/ADR-004-cota-tenant: ADR.md, CODE-REVIEW.md, SPEC.md, TASKS.md presentes",
+      "git show -s 37f0cab: pais 289172b (main) e c15fbab (ADR-004), 2026-11-23 10:25:54 -0300"
+    ],
+    "observacoes": "branch local permanece; main local ainda em 289172b (fetch atualizou apenas origin/main); VERIFY.md ainda ausente em origin/main — geracao fica com o orquestrador. Nenhum checkout/commit/merge executado pelo QA."
+  },
   "commands": [
     {
       "cmd": "npm test",
