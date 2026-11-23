@@ -83,5 +83,11 @@
   },
   "overrides": [],
   "prompt_assumptions": [],
+  "prd_adr": {
+    "prd_id": "public-chat-api",
+    "prd_status": "archived",
+    "active_adr": "ADR-005",
+    "adr_order": ["ADR-001", "ADR-002", "ADR-003", "ADR-004", "ADR-005"]
+  },
   "last_update": "2026-11-20T00:00:00Z"
 }

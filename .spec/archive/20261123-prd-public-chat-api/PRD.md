@@ -2,6 +2,7 @@
 prd_id: public-chat-api
 title: Evolução da API pública do Assistant (chat-completion)
 status: aprovado_humano
+prd_status: archived
 date: 2026-11-21
 owner: architect (proposta) — aprovação: operador humano
 ---
@@ -134,3 +135,13 @@ Veredito: APROVADO
 **Trava levantada:** campos marcados pelo operador em 2026-11-21; `prd_version: 2`. Com `unit: adr`, linhas `in-progress`/`merged` exigem `SPEC.md` + `TASKS.md` (e `VERIFY.md` após merge) — `.agents/rules/prd-adr-pipeline.md:28-33`.
 
 **Marcos concluídos (2026-11-21):** índice convertido ao formato canônico; ADR-001 aberta, implementada, revisada e mesclada (PR #4, merge `d0d3890`); `VERIFY.md` publicado em `5658264`. Próximo: ADR-002.
+
+## Arquivamento
+
+- **Data:** 2026-11-23.
+- **Duração:** 2026-11-21 → 2026-11-23.
+- **Traceability:** 100% — 23/23 RFs, 27/27 tasks, 0 órfãos (`TRACEABILITY.md`).
+- **Teto de 5 ADRs:** atendido — ADR-001..005 todas `merged`, nenhuma ADR fora do índice.
+- **Artefatos entregues:** `PRD.md`, `RESEARCH.md`, `EXPLORATION.md`, `CONSTRAINTS.md`, `DESIGN-DECISIONS.md`, `ARCHITECTURE.md`, `ARCHITECT-REVIEW.md`, `ADR-INDEX.md`, `TRACEABILITY.md`, `CODE-REVIEW.md` e, por ADR, `ADR.md`/`SPEC.md`/`TASKS.md`/`VERIFY.md` (com `CODE-REVIEW.md` nas ADRs 002–005).
+- **Código entregues:** spec OpenAPI tipada e gate autenticado; paridade de conversão e trace atribuível; admin de credenciais com secret one-shot; cota por tenant com `429` no token; portas de política de turno em `assistant/api` sem aresta `impl → impl`.
+- **PRs/fechamentos:** ADR-001 merge `d0d3890` (PR #4), fechamento `5658264`; ADR-002 merge `c71081e` (PR #5), fechamento `293d778`; ADR-003 merge `431150e` (PR #6), fechamento `289172b`; ADR-004 merge `37f0cab` (PR #7), fechamento `948fc42`; ADR-005 merge `58c8c9d` (PR #8), fechamento `0699b96`.
