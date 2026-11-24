@@ -1,6 +1,6 @@
 # ADR-002 — Emissão, hash, rotação e revogação da API key
 
-**Status:** in-progress · **Data:** 2026-11-24 · **PRD:** `public-api-key-complementar` · **Branch:** `adr/public-api-key-complementar/02-emissao-rotacao`
+**Status:** merged (merge `aae4379`, PR #12) · **Data:** 2026-11-24 · **PRD:** `public-api-key-complementar` · **Branch:** `adr/public-api-key-complementar/02-emissao-rotacao`
 
 **depende-de:** ADR-001 (merged — formato `Bearer sk-`, porta `PublicApiKeyAuthenticator` e OpenAPI).
 

@@ -5,6 +5,22 @@
   "phase": "Testing",
   "gitSha": "3d29f44e679740ea6d50ae94d0dde4db887d0918",
   "worktree": "/home/joao/fusionlf/wsProjeto/hive",
+  "mergeVerification": {
+    "status": "MERGE_CONFIRMADO",
+    "data": "2026-11-24",
+    "mergeCommitOriginMain": "aae4379c245c0de812d852d66c1153f21cfea71d",
+    "mergeCommitSubject": "Merge pull request #12 from freitasjh/adr/public-api-key-complementar/02-emissao-rotacao",
+    "adrsCommit": "749a131451f0f827339412651fe297e6bf328f10",
+    "ancestryExit": 0,
+    "provas": [
+      "git fetch origin main: 3667f4d..aae4379 main -> origin/main (exit 0)",
+      "git merge-base --is-ancestor 749a131... origin/main: exit 0",
+      "git log --oneline -5 origin/main: aae4379 Merge PR #12 -> 749a131 feat(publicapi): emite e rotaciona api key com one-shot -> 3d29f44 -> 3667f4d -> 2325ab8",
+      "git ls-tree -r --name-only origin/main -- .spec/prd/public-api-key-complementar/ADRs/ADR-002-emissao-rotacao: ADR.md, CODE-REVIEW.md, SPEC.md, TASKS.md presentes",
+      "git show -s aae4379: pais 3667f4d (main) e 749a131 (ADR-002), 2026-11-24 11:36:00 -0300"
+    ],
+    "observacoes": "branch local permanece em 749a131 (commit de implementacao feito apos o QA em 3d29f44); VERIFY.md ainda ausente em origin/main — geracao fica com o orquestrador. Nenhum checkout/commit/merge executado pelo QA."
+  },
   "commands": [
     {
       "cmd": "npm test",
