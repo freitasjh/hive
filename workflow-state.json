@@ -73,6 +73,17 @@
       "scope": "ADR-005 public-chat-api — fronteira de modulos e portas de turno; branch adr/public-chat-api/05-fronteira-modulos; review com 0/0/0",
       "artifact": ".spec/prd/public-chat-api/ADRs/ADR-005-fronteira-modulos/CODE-REVIEW.md",
       "date": "2026-11-23"
+    },
+    "public-api-key-complementar/ADR-001": {
+      "status": "passed",
+      "approval_status": "APPROVED",
+      "critical_issues_count": 0,
+      "severity_counts": { "🔴": 0, "🟠": 0, "🟡": 0, "🔵": 1 },
+      "must_fix_before_done": [],
+      "reviewer_session": "ses_dffa34effffeZMrCoNwL2t4pqv",
+      "scope": "public-api-key-complementar/ADR-001 — formato Bearer sk- e contrato OpenAPI; branch adr/public-api-key-complementar/01-formato-bearer; review APPROVED com 1 observação de ambiente",
+      "artifact": ".spec/prd/public-api-key-complementar/ADRs/ADR-001-formato-bearer/CODE-REVIEW.md",
+      "date": "2026-11-23"
     }
   },
   "harness_status": "passed",

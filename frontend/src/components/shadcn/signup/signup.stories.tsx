@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react"
+import type { SignupCredentialsData } from "./signup-types"
 import { SignupWizardCard } from "./signup-wizard-card"
 import { SignupStepCredentials } from "./signup-step-credentials"
 import { SignupStepWorkspace } from "./signup-step-workspace"
@@ -46,10 +47,10 @@ export const Step1CredentialsOnly: StoryObj = {
           password: "",
           agreeTerms: true,
         }}
-        onNext={(data) => {
+        onNext={(data: SignupCredentialsData) => {
           alert(`Passo 1 concluído para: ${data.fullName} (${data.email})`)
         }}
-        onSocialAuth={(p) => alert(`Autenticação com ${p}`)}
+        onSocialAuth={(p: "google" | "github") => alert(`Autenticação com ${p}`)}
         onNavigateLogin={() => alert("Ir para login")}
       />
     </div>

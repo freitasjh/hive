@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "demand": "public-api-key-complementar-adr-001",
+  "agent": "qa-engineer",
+  "phase": "Testing",
+  "gitSha": "18403948ab3488081ea4c8081e03973c4d254c6f",
+  "worktree": "/tmp/opencode/hive-apikey",
+  "commands": [
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 115000,
+      "stdoutHash": "5b21819c5c01eb39a5028be33d70e14a6dcecf693085799303fe8aa578cf6a90"
+    },
+    {
+      "cmd": "npm --prefix frontend run build",
+      "exitCode": 0,
+      "durationMs": 12000,
+      "stdoutHash": "5bc77fc9299d86be451586eaccb6b485761e280bec71d120ad2aafb5580093b8"
+    },
+    {
+      "cmd": "mvn verify -pl integration-test (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 71000,
+      "stdoutHash": "ba5f57691463d6f059917a2e01134b05b7b9f38da64d2dc4d739fcff2edc4942"
+    },
+    {
+      "cmd": "mvn install -DskipTests (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 13000,
+      "stdoutHash": "9f9f9af4b65f276d983f7a55d2fda2d7cd41c39b9349d7f9f9c13cfc598db36f"
+    },
+    {
+      "cmd": "node --input-type=module -e \"import { runPrdChecks } from './.opencode/plugins/lib/prd-adr-pipeline/checks.mjs'; console.log(JSON.stringify(runPrdChecks('.'),null,2));\"",
+      "exitCode": 0,
+      "durationMs": 15000,
+      "stdoutHash": "eab81f73983246180e0f714bc57d6b0623ba7a9f34c0205f908bb9a7f0684944"
+    },
+    {
+      "cmd": "git diff --check",
+      "exitCode": 0,
+      "durationMs": 100,
+      "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 526, "failed": 0, "skipped": 0 },
+    "it": { "passed": 139, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 411, "failed": 0, "skipped": 0 }
+  },
+  "evaluation": {
+    "h1": {
+      "status": "PASS",
+      "detail": "suiteFull do harness.config.json (npm test) reexecutado: exit 0; front 411/411, backend 526/526, 0/0/0."
+    },
+    "h2": {
+      "status": "PASS",
+      "detail": "zero falhas pre-existentes; 66 arquivos surefire somados: 526 testes, 0/0/0."
+    },
+    "h3": {
+      "status": "N/A",
+      "detail": "sem UI nesta ADR; namespace browser nao existe e nao foi usado; chrome-devtools nao acionado."
+    },
+    "h4": {
+      "status": "PASS",
+      "detail": "sk- exato sem fallback (401 para sk- vazio/sk-eyJ.../SK-/formato desconhecido); ObjectProvider fail-closed sem bean; mesmo principal/authorities/attributes/TenantContext do JWT; bearer-key + apiKeyAuth so na operacao de chat; token endpoint intacto; contratos anteriores reexecutados; zero diff em paths protegidos."
+    },
+    "h5": {
+      "status": "PASS",
+      "detail": "R2: 5432 pertence ao DBeaver (PID 2349206, dono conferido) e foi preservada; 8080/5433/6379 livres; nenhum pkill -f. R4: brain_store gravado (verificacao inicial + recheck). 26 flattened poms restaurados."
+    },
+    "h6": {
+      "status": "PASS",
+      "detail": "VERDE. Suite 0 falhas · front test+build 0 erros (TS7006 corrigido em signup.stories.tsx) · H3 N/A · 139 ITs verdes · code-review APPROVED 0/0/0/1 🔵 visivel na worktree · brain_store + workflow-state escopado · portas livres · esteira conforme · zero diff proibido · diff final sem arquivos alheios."
+    },
+    "esteira": {
+      "PRD-01": "PASS para public-api-key-complementar: PRD §16 APPROVED com prd_version 2. Unico achado global do runPrdChecks e o orfao pre-existente chat-model-override/PROPOSAL.md, fora de escopo.",
+      "ADR-01": "PASS",
+      "ADR-02": "PASS",
+      "artefatos": "ADR-INDEX 1:1 com ADRs/ADR-001-formato-bearer/, order 1, unit adr; TASKS.md linha 1 = <!-- scope: adr/ADR-001 -->; ADR.md com depende-de e Interface congelada; SPEC.md + TASKS.md presentes; VERIFY.md AUSENTE (correto pre-merge). CODE-REVIEW.md agora visivel na worktree: APPROVED, 0/0/0, 1 🔵."
+    },
+    "governanca": {
+      "status": "RESOLVIDO",
+      "detalhe": "Na recheck, CODE-REVIEW.md esta presente em .spec/prd/public-api-key-complementar/ADRs/ADR-001-formato-bearer/ e workflow-state.json.code_reviews_by_adr['public-api-key-complementar/ADR-001'] esta presente e valido: status passed, APPROVED, severity_counts 0/0/0/1, must_fix_before_done [], reviewer_session ses_dffa34effffeZMrCoNwL2t4pqv, artifact apontando para o arquivo existente. Bloqueio anterior encerrado sem copia pelo QA.",
+      "codeReviewVeredito": "APPROVED — 0 🔴 · 0 🟠 · 0 🟡 · 1 🔵 — must_fix_before_done: []"
+    },
+    "gatesFuncionais": {
+      "prefixo": "PublicApiSecurityFilter: KEY_PREFIX='sk-' exato case-sensitive; StartsWith -> somente rota da porta; demais valores -> somente JWT; falha -> 401 imediato sem fallback. PublicApiKeyAuthIT 3/3 afirma 200 com key valida e 401 para sk- vazio, sk-unknown, sk-eyJ..., SK-test-key; CAPTURED vazio apos 401; x-goog-api-key ignorado.",
+      "objectProvider": "ObjectProvider<PublicApiKeyAuthenticator> no filtro; getIfAvailable() sem bean -> 401 fail-closed (PublicApiKeyNoBeanIT 2/2); nenhum implements PublicApiKeyAuthenticator em producao (apenas @TestConfiguration em IT).",
+      "principal": "AuthenticatedKey Record(tenantId,clientId,permissions,pcode,plock,plim) espelha o principal do JWT; filtro preenche publicapi.clientId/pcode/plock/plim e TenantContext.runWithTenant; trace IT afirma clientId=key-client, tenantId e turnId nao nulo. tenant-id da key vem da porta, nao do request.",
+      "openapi": "OpenApiConfig mantem bearer-key (http/bearer) e soma apiKeyAuth (http/bearer); @SecurityRequirements so em PublicChatControllerV1.completions; token endpoint sem apiKeyAuth; OpenApiSpecIT 10/10 afirma ambos no group public, chat com os dois, token sem apiKeyAuth e documentacao sem x-goog-api-key; zero bearerAuth/x-goog-api-key em producao.",
+      "contratos": "OpenApiSpecIT 10/10, PublicApiClientAdminIT 10/10, PublicApiTenantQuotaIT 4/4, PublicAuthQuotaContractIT 2/2, ChatCallerParityIT operacional. Envelope, duplo /v1, model/stream/role:system e 429 do token preservados.",
+      "escopo": "Unico pom real alterado: backend/security/impl/pom.xml (aresta explicita para publicapi/api). Zero diff em PRD/RESEARCH/ADR-INDEX/ADRs, .spec/archive/**, MFA, workflow-state.json (somente registro escopado), AGENTS.md, skills, emissao/cota/telemetria; nenhum teste apagado ou @Disabled; 26 flattened poms restaurados.",
+      "diffFinal": "13 entradas no git status: 9 arquivos de codigo (6 modificados + 3 novos), CODE-REVIEW.md, workflow-state.json, harness/public-api-key-complementar-adr-001.json e signup.stories.tsx. Nenhum arquivo alheio. signup-step-credentials.tsx permanece ignorado por .gitignore:32 e nao rastreado (confirmado por git check-ignore)."
+    },
+    "bugs_identified": [
+      "DIVIDA DE REPO (nao bloqueante): .gitignore:32 (*credentials*) ignora frontend/src/components/shadcn/signup/signup-step-credentials.tsx; clean checkout ainda depende de restauracao local desse arquivo. Pre-existente, diff desta ADR nao depende dele.",
+      "RISCO DE DESENHO (aceito): ObjectProvider sem bean ate a ADR-002 devolve 401 para qualquer sk- — fail-closed por intencao; nenhum outro modulo deve registrar PublicApiKeyAuthenticator.",
+      "FORA DE ESCOPO: orfao pre-existente .spec/prd/chat-model-override/PROPOSAL.md — unico motivo do ok:false global do runPrdChecks.",
+      "Operacional: mvn -pl exige cwd backend/; mvn install regenera .flattened-pom.xml (26 restaurados)."
+    ],
+    "confirmacoes": {
+      "numerosMedidos": "front 411, backend 526, ITs 139 — conferem com o declarado; PublicApiKeyAuthIT 3/3, PublicApiKeyNoBeanIT 2/2, OpenApiSpecIT 10/10",
+      "build": "npm --prefix frontend run build exit 0 apos anotacoes de tipo em signup.stories.tsx:49,52; mvn install -DskipTests BUILD SUCCESS",
+      "semCommit": "branch adr/public-api-key-complementar/01-formato-bearer @ 1840394, worktree isolada, arvore sem commit; nenhum commit, merge ou checkout; branches alheias nao tocadas",
+      "escopoEscrita": "somente este arquivo de evidencia e notas no Brain; nenhum codigo-fonte alterado pelo QA"
+    }
+  },
+  "brainStore": [
+    "arquitetura/projetos/hive/public-api-key-complementar-adr001-qa-verificacao-2026-11-23",
+    "arquitetura/projetos/hive/public-api-key-complementar-adr001-qa-h6-refit-2026-11-23"
+  ],
+  "cleanup": {
+    "ports": ["8080", "5432", "5433", "6379"],
+    "portsStatus": "5432 preservada (DBeaver PID 2349206, dono conferido); 8080/5433/6379 livres",
+    "killedProcesses": [],
+    "generatedArtifactsRestored": "26 .flattened-pom.xml regenerados por mvn test/verify/install restaurados ao estado pre-verificacao (10 rastreados via git checkout, 16 untracked via rm)"
+  },
+  "selfReported": false
+}

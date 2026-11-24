@@ -47,6 +47,12 @@ public class OpenApiConfig {
                                 new SecurityScheme()
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
-                                        .bearerFormat("JWT")));
+                                        .bearerFormat("JWT"))
+                        // ADR-001/key: esquema adicional; bearer-key permanece inalterado.
+                        .addSecuritySchemes("apiKeyAuth",
+                                new SecurityScheme()
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .bearerFormat("sk-")));
     }
 }
