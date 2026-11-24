@@ -26,6 +26,7 @@ const actions: PublicClientsActions = {
   onOpenCreate: () => {},
   onCloseCreate: () => {},
   onFormChange: () => {},
+  onToggleGrant: () => {},
   onPromptChange: () => {},
   onAddPrompt: () => {},
   onRemovePrompt: () => {},
@@ -77,6 +78,17 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = { args: { state, actions, oneShot: null } }
 export const Active: Story = {
   args: { state: { ...state, createOpen: true }, actions, oneShot: null },
+}
+export const CreateWithGrant: Story = {
+  args: {
+    state: {
+      ...state,
+      createOpen: true,
+      form: { ...emptyPublicClientForm, grants: ["PUBLIC_CHAT_COMPLETE"] },
+    },
+    actions,
+    oneShot: null,
+  },
 }
 export const Hover: Story = {
   ...Default,

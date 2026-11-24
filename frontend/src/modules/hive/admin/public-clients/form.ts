@@ -2,26 +2,18 @@ import type { PublicApiClientCreate } from "@/services/admin.types"
 import type { AdminMessageKey } from "../i18n"
 import type { PublicClientsFormState } from "../state"
 
+/** Catálogo fechado de grants — o mesmo validado no writer do backend. */
+export const PUBLIC_GRANTS: readonly string[] = ["PUBLIC_CHAT_COMPLETE"]
+
 /** Estado inicial do formulário de criação — sem segredo e sem campos do servidor. */
 export const emptyPublicClientForm: PublicClientsFormState = {
   label: "",
-  grantsText: "",
+  grants: [],
   prompts: [],
   tokenTtlSeconds: "",
   maxMessages: "",
   maxMessageChars: "",
   maxTotalChars: "",
-}
-
-export function parseGrants(text: string): string[] {
-  return Array.from(
-    new Set(
-      text
-        .split(/[,\n]/)
-        .map((part) => part.trim())
-        .filter(Boolean)
-    )
-  )
 }
 
 function optionalPositiveInt(value: string): number | null {
@@ -40,7 +32,7 @@ function optionalPositiveInt(value: string): number | null {
  */
 export function validatePublicClientForm(form: PublicClientsFormState): AdminMessageKey | null {
   if (!form.label.trim()) return "admin.publicClients.validationLabel"
-  if (parseGrants(form.grantsText).length === 0) return "admin.publicClients.validationGrants"
+  if (form.grants.length === 0) return "admin.publicClients.validationGrants"
 
   for (const prompt of form.prompts) {
     if (!prompt.promptCode.trim()) return "admin.publicClients.validationPromptCode"
@@ -67,7 +59,7 @@ export function validatePublicClientForm(form: PublicClientsFormState): AdminMes
 export function toCreatePayload(form: PublicClientsFormState): PublicApiClientCreate {
   const payload: PublicApiClientCreate = {
     label: form.label.trim(),
-    grants: parseGrants(form.grantsText),
+    grants: [...form.grants],
     prompts: form.prompts.map((prompt) => ({
       promptCode: prompt.promptCode.trim(),
       pinMode: prompt.pinMode,

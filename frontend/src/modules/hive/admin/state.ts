@@ -136,7 +136,7 @@ export interface PublicClientPromptDraft {
 
 export interface PublicClientsFormState {
   label: string
-  grantsText: string
+  grants: string[]
   prompts: PublicClientPromptDraft[]
   tokenTtlSeconds: string
   maxMessages: string
@@ -183,6 +183,7 @@ export interface PublicClientsActions {
   onOpenCreate: () => void
   onCloseCreate: () => void
   onFormChange: (patch: Partial<PublicClientsFormState>) => void
+  onToggleGrant: (grant: string, checked: boolean) => void
   onPromptChange: (index: number, patch: Partial<PublicClientPromptDraft>) => void
   onAddPrompt: () => void
   onRemovePrompt: (index: number) => void

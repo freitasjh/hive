@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/shadcn/ui/badge"
 import { Button } from "@/components/shadcn/ui/button"
+import { Checkbox } from "@/components/shadcn/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -40,8 +41,9 @@ import {
 } from "@/components/shadcn/ui/table"
 import type { PublicApiClient, PublicClientPinMode } from "@/services/admin.types"
 import { EmptyState, ErrorBanner, LoadingBlock, NoticeBanner } from "../components/AdminStates"
-import { useAdminI18n } from "../i18n"
+import { useAdminI18n, type AdminMessageKey } from "../i18n"
 import type { OneShotSecret, PublicClientsActions, PublicClientsState } from "../state"
+import { PUBLIC_GRANTS } from "./form"
 
 export interface PublicClientsViewProps {
   state: PublicClientsState
@@ -235,17 +237,29 @@ export function PublicClientsView({ state, actions, oneShot }: PublicClientsView
                 className="h-11 w-full"
               />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="pc-grants">{t("admin.publicClients.fieldGrants")}</Label>
-              <Input
-                id="pc-grants"
-                name="grants"
-                data-testid="input-grants"
-                value={state.form.grantsText}
-                onChange={(event) => actions.onFormChange({ grantsText: event.target.value })}
-                className="h-11 w-full font-mono"
-              />
-            </div>
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="text-sm font-medium text-foreground">
+                {t("admin.publicClients.fieldGrants")}
+              </legend>
+              {PUBLIC_GRANTS.map((grant) => {
+                const id = `pc-grant-${grant}`
+                return (
+                  <Label
+                    key={grant}
+                    htmlFor={id}
+                    className="min-h-11 cursor-pointer rounded-md border border-border/70 px-3 py-2 font-normal"
+                  >
+                    <Checkbox
+                      id={id}
+                      data-testid={`checkbox-grant-${grant}`}
+                      checked={state.form.grants.includes(grant)}
+                      onCheckedChange={(checked) => actions.onToggleGrant(grant, checked === true)}
+                    />
+                    <span>{t(`admin.publicClients.grant.${grant}` as AdminMessageKey)}</span>
+                  </Label>
+                )
+              })}
+            </fieldset>
 
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-3">

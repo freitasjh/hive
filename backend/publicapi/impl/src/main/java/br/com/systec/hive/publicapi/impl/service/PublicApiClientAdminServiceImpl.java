@@ -137,6 +137,8 @@ public class PublicApiClientAdminServiceImpl implements PublicApiClientAdminServ
     public PublicApiClientResponseDTO updateGrants(String clientId, PublicApiClientGrantsDTO request) {
         UUID tenantId = currentTenantId();
         PublicApiClientEntity entity = owned(tenantId, clientId);
+        // Validar ANTES de apagar: grant inválido não pode remover os grants já persistidos.
+        PublicApiClientAccessWriter.validateGrants(request.getGrants());
         grantRepository.deleteAllByClientRef(entity.getId());
         grantRepository.flush();
         accessWriter.write(tenantId, entity.getId(), request.getGrants(), List.of());
