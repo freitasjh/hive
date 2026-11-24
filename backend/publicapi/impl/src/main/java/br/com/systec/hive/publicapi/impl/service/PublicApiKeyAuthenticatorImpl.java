@@ -79,7 +79,9 @@ public class PublicApiKeyAuthenticatorImpl implements PublicApiKeyAuthenticator 
             keyRepository.save(key);
             PublicClientTokenIssuer.Policy policy = tokenIssuer.policyFor(client);
             return new AuthenticatedKey(client.getTenantId(), client.getClientId(),
-                    policy.permissions(), policy.pcode(), policy.plock(), policy.plim());
+                    policy.permissions(), policy.pcode(), policy.plock(), policy.plim(),
+                    key.getKeyId(), key.getKeyChatRequestsPerMinute() == null
+                            ? 100 : key.getKeyChatRequestsPerMinute());
         } catch (Exception e) {
             // Nunca logar a credencial — somente o tipo do problema.
             log.warn("Public API key rejected: {}", e.getClass().getSimpleName());

@@ -26,6 +26,9 @@ public class PublicApiClientKeyEntity extends AbstractEntity {
     @Column(name = "key_hash", nullable = false, length = 72, columnDefinition = "VARCHAR(72)")
     private String keyHash;
 
+    @Column(name = "key_chat_requests_per_minute", nullable = false)
+    private Integer keyChatRequestsPerMinute = 100;
+
     @Column(name = "previous_key_id", length = 64)
     private String previousKeyId;
 
@@ -50,6 +53,8 @@ public class PublicApiClientKeyEntity extends AbstractEntity {
     public void setKeyId(String keyId) { this.keyId = keyId; }
     public String getKeyHash() { return keyHash; }
     public void setKeyHash(String keyHash) { this.keyHash = keyHash; }
+    public Integer getKeyChatRequestsPerMinute() { return keyChatRequestsPerMinute; }
+    public void setKeyChatRequestsPerMinute(Integer keyChatRequestsPerMinute) { this.keyChatRequestsPerMinute = keyChatRequestsPerMinute; }
     public String getPreviousKeyId() { return previousKeyId; }
     public void setPreviousKeyId(String previousKeyId) { this.previousKeyId = previousKeyId; }
     public String getPreviousKeyHash() { return previousKeyHash; }

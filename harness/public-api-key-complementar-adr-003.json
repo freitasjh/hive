@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "demand": "public-api-key-complementar-adr-003",
+  "agent": "qa-engineer",
+  "phase": "Testing",
+  "gitSha": "84d764064b5a6de7ee5a277df038ab02efa71f37",
+  "worktree": "/home/joao/fusionlf/wsProjeto/hive",
+  "commands": [
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 73000,
+      "stdoutHash": "500b6ac5ce2094521f523be370f44851afd0832f237f3064f13d03d14f4debd6"
+    },
+    {
+      "cmd": "npm --prefix frontend run build",
+      "exitCode": 0,
+      "durationMs": 10000,
+      "stdoutHash": "47d79fa6e04777d6fbb3b5e534476fe70435df4ac1712bf2c6d2deba722f8f1c"
+    },
+    {
+      "cmd": "mvn verify -pl integration-test (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 67000,
+      "stdoutHash": "72a8c542977c9a8f53b3a3a1a741132b8d3c863c3febe840d506393f778f9cd6"
+    },
+    {
+      "cmd": "mvn install -DskipTests (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 11000,
+      "stdoutHash": "d94541543e8909dad85ce96ede576c6e8840105c0c2e712daff9571ba61edb32"
+    },
+    {
+      "cmd": "node --input-type=module -e \"import { runPrdChecks } from './.opencode/plugins/lib/prd-adr-pipeline/checks.mjs'; console.log(JSON.stringify(runPrdChecks('.'),null,2));\"",
+      "exitCode": 0,
+      "durationMs": 200,
+      "stdoutHash": "eab81f73983246180e0f714bc57d6b0623ba7a9f34c0205f908bb9a7f0684944"
+    },
+    {
+      "cmd": "git diff --check",
+      "exitCode": 0,
+      "durationMs": 100,
+      "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 530, "failed": 0, "skipped": 0 },
+    "it": { "passed": 152, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 411, "failed": 0, "skipped": 0 }
+  },
+  "evaluation": {
+    "h1": {
+      "status": "PASS",
+      "detail": "suiteFull do harness.config.json (npm test) reexecutada: exit 0; front 411/411, backend 530/530, 0/0/0; 67 arquivos surefire."
+    },
+    "h2": {
+      "status": "PASS",
+      "detail": "zero falhas pre-existentes apos o saneamento do pool Hikari de IT (PR #11); 530 testes, 0/0/0."
+    },
+    "h3": {
+      "status": "N/A",
+      "detail": "sem UI nesta ADR; namespace browser nao existe e nao foi usado; chrome-devtools nao acionado."
+    },
+    "h4": {
+      "status": "PASS",
+      "detail": "V4 em Postgres real; keyKey isolado e acquireKey delegando ao mesmo Lua; AuthenticatedKey com keyId/limite e atributos so no ramo sk-; contadores de key e JWT independentes; telemetria preenchida; zero diff em paths protegidos."
+    },
+    "h5": {
+      "status": "PASS",
+      "detail": "R2: porta 5432 pertence ao DBeaver (PID 3844372, dono conferido) e foi preservada; 8080/5433/6379 livres; nenhum pkill -f. R4: brain_store registrado. 26 flattened poms restaurados."
+    },
+    "h6": {
+      "status": "PASS",
+      "detail": "VERDE. Suite 0 falhas · builds 0 erros · H3 N/A · 152 ITs verdes · code-review APPROVED 0/0/0/0 com registro escopado · brain_store + workflow-state · portas livres · esteira conforme · zero diff proibido."
+    },
+    "esteira": {
+      "PRD-01": "PASS para public-api-key-complementar: PRD §16 APPROVED com prd_version 2. Unico achado global do runPrdChecks e o orfao pre-existente chat-model-override/PROPOSAL.md, fora de escopo.",
+      "ADR-01": "PASS",
+      "ADR-02": "PASS",
+      "artefatos": "ADR-INDEX 1:1 com diretorio; order 3 sem pulo (001/002 merged); depends_on ADR-001, ADR-002; unit adr; TASKS.md linha 1 = <!-- scope: adr/ADR-003 -->; ADR.md/SPEC.md/TASKS.md/CODE-REVIEW.md presentes; VERIFY.md AUSENTE (correto pre-merge)."
+    },
+    "codeReview": {
+      "artifact": ".spec/prd/public-api-key-complementar/ADRs/ADR-003-cota-telemetria/CODE-REVIEW.md",
+      "veredito": "APPROVED — 0 🔴 · 0 🟠 · 0 🟡 · 0 🔵",
+      "reviewer_session": "ses_dffa34effffeZMrCoNwL2t4pqv",
+      "data": "2026-11-24",
+      "estado": "code_reviews_by_adr['public-api-key-complementar/ADR-003'] conferido: status passed, APPROVED, severity_counts 0/0/0/0, artifact existente. git diff -- workflow-state.json mostra SOMENTE o bloco ADR-003 adicionado."
+    },
+    "gatesFuncionais": {
+      "migration": "V4__public_api_client_key_chat_rpm.sql em Postgres real (IT count=1): ADD COLUMN key_chat_requests_per_minute INT NOT NULL DEFAULT 100, backfill UPDATE com COALESCE(cota do tenant V2, 100), CHECK BETWEEN 1 AND 10000; sem DROP/repair; V1/V2/V3 intactas.",
+      "redis": "RedisQuotaGuard.keyKey() = hive:public:quota-key:{keyId}, distinto de tenantKey (hive:public:quota-tenant); acquireKey delega a acquireDecision; bloco LUA_SCRIPT com 1265 bytes e SHA256 7f02dd6f433abdb0 identico em HEAD e worktree; fail-open com measured=false omite atributos/headers.",
+      "filtro": "AuthenticatedKey ganhou keyId e keyChatRequestsPerMinute; PublicApiSecurityFilter seta publicapi.keyId e publicapi.keylim SOMENTE no ramo sk-; PublicChatServiceImpl escolhe acquireKey quando ambos os atributos presentes, senao acquireTenant.",
+      "it": "PublicApiKeyQuotaIT 2/2: V4 coluna/default/check e backfill; mesmo tenant com JWT limite 1 (2o request 429) e key limite 2 (3o request 429); headers X-RateLimit-Limit-Requests refletem 1 e 2; trace com clientId e turnId preenchidos nos dois caminhos.",
+      "escopo": "Zero diff em ADR-001/002, PRD/RESEARCH/ADR-INDEX, arquivadas, MFA, workflow-state (so registro), AGENTS.md, skills, UI, configs, ChatTurnGateway/TurnRequest/TurnReply/ChatTrace/TurnOutcomeMapper, regras de prompt, V2/cota tenant, emissor de JWT/plim e poms; nenhum teste apagado ou @Disabled; 26 flattened poms restaurados."
+    },
+    "bugs_identified": [
+      "RISCO DE COBERTURA (nao bloqueante, registrado no CODE-REVIEW): o IT de backfill reaplica o UPDATE manualmente em vez de provar que a V4 popula uma linha pre-existente no momento da migration; SQL inspecionado e correto.",
+      "DIVIDA DE REPO PRE-EXISTENTE (fora de escopo): .gitignore:32 (*credentials*) ignora diretorio de credentials.",
+      "FORA DE ESCOPO: orfao pre-existente .spec/prd/chat-model-override/PROPOSAL.md — unico motivo do ok:false global do runPrdChecks.",
+      "Operacional: mvn -pl exige cwd backend/; mvn install regenera .flattened-pom.xml (26 restaurados)."
+    ],
+    "confirmacoes": {
+      "numerosMedidos": "front 411, backend 530, ITs 152 — conferem com o declarado; PublicApiKeyQuotaIT 2/2, ChatCallerParityIT 1/1, OpenApiSpecIT 10/10, PublicApiClientAdminIT 10/10, PublicApiTenantQuotaIT 4/4",
+      "semCommit": "branch adr/public-api-key-complementar/03-cota-telemetria @ 84d7640, arvore sem commit; nenhum commit, merge ou checkout pelo QA; worktrees alheias nao tocadas",
+      "escopoEscrita": "somente este arquivo de evidencia e nota no Brain; nenhum codigo-fonte alterado pelo QA"
+    }
+  },
+  "brainStore": [
+    "arquitetura/projetos/hive/public-api-key-complementar-adr003-qa-verificacao-2026-11-24"
+  ],
+  "cleanup": {
+    "ports": ["8080", "5432", "5433", "6379"],
+    "portsStatus": "5432 preservada (DBeaver PID 3844372, dono conferido); 8080/5433/6379 livres",
+    "killedProcesses": [],
+    "generatedArtifactsRestored": "26 .flattened-pom.xml regenerados por mvn test/verify/install restaurados ao estado pre-verificacao (10 rastreados via git checkout, 16 untracked via rm)"
+  },
+  "selfReported": false
+}

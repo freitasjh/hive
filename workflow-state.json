@@ -95,6 +95,17 @@
       "scope": "public-api-key-complementar/ADR-002 — emissao/hash/rotacao/revogacao da API key; branch adr/public-api-key-complementar/02-emissao-rotacao; review APPROVED apos correcao do fallback O(N)",
       "artifact": ".spec/prd/public-api-key-complementar/ADRs/ADR-002-emissao-rotacao/CODE-REVIEW.md",
       "date": "2026-11-24"
+    },
+    "public-api-key-complementar/ADR-003": {
+      "status": "passed",
+      "approval_status": "APPROVED",
+      "critical_issues_count": 0,
+      "severity_counts": { "🔴": 0, "🟠": 0, "🟡": 0, "🔵": 0 },
+      "must_fix_before_done": [],
+      "reviewer_session": "ses_dffa34effffeZMrCoNwL2t4pqv",
+      "scope": "public-api-key-complementar/ADR-003 — cota propria da key e telemetria; branch adr/public-api-key-complementar/03-cota-telemetria; review APPROVED com risco de cobertura do backfill",
+      "artifact": ".spec/prd/public-api-key-complementar/ADRs/ADR-003-cota-telemetria/CODE-REVIEW.md",
+      "date": "2026-11-24"
     }
   },
   "harness_status": "passed",

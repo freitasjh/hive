@@ -137,8 +137,12 @@ public class PublicChatServiceImpl implements PublicChatService {
             throw new IllegalArgumentException("request_too_large");
         }
 
-        // ADR-004/QT03: contador compartilhado por tenant; m/c/t inalterados e r com fallback 100.
-        QuotaDecision decision = quotaGuard.acquireTenant(tenantId, limit(limits, "r", 100));
+        // ADR-003/COT03: key tem contador/limite próprios; JWT segue com plim.r do tenant.
+        Object keyId = httpRequest == null ? null : httpRequest.getAttribute("publicapi.keyId");
+        Object keyLimit = httpRequest == null ? null : httpRequest.getAttribute("publicapi.keylim");
+        QuotaDecision decision = keyId instanceof String kid && keyLimit instanceof Number kl
+                ? quotaGuard.acquireKey(kid, kl.intValue())
+                : quotaGuard.acquireTenant(tenantId, limit(limits, "r", 100));
         if (decision.measured() && httpRequest != null) {
             httpRequest.setAttribute("publicapi.quota.limit", decision.limit());
             httpRequest.setAttribute("publicapi.quota.remaining", decision.remaining());
