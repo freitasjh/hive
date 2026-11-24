@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "demand": "public-api-debts-1-3",
+  "agent": "qa-engineer",
+  "phase": "BugReview",
+  "gitSha": "9989e1652f30157d2201185f1d630b72cfd13ba0",
+  "commands": [
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 63000,
+      "stdoutHash": "32e632af6ccc9556e91d4625788ff7b5f58b604996dfb34f5936347e1bb6a83a"
+    },
+    {
+      "cmd": "mvn verify -pl integration-test (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 66000,
+      "stdoutHash": "640aabf64f0d397c25081c39768af11ab092d5b8442b9bfd33cd0f06ba5707ff"
+    },
+    {
+      "cmd": "npm --prefix frontend run build",
+      "exitCode": 0,
+      "durationMs": 17000,
+      "stdoutHash": "405d29268b8d51bdda1311317287f6db7c41b3aa8e131848789efd5cf3f3c50f"
+    },
+    {
+      "cmd": "mvn install -DskipTests (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 12000,
+      "stdoutHash": "9f0d74456e4e4d7e9baa979219c6be48fc25e4ecccc8764ccb05f08af6f294fa"
+    },
+    {
+      "cmd": "node --input-type=module -e \"import { runPrdChecks } from './.opencode/plugins/lib/prd-adr-pipeline/checks.mjs'; console.log(JSON.stringify(runPrdChecks('.'),null,2));\"",
+      "exitCode": 0,
+      "durationMs": 200,
+      "stdoutHash": "eab81f73983246180e0f714bc57d6b0623ba7a9f34c0205f908bb9a7f0684944"
+    },
+    {
+      "cmd": "git diff --check",
+      "exitCode": 0,
+      "durationMs": 100,
+      "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 526, "failed": 0, "skipped": 0 },
+    "it": { "passed": 138, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 411, "failed": 0, "skipped": 0 }
+  },
+  "evaluation": {
+    "h1": {
+      "status": "PASS",
+      "detail": "suiteFull do harness.config.json (npm test) reexecutada: exit 0; front 411/411, backend 526/526, 0/0/0 — numeros declarados confirmados."
+    },
+    "h2": {
+      "status": "PASS",
+      "detail": "zero falhas pre-existentes; 66 arquivos surefire somados: 526 testes, 0/0/0."
+    },
+    "h3": {
+      "status": "N/A",
+      "detail": "bugfix sem UI; namespace browser nao existe e nao foi usado; chrome-devtools nao acionado."
+    },
+    "h4": {
+      "status": "PASS",
+      "detail": "item 1: findByClientRefIn em ambos repositorios, agrupamento por clientRef, fill() sobrecarregado sem regra duplicada, contagem constante de 4 queries com 20 e 100, contrato/ordenacao preservados. Itens 2-3: nenhuma mudanca de producao; ITs com assercoes reais, JWT via issuer e DB real."
+    },
+    "h5": {
+      "status": "PASS",
+      "detail": "portas 8080/5432/5433/6379 livres; encerramento por PID via lsof/ps + kill (R2) sem pkill -f; nenhum servico iniciado nesta rodada; 26 flattened poms restaurados; brain_store gravado (R4)."
+    },
+    "h6": {
+      "status": "PASS",
+      "detail": "VERDE. Suite 0 falhas · builds 0 erros · H3 N/A · 5 ITs novos verdes · R1 documentado antes da edicao · R2/R3/R4 respeitados · code review APPROVED sem 🔴 · zero diff em paths protegidos · portas livres."
+    },
+    "r1": {
+      "before": [
+        "PublicApiClientAdminQueryIT.java:23-25 — Hibernate Statistics nativo em Postgres/Redis reais: 42 queries com 20 clients e 202 com 100 (padrao 2N+2), antes de qualquer edicao",
+        "PublicApiQuotaFailOpenIT.java:29-31 — headers HTTP reais sem X-RateLimit em decisao nao medida: sucesso [content-type, x-content-type-options, x-xss-protection, cache-control, pragma, expires, x-frame-options]; negacao com retry-after=7 e os mesmos headers, sem X-RateLimit",
+        "PublicApiPlimStalenessIT.java:20 — token antigo plim.r=250 apos DB mudar para 1; token novo=1"
+      ],
+      "after": [
+        "N1_AFTER_FIX size=20 queries=4",
+        "N1_AFTER_FIX size=100 queries=4",
+        "N2_MEASURE success_headers e denied_headers sem X-RateLimit-*; retry-after presente na negacao",
+        "N3_MEASURE oldToken_plim_r=250 / oldToken_afterChange=250 / newToken=1"
+      ]
+    },
+    "gates": {
+      "item1": "PublicApiClientAdminServiceImpl.list() linhas 81-100: findByTenantId paginado + findByClientRefIn para grants e prompts, groupingBy clientRef, mapeamento sem consulta por item. Sobrecarga fill(): linha 180 (item unico, consulta findByClientRef) e linha 189 (listas pre-carregadas); a primeira delega a segunda — nenhuma regra duplicada. IT afirma 4 queries e, para cada item, grants=[PUBLIC_CHAT_COMPLETE] e 1 prompt p1 com 20 e 100 itens.",
+      "itens2e3": "Nenhum arquivo de producao alterado; apenas 3 ITs novos. PublicApiQuotaFailOpenIT usa @MockitoBean no RedisQuotaGuard para induzir decision measured=false e assere os headers HTTP reais; PublicApiPlimStalenessIT usa issuer real + JDBC real + JWT decodificado. Nenhum @Disabled, assumeTrue ou teste apagado.",
+      "escopo": "Modificados apenas 3 arquivos de producao (2 repositorios + AdminServiceImpl). Zero diff em .spec/archive/**, ADRs, PRD, MFA, workflow-state.json, AGENTS.md, skills, configs, frontend; nenhuma dependencia nova; nenhum @Disabled/assumeTrue; nenhum arquivo deletado; .flattened-pom.xml restaurados.",
+      "esteiraChecks": "ADR-01 PASS, ADR-02 PASS; PRD-01 sem achados em public-chat-api (orfao pre-existente chat-model-override fora de escopo)."
+    },
+    "bugs_identified": [
+      "RISCO RESIDUAL: PublicApiQuotaFailOpenIT induce measured=false via @MockitoBean no guard, nao por queda fisica do Redis; o caminho HTTP observado e real e o fail-open do guard e provado em RedisQuotaGuardTest, mas o IT nao derruba o Redis.",
+      "FORA DE ESCOPO: orfao pre-existente .spec/prd/chat-model-override/PROPOSAL.md — unico motivo do ok:false global do runPrdChecks.",
+      "Operacional: mvn -pl exige cwd backend/; mvn install regenera .flattened-pom.xml (26 restaurados)."
+    ],
+    "confirmacoes": {
+      "novosIts": "5 novos ITs: PublicApiClientAdminQueryIT 2/2, PublicApiQuotaFailOpenIT 2/2, PublicApiPlimStalenessIT 1/1 (133 -> 138)",
+      "semCommit": "branch fix/public-api-debts, HEAD 9989e16 (main), arvore sem commit; nenhum commit, merge ou checkout",
+      "escopoEscrita": "somente este arquivo de evidencia e nota no Brain; nenhum codigo-fonte alterado"
+    }
+  },
+  "brainStore": [
+    "arquitetura/projetos/hive/public-api-debts-itens1-3-qa-verificacao-2026-11-23"
+  ],
+  "cleanup": {
+    "ports": ["8080", "5432", "5433", "6379"],
+    "portsStatus": "todas livres; nenhum servico iniciado nesta rodada (R2 verificado por lsof)",
+    "killedProcesses": [],
+    "generatedArtifactsRestored": "26 .flattened-pom.xml regenerados por mvn test/verify/install restaurados ao estado pre-verificacao (10 rastreados via git checkout, 16 untracked via rm)"
+  },
+  "selfReported": false
+}

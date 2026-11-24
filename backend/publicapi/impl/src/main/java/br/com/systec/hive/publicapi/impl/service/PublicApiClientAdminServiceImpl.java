@@ -28,7 +28,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** ADR-003/ADM01..ADM03: gestão administrativa de clients públicos na chain humana. */
 @Service
@@ -79,8 +81,24 @@ public class PublicApiClientAdminServiceImpl implements PublicApiClientAdminServ
     public PublicApiClientPageDTO list(int page, int size) {
         UUID tenantId = currentTenantId();
         Page<PublicApiClientEntity> result = clientRepository.findByTenantId(tenantId, PageRequest.of(page, size));
-        List<PublicApiClientResponseDTO> content = result.getContent().stream()
-                .map(entity -> fill(new PublicApiClientResponseDTO(), entity))
+        List<PublicApiClientEntity> entities = result.getContent();
+        List<java.util.UUID> refs = entities.stream().map(PublicApiClientEntity::getId).toList();
+
+        // Bugfix N+1: duas queries para a página inteira, agrupadas por clientRef.
+        Map<java.util.UUID, List<String>> grantsByRef = grantRepository.findByClientRefIn(refs).stream()
+                .collect(Collectors.groupingBy(PublicApiClientGrantEntity::getClientRef,
+                        Collectors.mapping(PublicApiClientGrantEntity::getPermission, Collectors.toList())));
+
+        Map<java.util.UUID, List<PublicApiClientPromptBindingDTO>> promptsByRef =
+                promptRepository.findByClientRefIn(refs).stream()
+                        .collect(Collectors.groupingBy(PublicApiClientPromptEntity::getClientRef,
+                                Collectors.mapping(p -> new PublicApiClientPromptBindingDTO(
+                                        p.getPromptCode(), p.getPinMode(), p.getPinnedVersion()), Collectors.toList())));
+
+        List<PublicApiClientResponseDTO> content = entities.stream()
+                .map(entity -> fill(new PublicApiClientResponseDTO(), entity,
+                        grantsByRef.getOrDefault(entity.getId(), List.of()),
+                        promptsByRef.getOrDefault(entity.getId(), List.of())))
                 .toList();
         return new PublicApiClientPageDTO(content, page, size, result.getTotalElements(), result.getTotalPages());
     }
@@ -163,6 +181,17 @@ public class PublicApiClientAdminServiceImpl implements PublicApiClientAdminServ
     }
 
     private <T extends PublicApiClientResponseDTO> T fill(T dto, PublicApiClientEntity entity) {
+        List<String> grants = grantRepository.findByClientRef(entity.getId()).stream()
+                .map(PublicApiClientGrantEntity::getPermission).toList();
+        List<PublicApiClientPromptBindingDTO> prompts = promptRepository.findByClientRef(entity.getId()).stream()
+                .map(p -> new PublicApiClientPromptBindingDTO(p.getPromptCode(), p.getPinMode(), p.getPinnedVersion()))
+                .toList();
+        return fill(dto, entity, grants, prompts);
+    }
+
+    private <T extends PublicApiClientResponseDTO> T fill(T dto, PublicApiClientEntity entity,
+                                                          List<String> grants,
+                                                          List<PublicApiClientPromptBindingDTO> prompts) {
         dto.setClientId(entity.getClientId());
         dto.setLabel(entity.getLabel());
         dto.setTenantId(entity.getTenantId());
@@ -174,11 +203,6 @@ public class PublicApiClientAdminServiceImpl implements PublicApiClientAdminServ
         dto.setExpiresAt(entity.getExpiresAt());
         dto.setPreviousSecretExpiresAt(entity.getPreviousSecretExpiresAt());
 
-        List<String> grants = grantRepository.findByClientRef(entity.getId()).stream()
-                .map(PublicApiClientGrantEntity::getPermission).toList();
-        List<PublicApiClientPromptBindingDTO> prompts = promptRepository.findByClientRef(entity.getId()).stream()
-                .map(p -> new PublicApiClientPromptBindingDTO(p.getPromptCode(), p.getPinMode(), p.getPinnedVersion()))
-                .toList();
         dto.setGrants(grants);
         dto.setPrompts(prompts);
         return dto;
