@@ -83,15 +83,18 @@ public class PublicApiClientAdminServiceImpl implements PublicApiClientAdminServ
         Page<PublicApiClientEntity> result = clientRepository.findByTenantId(tenantId, PageRequest.of(page, size));
         List<PublicApiClientEntity> entities = result.getContent();
         List<java.util.UUID> refs = entities.stream().map(PublicApiClientEntity::getId).toList();
+
         // Bugfix N+1: duas queries para a página inteira, agrupadas por clientRef.
         Map<java.util.UUID, List<String>> grantsByRef = grantRepository.findByClientRefIn(refs).stream()
                 .collect(Collectors.groupingBy(PublicApiClientGrantEntity::getClientRef,
                         Collectors.mapping(PublicApiClientGrantEntity::getPermission, Collectors.toList())));
+
         Map<java.util.UUID, List<PublicApiClientPromptBindingDTO>> promptsByRef =
                 promptRepository.findByClientRefIn(refs).stream()
                         .collect(Collectors.groupingBy(PublicApiClientPromptEntity::getClientRef,
                                 Collectors.mapping(p -> new PublicApiClientPromptBindingDTO(
                                         p.getPromptCode(), p.getPinMode(), p.getPinnedVersion()), Collectors.toList())));
+
         List<PublicApiClientResponseDTO> content = entities.stream()
                 .map(entity -> fill(new PublicApiClientResponseDTO(), entity,
                         grantsByRef.getOrDefault(entity.getId(), List.of()),
