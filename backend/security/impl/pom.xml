@@ -60,6 +60,12 @@
             <artifactId>hive-publicapi-impl</artifactId>
             <version>${revision}</version>
         </dependency>
+        <!-- ADR-001/key: PublicApiSecurityFilter consome a porta PublicApiKeyAuthenticator. -->
+        <dependency>
+            <groupId>br.com.systec.hive</groupId>
+            <artifactId>hive-publicapi-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
         <dependency>
             <groupId>br.com.systec.hive</groupId>
             <artifactId>hive-identity-api</artifactId>

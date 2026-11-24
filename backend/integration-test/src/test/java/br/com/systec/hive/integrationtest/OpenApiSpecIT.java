@@ -112,6 +112,37 @@ class OpenApiSpecIT extends WebIntegrationTest {
     }
 
     @Test
+    void when_publicGroupSpecIsRead_then_bothBearerSchemesAreDeclaredOnChatOnly() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        String username = "spec-key-" + UUID.randomUUID();
+        seedTenantAndUser(tenantId, username, PASSWORD);
+        String token = jwtTestHelper.generateToken(username, tenantId);
+
+        MvcResult result = mockMvc.perform(get("/v3/api-docs")
+                        .param("group", "public")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode document = objectMapper.readTree(result.getResponse().getContentAsString());
+        JsonNode schemes = document.path("components").path("securitySchemes");
+
+        assertThat(schemes.has("bearer-key")).isTrue();
+        assertThat(schemes.path("bearer-key").path("type").asText()).isEqualTo("http");
+        assertThat(schemes.path("bearer-key").path("scheme").asText()).isEqualTo("bearer");
+        assertThat(schemes.has("apiKeyAuth")).isTrue();
+        assertThat(schemes.path("apiKeyAuth").path("type").asText()).isEqualTo("http");
+        assertThat(schemes.path("apiKeyAuth").path("scheme").asText()).isEqualTo("bearer");
+
+        String chatSecurity = document.path("paths")
+                .path("/v1/public/v1/chat/completions").path("post").path("security").toString();
+        assertThat(chatSecurity).contains("bearer-key").contains("apiKeyAuth");
+        String tokenSecurity = document.path("paths")
+                .path("/v1/public/auth/token").path("post").path("security").toString();
+        assertThat(tokenSecurity).doesNotContain("apiKeyAuth");
+        assertThat(document.toString()).doesNotContain("x-goog-api-key");
+    }
+
+    @Test
     void when_anonymousRequestsApiDocs_then_returnsUnauthorized() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isUnauthorized());

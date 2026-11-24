@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import br.com.systec.hive.commons.api.tools.controller.RestPath;
 import br.com.systec.hive.commons.api.tools.security.HasPermission;
@@ -44,6 +46,10 @@ public class PublicChatControllerV1 {
         this.publicChatService = publicChatService;
     }
 
+    @SecurityRequirements({
+            @SecurityRequirement(name = "bearer-key"),
+            @SecurityRequirement(name = "apiKeyAuth")
+    })
     @Operation(summary = "Cria uma chat completion",
             description = "Resposta com choices, usage e as extensões Hive prompt_code/metadata.hive. "
                     + "O duplo /v1 do path é preservado por compatibilidade com SDKs OpenAI.")

@@ -1,10 +1,12 @@
 package br.com.systec.hive.security.impl.config;
 
+import br.com.systec.hive.publicapi.api.service.PublicApiKeyAuthenticator;
 import br.com.systec.hive.publicapi.impl.service.PublicClientTokenIssuer;
 import br.com.systec.hive.security.impl.filter.PublicApiSecurityFilter;
 import br.com.systec.hive.security.impl.filter.SecurityFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -39,8 +41,9 @@ public class SecurityConfig {
 
     @Bean
     @org.springframework.core.annotation.Order(1)
-    public SecurityFilterChain publicSecurityFilterChain(HttpSecurity http) throws Exception {
-        PublicApiSecurityFilter publicApiSecurityFilter = new PublicApiSecurityFilter(publicClientTokenIssuer, redisTemplate);
+    public SecurityFilterChain publicSecurityFilterChain(HttpSecurity http,
+                                                                   ObjectProvider<PublicApiKeyAuthenticator> keyAuthenticator) throws Exception {
+        PublicApiSecurityFilter publicApiSecurityFilter = new PublicApiSecurityFilter(publicClientTokenIssuer, redisTemplate, keyAuthenticator);
         return http
                 .securityMatcher("/v1/public/**")
                 .csrf(AbstractHttpConfigurer::disable)
