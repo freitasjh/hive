@@ -15,6 +15,7 @@ public interface PublicApiKeyAuthenticator {
     /** Mesmo principal que o filtro hoje extrai do JWT — nenhuma nova lógica de cota ou telemetria. */
     record AuthenticatedKey(UUID tenantId, String clientId, List<String> permissions,
                             List<String> pcode, Map<String, Integer> plock,
-                            Map<String, Integer> plim) {
+                            Map<String, Integer> plim, String keyId,
+                            Integer keyChatRequestsPerMinute) {
     }
 }

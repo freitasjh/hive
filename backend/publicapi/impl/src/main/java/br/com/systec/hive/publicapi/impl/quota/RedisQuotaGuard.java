@@ -170,6 +170,16 @@ public class RedisQuotaGuard {
         return acquireDecision(tenantKey(tenantId), limit);
     }
 
+    /** ADR-003/COT03: contador da key, distinto de quota-tenant (JWT do mesmo tenant). */
+    public static String keyKey(String keyId) {
+        return "hive:public:quota-key:{" + keyId + "}";
+    }
+
+    public QuotaDecision acquireKey(String keyId, int keyLimitPerMinute) {
+        int limit = keyLimitPerMinute <= 0 ? 1 : keyLimitPerMinute;
+        return acquireDecision(keyKey(keyId), limit);
+    }
+
     public static String clientKey(String clientId) {
         return "hive:public:quota:{" + clientId + "}";
     }

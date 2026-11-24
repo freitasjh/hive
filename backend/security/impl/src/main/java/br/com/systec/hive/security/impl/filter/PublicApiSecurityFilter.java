@@ -92,6 +92,9 @@ public class PublicApiSecurityFilter extends OncePerRequestFilter {
                 request.setAttribute("publicapi.pcode", key.pcode());
                 request.setAttribute("publicapi.plock", key.plock());
                 request.setAttribute("publicapi.plim", key.plim());
+                // ADR-003: cota própria da key SOMENTE no ramo sk-; o JWT não vê estes atributos.
+                request.setAttribute("publicapi.keyId", key.keyId());
+                request.setAttribute("publicapi.keylim", key.keyChatRequestsPerMinute());
             } else {
                 DecodedJWT decoded = tokenIssuer.decodeAndVerify(bearerToken);
 

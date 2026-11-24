@@ -45,7 +45,8 @@ class PublicApiKeyAuthIT extends WebIntegrationTest {
                 return new PublicApiKeyAuthenticator.AuthenticatedKey(
                         tenantId, "key-client", List.of("PUBLIC_CHAT_COMPLETE"),
                         List.of(promptCode), Map.of(),
-                        Map.of("m", 200, "c", 32000, "t", 256000, "r", 100));
+                        Map.of("m", 200, "c", 32000, "t", 256000, "r", 100),
+                        "stub-key-id", 100);
             };
         }
     }
