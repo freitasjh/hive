@@ -1,6 +1,6 @@
 # ADR-003 — Cota própria da key e telemetria preservada
 
-**Status:** in-progress · **Data:** 2026-11-24 · **PRD:** `public-api-key-complementar` · **Branch:** `adr/public-api-key-complementar/03-cota-telemetria`
+**Status:** merged · **Data:** 2026-11-24 · **PRD:** `public-api-key-complementar` · **Branch:** `adr/public-api-key-complementar/03-cota-telemetria` · **Merge:** `6118a3a` (PR #13)
 
 **depende-de:** ADR-001 (formato Bearer) e ADR-002 (emissão/rotação da key), ambas merged.
 

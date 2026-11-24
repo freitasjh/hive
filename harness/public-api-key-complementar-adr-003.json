@@ -5,6 +5,22 @@
   "phase": "Testing",
   "gitSha": "84d764064b5a6de7ee5a277df038ab02efa71f37",
   "worktree": "/home/joao/fusionlf/wsProjeto/hive",
+  "mergeVerification": {
+    "status": "MERGE_CONFIRMADO",
+    "data": "2026-11-24",
+    "mergeCommitOriginMain": "6118a3a3b5caece92c90fc59a35e3bedfdadf9ed",
+    "mergeCommitSubject": "Merge pull request #13 from freitasjh/adr/public-api-key-complementar/03-cota-telemetria",
+    "adrsCommit": "01d28e9412cbbcccfd15edbf10fdc01279c6214a",
+    "ancestryExit": 0,
+    "provas": [
+      "git fetch origin main: a9cdd9a..6118a3a main -> origin/main (exit 0)",
+      "git merge-base --is-ancestor 01d28e9... origin/main: exit 0",
+      "git log --oneline -5 origin/main: 6118a3a Merge PR #13 -> 01d28e9 feat(publicapi): cota proprio da key com telemetria preservada -> 84d7640 -> a9cdd9a -> aae4379",
+      "git ls-tree -r --name-only origin/main -- .spec/prd/public-api-key-complementar/ADRs/ADR-003-cota-telemetria: ADR.md, CODE-REVIEW.md, SPEC.md, TASKS.md presentes",
+      "git show -s 6118a3a: pais a9cdd9a (main) e 01d28e9 (ADR-003), 2026-11-24 14:15:44 -0300"
+    ],
+    "observacoes": "branch local permanece em 01d28e9 (commit de implementacao feito apos o QA em 84d7640); VERIFY.md ainda ausente em origin/main — geracao fica com o orquestrador. Nenhum checkout/commit/merge executado pelo QA."
+  },
   "commands": [
     {
       "cmd": "npm test",
