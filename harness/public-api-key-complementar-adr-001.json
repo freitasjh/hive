@@ -5,6 +5,22 @@
   "phase": "Testing",
   "gitSha": "18403948ab3488081ea4c8081e03973c4d254c6f",
   "worktree": "/tmp/opencode/hive-apikey",
+  "mergeVerification": {
+    "status": "MERGE_CONFIRMADO",
+    "data": "2026-11-23",
+    "mergeCommitOriginMain": "3a891e7a82d5d962c692f3c947b8bf966a792f46",
+    "mergeCommitSubject": "Merge pull request #9 from freitasjh/adr/public-api-key-complementar/01-formato-bearer",
+    "adrsCommit": "fb67d715d40a0758e3c292a0e10925fd980fadda",
+    "ancestryExit": 0,
+    "provas": [
+      "git fetch origin main: 9989e16..3a891e7 main -> origin/main (exit 0)",
+      "git merge-base --is-ancestor fb67d71... origin/main: exit 0",
+      "git log --oneline -5 origin/main: 3a891e7 Merge PR #9 -> fb67d71 feat(publicapi): aceita api key Bearer na API publica -> 1840394 -> 9989e16 -> 0699b96",
+      "git ls-tree -r --name-only origin/main -- .spec/prd/public-api-key-complementar/ADRs/ADR-001-formato-bearer: ADR.md, CODE-REVIEW.md, SPEC.md, TASKS.md presentes",
+      "git show -s 3a891e7: pais 9989e16 (main) e fb67d71 (ADR-001), 2026-11-23 22:09:27 -0300"
+    ],
+    "observacoes": "branch local agora em fb67d71 (commit de implementacao feito apos o QA); main local ainda em 9989e16 (fetch atualizou apenas origin/main); VERIFY.md ainda ausente em origin/main — geracao fica com o orquestrador. Nenhum checkout/commit/merge executado pelo QA."
+  },
   "commands": [
     {
       "cmd": "npm test",

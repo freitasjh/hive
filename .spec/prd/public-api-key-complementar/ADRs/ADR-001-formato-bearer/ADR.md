@@ -1,6 +1,6 @@
 # ADR-001 — Formato Bearer `sk-` e contrato OpenAPI da key complementar
 
-**Status:** in-progress · **Data:** 2026-11-23 · **PRD:** `public-api-key-complementar` · **Branch:** `adr/public-api-key-complementar/01-formato-bearer`
+**Status:** merged (merge `3a891e7`, PR #9) · **Data:** 2026-11-23 · **PRD:** `public-api-key-complementar` · **Branch:** `adr/public-api-key-complementar/01-formato-bearer`
 
 **depende-de:** nenhuma ADR. Pré-condição: PRD §16 aprovado em 2026-11-23 (`prd_version: 2`).
 

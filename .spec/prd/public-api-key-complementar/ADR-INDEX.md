@@ -2,7 +2,7 @@
 
 | order | id | title | status | depends_on | dir | branch | merge | unit |
 |---|---|---|---|---|---|---|---|---|
-| 1 | ADR-001 | Formato Bearer `sk-` e contrato OpenAPI da key complementar | in-progress | — | ADRs/ADR-001-formato-bearer/ | adr/public-api-key-complementar/01-formato-bearer | — | adr |
+| 1 | ADR-001 | Formato Bearer `sk-` e contrato OpenAPI da key complementar | merged | — | ADRs/ADR-001-formato-bearer/ | adr/public-api-key-complementar/01-formato-bearer | 3a891e7 · PR #9 | adr |
 
 `prd_version: 2` (§16 aprovado em 2026-11-23). Unidade de entrega = ADR: 1 ADR = 1 branch = 1 PR = 1 revisão, merge humano. Com `unit: adr`, a linha `in-progress` exige `ADR.md` + `SPEC.md` + `TASKS.md`; `VERIFY.md` entra só após merge.
 
