@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "demand": "public-api-key-complementar-adr-002",
+  "agent": "qa-engineer",
+  "phase": "Testing",
+  "gitSha": "3d29f44e679740ea6d50ae94d0dde4db887d0918",
+  "worktree": "/home/joao/fusionlf/wsProjeto/hive",
+  "commands": [
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 67000,
+      "stdoutHash": "27d36d49a918de6e02315564e846f5e7d17eb0e07a9f820a2599307bdbd59430"
+    },
+    {
+      "cmd": "npm --prefix frontend run build",
+      "exitCode": 0,
+      "durationMs": 12000,
+      "stdoutHash": "8d396660237cd8427ade9035d603d078742f1ecde454ef82a0b92bbf71f9861e"
+    },
+    {
+      "cmd": "mvn verify -pl integration-test (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 64000,
+      "stdoutHash": "12c43b7a6b91e74f21cd12bfaa22e503b7d85880ddbbae98343a6febb34f0f00"
+    },
+    {
+      "cmd": "mvn install -DskipTests (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 30000,
+      "stdoutHash": "aa30a1455771741ec26ab5d1ba53b66fddcba56df19c7ecf9836e68d08a0a4fa"
+    },
+    {
+      "cmd": "node --input-type=module -e \"import { runPrdChecks } from './.opencode/plugins/lib/prd-adr-pipeline/checks.mjs'; console.log(JSON.stringify(runPrdChecks('.'),null,2));\"",
+      "exitCode": 0,
+      "durationMs": 200,
+      "stdoutHash": "eab81f73983246180e0f714bc57d6b0623ba7a9f34c0205f908bb9a7f0684944"
+    },
+    {
+      "cmd": "git diff --check",
+      "exitCode": 0,
+      "durationMs": 100,
+      "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 530, "failed": 0, "skipped": 0 },
+    "it": { "passed": 150, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 411, "failed": 0, "skipped": 0 }
+  },
+  "evaluation": {
+    "h1": {
+      "status": "PASS",
+      "detail": "suiteFull do harness.config.json (npm test) reexecutada: exit 0; front 411/411, backend 530/530 (era 526, +4 testes do autenticador), 0/0/0; 67 arquivos surefire."
+    },
+    "h2": {
+      "status": "PASS",
+      "detail": "zero falhas pre-existentes apos o saneamento do pool Hikari de IT (PR #11, maximum-pool-size=2 / minimum-idle=1); 530 testes, 0/0/0."
+    },
+    "h3": {
+      "status": "N/A",
+      "detail": "sem UI nesta ADR; namespace browser nao existe e nao foi usado; chrome-devtools nao acionado."
+    },
+    "h4": {
+      "status": "PASS",
+      "detail": "V3 em Postgres real; um unico @Service sem findAll e no maximo 1 BCrypt(10); one-shot sem plaintext em list/get/log; rotacao com janela controlada e revoke Redis+DB; cross-tenant 404/403; plim m/c/t/r identico; contratos anteriores reexecutados; zero diff em paths protegidos."
+    },
+    "h5": {
+      "status": "PASS",
+      "detail": "portas 8080/5432/5433/6379 verificadas por lsof, todas livres; nenhum pkill -f; 26 flattened poms restaurados; brain_store registrado (R4)."
+    },
+    "h6": {
+      "status": "PASS",
+      "detail": "VERDE. Suite 0 falhas · builds 0 erros · H3 N/A · 150 ITs verdes · code-review APPROVED 0/0/0/0 (1 🟠 corrigido em re-review) com registro escopado · brain_store + workflow-state · portas livres · esteira conforme · zero diff proibido."
+    },
+    "esteira": {
+      "PRD-01": "PASS para public-api-key-complementar: PRD §16 APPROVED com prd_version 2. Unico achado global do runPrdChecks e o orfao pre-existente chat-model-override/PROPOSAL.md, fora de escopo.",
+      "ADR-01": "PASS",
+      "ADR-02": "PASS",
+      "artefatos": "ADR-INDEX 1:1 com diretorio; order 2 sem pulo (ADR-001 merged em 3a891e7/PR #9); depends_on ADR-001; unit adr; TASKS.md linha 1 = <!-- scope: adr/ADR-002 -->; ADR.md/SPEC.md/TASKS.md/CODE-REVIEW.md presentes; VERIFY.md AUSENTE (correto pre-merge)."
+    },
+    "codeReview": {
+      "artifact": ".spec/prd/public-api-key-complementar/ADRs/ADR-002-emissao-rotacao/CODE-REVIEW.md",
+      "veredito": "APPROVED — 0 🔴 · 0 🟠 · 0 🟡 · 0 🔵",
+      "reviewer_session": "ses_dffa34effffeZMrCoNwL2t4pqv",
+      "data": "2026-11-24",
+      "estado": "code_reviews_by_adr['public-api-key-complementar/ADR-002'] conferido: status passed, APPROVED, severity_counts 0/0/0/0, artifact existente. git diff -- workflow-state.json mostra SOMENTE o bloco ADR-002 adicionado.",
+      "correcao": "1 🟠 do reviewer (fallback O(N) com findAll + BCrypt em todas as keys) corrigido antes do re-review: previous_key_id indexado na V3, findByKeyIdOrPreviousKeyId, no maximo 1 BCrypt."
+    },
+    "gatesFuncionais": {
+      "migration": "V3__public_api_client_key.sql aplicada em Postgres real (IT afirma count=1 e 9 colunas publicas): key_id UNIQUE, previous_key_id + idx_public_api_client_key_previous_id, CHECK do par previous_key_hash/previous_key_expires_at, tenant_id/client_ref FK, sem DROP/repair.",
+      "autenticador": "Unico @Service em producao (PublicApiKeyAuthenticatorImpl); authenticate devolve null em todas as falhas; BCryptPasswordEncoder(10) do rawKey completo; findByKeyIdOrPreviousKeyId(keyId,keyId) — 1 query indexada; escolha do hash pelo campo que casou; sem findAll(); unitario verifica never().findAll() para key inventada, key atual e key anterior dentro/fora da janela.",
+      "oneShot": "plaintext api_key somente em POST /keys (201) e rotate (200); list/get sem api_key nem hashes; nenhum log de plaintext no codigo novo.",
+      "rotacaoRevoke": "Janela fixa de 10 min controlada no IT por UPDATE em previous_key_expires_at (sem sleep): key antiga 200 dentro, 401 fora; POST /revoke -> 204, revoked_at gravado e set Redis hive:public:revoked-keys (IT isMember=true), proximo request 401; cross-tenant 404 e sem AGENT_MANAGE 403.",
+      "claims": "policyFor(client) compartilhado entre issuer e autenticador; IT afirma plim m=200, c=32000, t=256000, r=100 identicos entre JWT e key, permissions/pcode idem.",
+      "escopo": "Zero diff em ADR-001/PRD/RESEARCH/ADR-INDEX/arquivadas, MFA, workflow-state (so registro), AGENTS.md, skills, frontend, configs, ChatTurnGateway/ChatTrace/TurnOutcomeMapper, cota/telemetria e poms; nenhum teste apagado ou @Disabled; 26 flattened poms restaurados."
+    },
+    "bugs_identified": [
+      "RISCO RESIDUAL (nao bloqueante): plano do OR em findByKeyIdOrPreviousKeyId nao medido com EXPLAIN em banco real; indice existe em ambos os campos.",
+      "RISCO RESIDUAL: janela de rotacao depende de timestamp do DB — divergencia de relogio encurta/alonga a janela (fora desta ADR).",
+      "DIVIDA DE REPO PRE-EXISTENTE (fora de escopo): .gitignore:32 (*credentials*) ignora diretorio de credentials; nao bloqueia H6.",
+      "FORA DE ESCOPO: orfao pre-existente .spec/prd/chat-model-override/PROPOSAL.md — unico motivo do ok:false global do runPrdChecks.",
+      "Operacional: mvn -pl exige cwd backend/; mvn install regenera .flattened-pom.xml (26 restaurados)."
+    ],
+    "confirmacoes": {
+      "numerosMedidos": "front 411, backend 530, ITs 150 — conferem com o declarado; PublicApiKeyLifecycleIT 6/6; PublicApiKeyAuthIT 3/3; OpenApiSpecIT, PublicApiClientAdminIT 10/10 e PublicApiTenantQuotaIT 4/4 reexecutados",
+      "semCommit": "branch adr/public-api-key-complementar/02-emissao-rotacao @ 3d29f44, arvore sem commit; nenhum commit, merge ou checkout pelo QA; worktrees alheias nao tocadas",
+      "escopoEscrita": "somente este arquivo de evidencia e nota no Brain; nenhum codigo-fonte alterado pelo QA"
+    }
+  },
+  "brainStore": [
+    "arquitetura/projetos/hive/public-api-key-complementar-adr002-qa-verificacao-2026-11-24"
+  ],
+  "cleanup": {
+    "ports": ["8080", "5432", "5433", "6379"],
+    "portsStatus": "todas livres apos a execucao",
+    "killedProcesses": [],
+    "generatedArtifactsRestored": "26 .flattened-pom.xml regenerados por mvn test/verify/install restaurados ao estado pre-verificacao (10 rastreados via git checkout, 16 untracked via rm)"
+  },
+  "selfReported": false
+}

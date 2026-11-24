@@ -87,11 +87,10 @@ public class PublicClientTokenIssuer {
             throw new InvalidClientException("invalid secret");
         }
 
-        List<String> permissions = grantRepository.findByClientRef(client.getId())
-                .stream().map(PublicApiClientGrantEntity::getPermission).collect(Collectors.toList());
+        Policy policy = policyFor(client);
 
         if (requestedScope != null && !requestedScope.trim().isEmpty()) {
-            java.util.Set<String> granted = new java.util.HashSet<>(permissions);
+            java.util.Set<String> granted = new java.util.HashSet<>(policy.permissions());
             for (String s : requestedScope.trim().split("\\s+")) {
                 if (!granted.contains(s)) {
                     throw new InvalidScopeException();
@@ -99,8 +98,35 @@ public class PublicClientTokenIssuer {
             }
         }
 
-        List<PublicApiClientPromptEntity> prompts = promptRepository.findByClientRef(client.getId());
+        Instant now = Instant.now();
+        Instant exp = now.plusSeconds(client.getTokenTtlSeconds() == null ? 600 : client.getTokenTtlSeconds());
 
+        Algorithm algorithm = Algorithm.HMAC256(secret);
+        return JWT.create()
+                .withIssuer(ISSUER)
+                .withAudience(AUDIENCE)
+                .withSubject(clientId)
+                .withJWTId(UUID.randomUUID().toString())
+                .withClaim("tenant-id", client.getTenantId().toString())
+                .withClaim("permissions", policy.permissions())
+                .withClaim("pcode", policy.pcode())
+                .withClaim("plock", policy.plock())
+                .withClaim("plim", policy.plim())
+                .withClaim("typ", "JWT")
+                .withIssuedAt(Date.from(now))
+                .withExpiresAt(Date.from(exp))
+                .sign(algorithm);
+    }
+
+    /**
+     * ADR-002/KEY2-02: única fonte de permissions/pcode/plock/plim para JWT e autenticador de key.
+     * Valores idênticos aos de antes da extração — nenhuma mudança de semântica em plim.
+     */
+    public Policy policyFor(PublicApiClientEntity client) {
+        List<String> permissions = grantRepository.findByClientRef(client.getId())
+                .stream().map(PublicApiClientGrantEntity::getPermission).collect(Collectors.toList());
+
+        List<PublicApiClientPromptEntity> prompts = promptRepository.findByClientRef(client.getId());
         List<String> pcode = prompts.stream()
                 .map(PublicApiClientPromptEntity::getPromptCode).collect(Collectors.toList());
 
@@ -119,25 +145,11 @@ public class PublicClientTokenIssuer {
         plim.put("r", tenantQuotaRepository.findById(client.getTenantId())
                 .map(q -> q.getChatRequestsPerMinute() == null ? 100 : q.getChatRequestsPerMinute())
                 .orElse(100));
+        return new Policy(permissions, pcode, plock, plim);
+    }
 
-        Instant now = Instant.now();
-        Instant exp = now.plusSeconds(client.getTokenTtlSeconds() == null ? 600 : client.getTokenTtlSeconds());
-
-        Algorithm algorithm = Algorithm.HMAC256(secret);
-        return JWT.create()
-                .withIssuer(ISSUER)
-                .withAudience(AUDIENCE)
-                .withSubject(clientId)
-                .withJWTId(UUID.randomUUID().toString())
-                .withClaim("tenant-id", client.getTenantId().toString())
-                .withClaim("permissions", permissions)
-                .withClaim("pcode", pcode)
-                .withClaim("plock", plock)
-                .withClaim("plim", plim)
-                .withClaim("typ", "JWT")
-                .withIssuedAt(Date.from(now))
-                .withExpiresAt(Date.from(exp))
-                .sign(algorithm);
+    public record Policy(List<String> permissions, List<String> pcode,
+                         Map<String, Integer> plock, Map<String, Integer> plim) {
     }
 
     public String grantedScope(String clientId, String requestedScope) {
