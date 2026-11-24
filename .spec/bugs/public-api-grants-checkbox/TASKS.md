@@ -1,6 +1,6 @@
 # TASKS — Grants por checkbox na UI admin da API pública
 
-**Data:** 2026-11-23 · **Origem:** UI da ADR-003, arquivada em `.spec/archive/20261123-prd-public-chat-api/` (não editar) · **Fase:** BugAnalysis (R1 pendente).
+**Data:** 2026-11-23 · **Atualização:** 2026-11-24 · **Origem:** UI da ADR-003, arquivada em `.spec/archive/20261123-prd-public-chat-api/` (não editar) · **Fase:** BugCompleted (R1/R2/R3/R4 concluídos).
 
 > Este documento é a análise (R3). Código só após HITL B1→B2 e reprodução real (R1). Mudança de UI + validação de contrato.
 
@@ -20,15 +20,15 @@
 - **Impacto:** apenas criação/edição de grants de clients públicos; prompts, pin, cota, TTL e limites intactos.
 - **Testes:** Vitest/RTL para checkbox (selecionar/desselecionar, submissão com `grants`), IT de rejeição de grant desconhecido (400), suíte completa, H3 375/1280.
 - **Riscos:** quebrar clients já provisionados com strings arbitrárias se backend passar a rejeitar na leitura — por isso validar **somente na escrita**; i18n/a11y do checkbox; duplicidade de catálogo frontend/backend.
-- **R1 — pendente:** reproduzir na UI que uma string inventada é aceita e gerar client com claim inútil; capturar status e corpo da resposta.
+- **R1 — reproduzido (2026-11-24):** `POST /v1/public-api/clients` com `grants:["GRANT_INEXISTENTE"]` → **201** com o grant inválido; JWT do client com `permissions=[GRANT_INEXISTENTE]`; chamada ao chat negada por `AccessDeniedException` e convertida pelo handler genérico em **500 `internal_error`** (dívida pré-existente, fora deste bug).
 
 ---
 
 ## Portões
 
-- **R1 (Harness-first):** pendente — reproduzir com evidência real (browser/DevTools ou suíte) antes de codificar.
+- **R1 (Harness-first):** concluído — evidência real registrada acima, antes da edição.
 - **R2:** encerrar portas por `lsof -ti :PORTA` → conferir dono → `kill` por PID; nunca `pkill -f`.
 - **R3:** esta análise; comandos e paths devem vir de `harness.config.json`/`AGENTS.md`.
 - **R4:** `brain_store` obrigatório ao fechar.
-- **B1→B2:** "Aprovar seguir para implementação?" — aguardando operador.
+- **B1→B2:** aprovado pelo operador em 2026-11-24; backend e frontend implementados, review e QA verdes.
 - **H6:** suíte 0 falhas, H3 verde, `code-reviewer` sem 🔴, Brain registrado.

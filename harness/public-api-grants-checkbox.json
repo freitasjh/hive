@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "demand": "public-api-grants-checkbox",
+  "agent": "qa-engineer",
+  "phase": "BugReview",
+  "gitSha": "a9cfd7f64ea3292159bf7c909383a7a859a24776",
+  "commands": [
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 65000,
+      "stdoutHash": "d70708f3654ac140a1e8588e5db9b6e8215c85398944fe53ac8e0290998efe94"
+    },
+    {
+      "cmd": "npm --prefix frontend run build",
+      "exitCode": 0,
+      "durationMs": 11000,
+      "stdoutHash": "bab4b981a4ed2e4e605ac7021f14ab5a993248d864cc14031046320a2cd88c54"
+    },
+    {
+      "cmd": "mvn verify -pl integration-test (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 65000,
+      "stdoutHash": "64d0b42cfd5fb417c7cd8dbf41b96355082b323c4b3a27c4eb27fe380369a6dd"
+    },
+    {
+      "cmd": "mvn install -DskipTests (cwd: backend/)",
+      "exitCode": 0,
+      "durationMs": 12000,
+      "stdoutHash": "145724d28d6a5014821dd5d1609daec0dabdce694642dae9429b1f3015c7d71f"
+    },
+    {
+      "cmd": "git diff --check",
+      "exitCode": 0,
+      "durationMs": 100,
+      "stdoutHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 530, "failed": 0, "skipped": 0 },
+    "it": { "passed": 155, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 413, "failed": 0, "skipped": 0 }
+  },
+  "evaluation": {
+    "h1": {
+      "status": "PASS",
+      "detail": "suiteFull do harness.config.json (npm test) reexecutada: exit 0; front 413/413 (era 411, +2), backend 530/530, 0/0/0."
+    },
+    "h2": {
+      "status": "PASS",
+      "detail": "zero falhas pre-existentes apos o saneamento do pool Hikari de IT (PR #11); 530 testes backend, 0/0/0."
+    },
+    "h3": {
+      "status": "PASS",
+      "detail": "REPLAY com chrome-devtools + fixture frontend/scripts/h3-mock-api.mjs: login pela UI, #providers/public-clients, campo livre removido, checkbox PUBLIC_CHAT_COMPLETE, validacao 'Selecione ao menos um grant.' sem POST, POST 201 com grants:['PUBLIC_CHAT_COMPLETE'] e secret one-shot, 1280x800 e 375x812 sem overflow, foco via teclado com ring 3px e alvo 44px, console 0 [ERROR]/0 [WARN], rede 0 4xx/5xx. 3 screenshots do bug revisados e 3 screenshots do replay salvos."
+    },
+    "h4": {
+      "status": "PASS",
+      "detail": "R1 documentada antes da edicao; catalogo fechado no writer e no front; update invalido nao apaga grants; payload grants:string[] e contrato HTTP inalterados; zero diff em paths protegidos; nenhum teste apagado/@Disabled."
+    },
+    "h5": {
+      "status": "PASS",
+      "detail": "portas da fixture (8099) e do vite (5183) encerradas por PID apos lsof/ps + kill, sem pkill -f; 8080/5432/6379 pertencem a app Java da IDE (PID 357974, dono conferido) e foram preservadas; 26 flattened poms restaurados; brain_store gravado (R4)."
+    },
+    "h6": {
+      "status": "PASS",
+      "detail": "VERDE. Suite 0 falhas · build 0 erros · H3 PASS · code-review APPROVED 0/0/0/0 com registro code_reviews_by_bug valido · brain_store + workflow-state · portas proprias encerradas e alheias preservadas · zero diff proibido."
+    },
+    "r1": {
+      "status": "DOCUMENTADA_ANTES_DA_EDICAO",
+      "detalhe": "IT de reproducao (depois PublicApiGrantsValidationIT) em Postgres/Redis reais: POST /v1/public-api/clients com grants:['GRANT_INEXISTENTE'] -> 201 e claim inutil no JWT; chat com esse JWT -> AccessDeniedException resolvida pelo handler generico em 500 internal_error. Achado adicional pre-existente: 500 em vez de 403 no chat, controller nao tocado."
+    },
+    "gates": {
+      "backend": "PublicApiClientAccessWriter.PUBLIC_CHAT_GRANT = 'PUBLIC_CHAT_COMPLETE'; validateGrants no inicio de write() e em updateGrants() ANTES de deleteAllByClientRef/flush; IllegalArgumentException -> 400 ILLEGAL_ARGUMENT via ControllerExceptionHandler. PublicApiGrantsValidationIT 3/3.",
+      "frontend": "PUBLIC_GRANTS = ['PUBLIC_CHAT_COMPLETE'] em form.ts; estado grants:string[] sem grantsText/parseGrants; onToggleGrant com dedupe/filtro; checkbox shadcn em Label htmlFor dentro de fieldset/legend, alvo 44px e foco visivel; i18n pt/en.",
+      "escopo": "Zero diff em PublicChatControllerV1, prompt/pin/cota/TTL/limites, ADRs, .spec/archive/**, MFA, workflow-state.json (somente bloco aditivo code_reviews_by_bug), AGENTS.md, skills, configs, branches/worktrees alheias e frontend fora do escopo; nenhum teste apagado ou @Disabled; 26 flattened poms restaurados."
+    },
+    "h3Evidence": {
+      "browser": "chrome-devtools MCP",
+      "fixture": "frontend/scripts/h3-mock-api.mjs na porta 8099 + npm run dev na 5183",
+      "viewports": ["1280x800", "375x812 mobile/touch"],
+      "reviewedScreenshots": [
+        {
+          "path": ".spec/bugs/public-api-grants-checkbox/harness/create-1280.png",
+          "sha256": "4e7c6d0cb116ad6a98dbb1561d7d6fff1819213337ca8c8959bde0c9e15f928e"
+        },
+        {
+          "path": ".spec/bugs/public-api-grants-checkbox/harness/create-375.png",
+          "sha256": "33ddc09e7c3f444243cc049e2f0734f583c7a889a77c708975ae37666717021a"
+        },
+        {
+          "path": ".spec/bugs/public-api-grants-checkbox/harness/focus-checked-375.png",
+          "sha256": "21816c0f788b865ef557ddf4c6d0a40f8555e23cbbc8d6dfae72973d73044378"
+        }
+      ],
+      "replayScreenshots": [
+        {
+          "path": "/tmp/opencode/qa10-grants-1280.png",
+          "sha256": "d2002ff9db6ab89ab1c25322f2349de2a8241974af95b1d3926f4478e00026e8"
+        },
+        {
+          "path": "/tmp/opencode/qa10-grants-375.png",
+          "sha256": "58892d079f874c1ba2de23ab2881946b4a10e3020357d73916a2f019530b3eef"
+        },
+        {
+          "path": "/tmp/opencode/qa10-grants-focus-375.png",
+          "sha256": "9a00d42ff2527dbd0cbcf16ea116996721f864b480927bdb241559fb2248d0e0"
+        }
+      ],
+      "provas": [
+        "sem campo livre de grants no dialog; apenas checkbox 'Concluir chat público'",
+        "submit sem grant -> alert 'Selecione ao menos um grant.' e nenhum POST na rede",
+        "POST /hive/v1/public-api/clients [201] com body {\"label\":\"QA grants checkbox\",\"grants\":[\"PUBLIC_CHAT_COMPLETE\"],\"prompts\":[]}",
+        "response com client_secret h3_sk_... one-shot; apos 'Guardei, fechar' secret ausente do DOM e dialogCount=0",
+        "375: scrollWidth 375 = innerWidth 375; label do checkbox 44px; :focus-visible true com box-shadow ring 3px apos teclado; aria-checked=true",
+        "console 0 ERROR/0 WARN (debug/info/issue apenas); rede 0 4xx/5xx"
+      ]
+    },
+    "bugs_identified": [
+      "RISCO PRE-EXISTENTE (fora deste bug): PublicChatControllerV1 converte AccessDeniedException em 500 internal_error em vez de 403 — descoberto na R1, controller sem diff.",
+      "RISCO DE MANUTENCAO: catalogo de grants duplicado em form.ts (front) e PublicApiClientAccessWriter.java (back); alinhar se backend adicionar grants.",
+      "[issue] de a11y no console: searchbox da lista sem id/name — pre-existente, nao e ERROR/WARN.",
+      "Operacional: mvn -pl exige cwd backend/; mvn install regenera .flattened-pom.xml (26 restaurados)."
+    ],
+    "confirmacoes": {
+      "numerosMedidos": "front 413, backend 530, ITs 155 — conferem com o declarado; PublicApiGrantsValidationIT 3/3",
+      "semCommit": "branch fix/public-api-grants-checkbox @ a9cfd7f, arvore sem commit; nenhum commit, merge ou checkout pelo QA; branches/worktrees alheias nao tocadas",
+      "escopoEscrita": "somente este arquivo de evidencia e nota no Brain; nenhum codigo-fonte alterado pelo QA"
+    }
+  },
+  "brainStore": [
+    "arquitetura/projetos/hive/public-api-grants-checkbox-qa-verificacao-2026-11-24"
+  ],
+  "cleanup": {
+    "ports": ["8099", "5183", "8080", "5432", "5433", "6379"],
+    "portsStatus": "8099 livre; 5183 sem listener (apenas CLOSE_WAIT do chrome); 8080/5432/6379 occupadas por app Java da IDE (PID 357974, dono conferido) e preservadas; 5433 livre",
+    "killedProcesses": [552768, 552899, 552912],
+    "generatedArtifactsRestored": "26 .flattened-pom.xml regenerados por mvn test/verify/install restaurados ao estado pre-verificacao (10 rastreados via git checkout, 16 untracked via rm)"
+  },
+  "selfReported": false
+}

@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { emptyPublicClientForm, parseGrants, toCreatePayload, validatePublicClientForm } from './form'
+import { emptyPublicClientForm, PUBLIC_GRANTS, toCreatePayload, validatePublicClientForm } from './form'
 
 describe('public clients form', () => {
-  it('parseGrants remove vazios, duplicados e espaços', () => {
-    expect(parseGrants(' PUBLIC_CHAT_COMPLETE, chat ,,\nPUBLIC_CHAT_COMPLETE ')).toEqual([
-      'PUBLIC_CHAT_COMPLETE',
-      'chat',
-    ])
+  it('catálogo de grants é fechado: somente PUBLIC_CHAT_COMPLETE', () => {
+    expect(PUBLIC_GRANTS).toEqual(['PUBLIC_CHAT_COMPLETE'])
   })
 
   it('valida rótulo, grants, prompt e versão fixada', () => {
@@ -17,7 +14,7 @@ describe('public clients form', () => {
 
     const noPromptCode = {
       ...noGrants,
-      grantsText: 'PUBLIC_CHAT_COMPLETE',
+      grants: ['PUBLIC_CHAT_COMPLETE'],
       prompts: [{ promptCode: '', pinMode: 'FOLLOW_ACTIVE' as const, pinnedVersion: null }],
     }
     expect(validatePublicClientForm(noPromptCode)).toBe('admin.publicClients.validationPromptCode')
@@ -33,7 +30,7 @@ describe('public clients form', () => {
     const base = {
       ...emptyPublicClientForm,
       label: 'Chat',
-      grantsText: 'PUBLIC_CHAT_COMPLETE',
+      grants: ['PUBLIC_CHAT_COMPLETE'],
     }
     expect(validatePublicClientForm({ ...base, tokenTtlSeconds: '10' })).toBe(
       'admin.publicClients.validationLimits'
@@ -47,7 +44,7 @@ describe('public clients form', () => {
   it('monta payload somente com campos preenchidos, sem clientId/tenant', () => {
     const payload = toCreatePayload({
       label: '  Chat do site  ',
-      grantsText: 'A, B',
+      grants: ['PUBLIC_CHAT_COMPLETE'],
       prompts: [{ promptCode: 'greeting', pinMode: 'PINNED', pinnedVersion: 2 }],
       tokenTtlSeconds: '900',
       maxMessages: '',
@@ -57,7 +54,7 @@ describe('public clients form', () => {
 
     expect(payload).toEqual({
       label: 'Chat do site',
-      grants: ['A', 'B'],
+      grants: ['PUBLIC_CHAT_COMPLETE'],
       prompts: [{ promptCode: 'greeting', pinMode: 'PINNED', pinnedVersion: 2 }],
       tokenTtlSeconds: 900,
     })

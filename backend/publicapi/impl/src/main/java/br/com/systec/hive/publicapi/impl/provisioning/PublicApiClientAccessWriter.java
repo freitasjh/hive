@@ -37,8 +37,23 @@ public class PublicApiClientAccessWriter {
         this.promptRepository = promptRepository;
     }
 
+    /** Bugfix grants: validação no ponto de escrita; catálogo fechado, sem silêncio para string inventada. */
+    public static void validateGrants(List<String> grants) {
+        if (grants == null) return;
+        for (String permission : grants) {
+            if (permission == null || permission.isBlank()) {
+                throw new IllegalArgumentException("permission não pode ser vazia");
+            }
+            if (!PUBLIC_CHAT_GRANT.equals(permission)) {
+                throw new IllegalArgumentException("permission desconhecida: " + permission
+                        + ". Catálogo: " + PUBLIC_CHAT_GRANT);
+            }
+        }
+    }
+
     @Transactional(propagation = Propagation.REQUIRED)
     public void write(UUID tenantId, UUID clientRef, List<String> grants, List<PromptBinding> prompts) {
+        validateGrants(grants);
         if (grants != null) {
             for (String permission : new LinkedHashSet<>(grants)) {
                 if (permission == null || permission.isBlank()) {

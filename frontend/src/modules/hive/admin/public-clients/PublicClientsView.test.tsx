@@ -50,6 +50,7 @@ function makeActions(overrides: Partial<PublicClientsActions> = {}): PublicClien
     onOpenCreate: vi.fn(),
     onCloseCreate: vi.fn(),
     onFormChange: vi.fn(),
+    onToggleGrant: vi.fn(),
     onPromptChange: vi.fn(),
     onAddPrompt: vi.fn(),
     onRemovePrompt: vi.fn(),
@@ -205,6 +206,40 @@ describe('PublicClientsView', () => {
     expect(actions.onAddPrompt).toHaveBeenCalledTimes(1)
     expect(actions.onRemovePrompt).toHaveBeenCalledWith(0)
     expect(actions.onCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it('seleciona grants por checkbox do catálogo, sem campo livre', () => {
+    const actions = makeActions()
+    const { unmount } = render(
+      <PublicClientsView
+        state={makeState({ createOpen: true, form: emptyPublicClientForm })}
+        actions={actions}
+        oneShot={null}
+      />
+    )
+
+    expect(screen.queryByTestId('input-grants')).toBeNull()
+    expect(document.querySelector('label[for="pc-grant-PUBLIC_CHAT_COMPLETE"]')).toBeTruthy()
+    const checkbox = screen.getByRole('checkbox', { name: /Concluir chat público/i }) as HTMLButtonElement
+    expect(checkbox.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(checkbox)
+    expect(actions.onToggleGrant).toHaveBeenCalledWith('PUBLIC_CHAT_COMPLETE', true)
+    unmount()
+
+    render(
+      <PublicClientsView
+        state={makeState({
+          createOpen: true,
+          form: { ...emptyPublicClientForm, grants: ['PUBLIC_CHAT_COMPLETE'] },
+        })}
+        actions={actions}
+        oneShot={null}
+      />
+    )
+    const checked = screen.getByRole('checkbox', { name: /Concluir chat público/i }) as HTMLButtonElement
+    expect(checked.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(checked)
+    expect(actions.onToggleGrant).toHaveBeenCalledWith('PUBLIC_CHAT_COMPLETE', false)
   })
 
   it('pede confirmação antes de revogar', () => {

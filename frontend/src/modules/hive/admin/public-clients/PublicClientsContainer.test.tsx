@@ -100,7 +100,7 @@ describe('PublicClientsContainer', () => {
 
     fireEvent.click(screen.getByTestId('empty-cta'))
     fireEvent.change(screen.getByTestId('input-label'), { target: { value: 'Chat do site' } })
-    fireEvent.change(screen.getByTestId('input-grants'), { target: { value: 'PUBLIC_CHAT_COMPLETE' } })
+    fireEvent.click(screen.getByTestId('checkbox-grant-PUBLIC_CHAT_COMPLETE'))
     fireEvent.click(screen.getByTestId('create-submit'))
 
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
@@ -128,6 +128,23 @@ describe('PublicClientsContainer', () => {
     fireEvent.click(screen.getByTestId('new-client-btn'))
     fireEvent.click(screen.getByTestId('create-submit'))
     await waitFor(() => expect(screen.getByTestId('validation-error')).toBeTruthy())
+    expect(mocks.create).not.toHaveBeenCalled()
+  })
+
+  it('desseleciona grant e volta a exigir ao menos um', async () => {
+    mocks.list.mockResolvedValueOnce(page([]))
+    render(<PublicClientsContainer />)
+    await waitFor(() => expect(screen.getByTestId('public-clients-empty')).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId('empty-cta'))
+    fireEvent.change(screen.getByTestId('input-label'), { target: { value: 'Chat do site' } })
+    const checkbox = screen.getByTestId('checkbox-grant-PUBLIC_CHAT_COMPLETE')
+    fireEvent.click(checkbox)
+    expect(checkbox.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(checkbox)
+    expect(checkbox.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(screen.getByTestId('create-submit'))
+    await waitFor(() => expect(screen.getByTestId('validation-error').textContent).toContain('grant'))
     expect(mocks.create).not.toHaveBeenCalled()
   })
 

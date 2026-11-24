@@ -108,6 +108,19 @@
       "date": "2026-11-24"
     }
   },
+  "code_reviews_by_bug": {
+    "public-api-grants-checkbox": {
+      "status": "passed",
+      "approval_status": "APPROVED",
+      "critical_issues_count": 0,
+      "severity_counts": { "🔴": 0, "🟠": 0, "🟡": 0, "🔵": 0 },
+      "must_fix_before_done": [],
+      "reviewer_session": "ses_dffa34effffeZMrCoNwL2t4pqv",
+      "scope": "public-api-grants-checkbox — checkbox de grants e validação no backend; branch fix/public-api-grants-checkbox; review APPROVED",
+      "artifact": ".spec/bugs/public-api-grants-checkbox/CODE-REVIEW.md",
+      "date": "2026-11-24"
+    }
+  },
   "harness_status": "passed",
   "harness_note": "Branch feature/login-tela-mfa. Backend 501 testes + IT MfaLoginFlowIT 4/4; frontend 280 testes + build 0. Login sem MFA devolve mfaSetupAvailable=true e UI mostra convite NAO-modal (MfaSetupInvite) com Configurar agora (abre MfaSetupDialog com QR) e Pular (sem persistencia). Login com MFA: desafio com tenantId, sem token/campo; verify/recovery com X-Tenant-ID do desafio. Dividas 🔵: tautologia em LoginServiceImpl:87, @JsonInclude classe-nivel em LoginResponseDTO, teto 50 prompts no seletor, X-Forwarded-For proxy, reautenticacao recente setup. H3 real nao executado por bloqueio de perfil chrome-devtools de outro agente. Arquivos publicapi/frontend de outro agente seguem fora do commit.",
   "gates": {

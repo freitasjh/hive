@@ -113,6 +113,18 @@ export function PublicClientsContainer() {
         validationError: null,
       }))
     },
+    onToggleGrant(grant, checked) {
+      setState((current) => ({
+        ...current,
+        form: {
+          ...current.form,
+          grants: checked
+            ? Array.from(new Set([...current.form.grants, grant]))
+            : current.form.grants.filter((value) => value !== grant),
+        },
+        validationError: null,
+      }))
+    },
     onPromptChange(index: number, patch: Partial<PublicClientPromptDraft>) {
       setState((current) => ({
         ...current,
