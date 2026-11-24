@@ -120,7 +120,18 @@
     "prd_id": "public-chat-api",
     "prd_status": "archived",
     "active_adr": "ADR-005",
-    "adr_order": ["ADR-001", "ADR-002", "ADR-003", "ADR-004", "ADR-005"]
+    "adr_order": ["ADR-001", "ADR-002", "ADR-003", "ADR-004", "ADR-005"],
+    "public-api-key-complementar": {
+      "prd_id": "public-api-key-complementar",
+      "prd_status": "archived",
+      "active_adr": "ADR-003",
+      "adr_order": ["ADR-001", "ADR-002", "ADR-003"],
+      "merges": {
+        "ADR-001": "3a891e7 · PR #9",
+        "ADR-002": "aae4379 · PR #12",
+        "ADR-003": "6118a3a · PR #13"
+      }
+    }
   },
   "last_update": "2026-11-20T00:00:00Z"
 }

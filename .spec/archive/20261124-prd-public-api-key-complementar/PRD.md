@@ -2,6 +2,7 @@
 prd_id: public-api-key-complementar
 title: API key complementar ligada ao client da API pública
 status: aprovado_humano
+prd_status: archived
 date: 2026-11-23
 owner: orquestrador (proposta) — aprovação: operador humano
 ---
@@ -135,3 +136,12 @@ Data: 2026-11-23.
 - [X] `prd_version: 2` — ADRs com `unit: adr` (`SPEC.md` + `TASKS.md`; `VERIFY.md` após merge), conforme `.agents/rules/prd-adr-pipeline.md:28-33`.
 
 **Trava:** nenhum `ADRs/**` deve nascer antes da assinatura deste §16. Após aprovação: converter `ADR-INDEX.md` em índice canônico e abrir o ADR 1.
+
+## Arquivamento
+
+- **Data:** 2026-11-24.
+- **Duração:** 2026-11-23 → 2026-11-24.
+- **Traceability:** 100% — 11/11 RFs, 14/14 tasks, 0 órfãos (`TRACEABILITY.md`).
+- **ADRs:** 3 merged, teto respeitado — ADR-001 `3a891e7` (PR #9), ADR-002 `aae4379` (PR #12), ADR-003 `6118a3a` (PR #13).
+- **Artefatos entregues:** `PRD.md`, `RESEARCH.md`, `ADR-INDEX.md`, `TRACEABILITY.md` e, por ADR, `ADR.md`/`SPEC.md`/`TASKS.md`/`CODE-REVIEW.md`/`VERIFY.md`.
+- **Código entregue:** formato Bearer `sk-` e esquemas OpenAPI `bearer-key` + `apiKeyAuth`; emissão/hash/rotação/revogação de key com BCrypt custo 10, one-shot e janela de 10 min; cota própria da key (`V4`, `hive:public:quota-key:{keyId}`) com telemetria `turnId`/`clientId` preservada. `plim` e emissor de JWT inalterados.
