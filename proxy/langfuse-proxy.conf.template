@@ -1,0 +1,59 @@
+# ADR-004 / ACC-01..06 — reverse proxy na frente da UI e da API do Langfuse Community.
+# Capacidades congeladas: telemetry.read (Admin Hive, Suporte) e telemetry.admin (time de IA).
+# Sem capacidade => 403. O proxy controla o acesso a instancia; NAO cria papeis por projeto.
+# __CERT__ / __KEY__ / portas / CIDR vem do ambiente de implantacao; nenhuma credencial aparece aqui.
+worker_processes 1;
+error_log __ERROR_LOG__ notice;
+pid __PID__;
+events { worker_connections 256; }
+
+http {
+    access_log __ACCESS_LOG__;
+
+    upstream capability_gateway { server 127.0.0.1:__AUTH_PORT__; }
+    upstream langfuse_upstream { server 127.0.0.1:__UPSTREAM_PORT__; }
+
+    # HTTP simples nunca responde dado de trace.
+    server { listen __HTTP_PORT__; return 444; }
+
+    server {
+        listen 443 ssl;
+        ssl_certificate __CERT__;
+        ssl_certificate_key __KEY__;
+
+        # Signup e login por usuario/senha desabilitados no proxy (ver README para as env do Langfuse).
+        location ~ ^/(api/auth/(signin|signup)|auth/(login|signup)|signup|login)(/|$) { return 403; }
+
+        # Administracao: somente rede interna do proxy E capacidade administrativa.
+        location ^~ /api/admin/ {
+            allow __ADMIN_CIDR__;
+            deny all;
+            auth_request /_auth_admin;
+            proxy_pass http://langfuse_upstream;
+            proxy_set_header X-Forwarded-Proto https;
+        }
+
+        # UI e API: leitura exige capability gateway com a capacidade de leitura.
+        location / {
+            auth_request /_auth_read;
+            proxy_pass http://langfuse_upstream;
+            proxy_set_header X-Forwarded-Proto https;
+        }
+
+        location = /_auth_read {
+            internal;
+            proxy_pass http://capability_gateway/verify?capability=telemetry.read;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_set_header X-Original-URI $request_uri;
+        }
+
+        location = /_auth_admin {
+            internal;
+            proxy_pass http://capability_gateway/verify?capability=telemetry.admin;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_set_header X-Original-URI $request_uri;
+        }
+    }
+}

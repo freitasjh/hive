@@ -91,6 +91,11 @@ Decisão congelada do operador: Langfuse **self-host v4 Community, sem EE**; lei
 
 - **Inferência `Full access`:** a doc só define "all read/write" e a ação `traces:delete`; que a terceira chave deva ser `Full access` continua **inferência**, **a confirmar por IT de 403** com `Viewer` e `Application` na rota de delete antes de produção. Nenhuma chave de delete no backend. Se o IT falhar, revisar esta emenda — não promover a inferência a contrato por palpite.
 
+**Débitos de produção registrados no review (2026-11-25 — não bloqueiam merge):**
+- `docker/check-retention-gate.sh` valida apenas cron/compose/"30"; **deve exigir a evidência do `key-scope-it.sh`** (`application_delete=403`, `viewer_delete=403`, `full_delete=200`) antes de permitir implantação — sem isso, a inferência `Full access` pode seguir não provada em produção.
+- `docker/cron/langfuse-retention.cron` chama `docker compose` sem carregar o cofre; **a origem de `LANGFUSE_RETENTION_AUTH` deve ser explícita** (`.env`/cofre) no crontab, senão o job falha às 03:00 e a retenção some com o gate ainda verde.
+- Melhorias não bloqueantes: ler os roots com chave `Viewer` em vez da chave de delete (menor privilégio); guardar `Instant.parse` contra `DateTimeParseException` para não perder a linha de auditoria.
+
 ### Impacto nas tasks (para o `engineer`, sem alteração aqui)
 
 - **ACC-01** (RF-01): contrato inalterado; o job **não é usuário do proxy** — as capacidades `telemetry.read`/`telemetry.admin` continuam sendo para pessoas. Nenhuma capacidade do proxy é usada para autorizar a CLI; a execução é cron do host via Docker Compose, **fora do proxy e do backend**.
