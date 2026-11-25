@@ -9,6 +9,7 @@ import br.com.systec.hive.assistant.impl.diagnostics.ChatSpanSink;
 import br.com.systec.hive.assistant.impl.diagnostics.ChatTurnSpanScope;
 import br.com.systec.hive.assistant.impl.diagnostics.ProviderCallSpanListener;
 import br.com.systec.hive.assistant.impl.diagnostics.SpanListeningChatModel;
+import br.com.systec.hive.assistant.impl.diagnostics.TextRedactor;
 import br.com.systec.hive.provider.api.LlmClientFactory;
 import br.com.systec.hive.provider.langchain4j.LlmRetryPolicy;
 import dev.langchain4j.data.message.ChatMessage;
@@ -53,30 +54,38 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
     private final LlmClientFactory<ChatModel> llmClientFactory;
     private final LlmRetryPolicy retryPolicy;
     private final ChatSpanSink spanSink;
+    private final TextRedactor redactor;
 
     /** Construtor de produção: ADR-002 liga o sink real injetado pelo bootstrap. */
     @Autowired
     public AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory, ChatSpanSink spanSink) {
-        this(llmClientFactory, LlmRetryPolicy.defaults(), spanSink);
+        this(llmClientFactory, LlmRetryPolicy.defaults(), spanSink, new TextRedactor());
     }
 
     /** Construtor de teste sem export: mantém o comportamento anterior quando não há sink. */
     public AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory) {
-        this(llmClientFactory, LlmRetryPolicy.defaults(), ChatSpanSink.noop());
+        this(llmClientFactory, LlmRetryPolicy.defaults(), ChatSpanSink.noop(), new TextRedactor());
     }
 
     /** Construtor de teste: política de retry sem espera. A abstrata cria o store em memória. */
     AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory, LlmRetryPolicy retryPolicy) {
-        this(llmClientFactory, retryPolicy, ChatSpanSink.noop());
+        this(llmClientFactory, retryPolicy, ChatSpanSink.noop(), new TextRedactor());
     }
 
     /** Construtor de teste com sink de spans: a fatia de contrato não depende de exporter. */
     public AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory, LlmRetryPolicy retryPolicy,
                                 ChatSpanSink spanSink) {
+        this(llmClientFactory, retryPolicy, spanSink, new TextRedactor());
+    }
+
+    /** Construtor de teste com redator controlado (canário de fail-closed). */
+    public AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory, LlmRetryPolicy retryPolicy,
+                                ChatSpanSink spanSink, TextRedactor redactor) {
         super();
         this.llmClientFactory = llmClientFactory;
         this.retryPolicy = retryPolicy;
         this.spanSink = spanSink;
+        this.redactor = redactor;
     }
 
     /**
@@ -126,7 +135,8 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
             ChatModel client = llmClientFactory.createClientWithSession(request.provider(), request.model(),
                     request.promptTemplate().temperature(), request.promptTemplate().maxTokens(),
                     request.promptTemplate().topP(), request.apiKey(), request.baseUrl(), request.sessionId());
-            AssistantDefault proxy = proxyFor(new SpanListeningChatModel(client, new ProviderCallSpanListener()));
+            AssistantDefault proxy = proxyFor(new SpanListeningChatModel(client,
+                    new ProviderCallSpanListener(redactor)));
 
             // A8: uma chamada por vez por @MemoryId. Seed + proxy dentro do mesmo lock, senão dois
             // turnos poderiam reescrever a memória um do outro entre o set e a leitura do AiService.
