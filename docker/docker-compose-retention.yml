@@ -1,0 +1,16 @@
+# ADR-004 / ACC-23 — job externo de retencao, disparado por cron do host.
+# Nome fixo para nao compartilhar namespace com outros clones (ver docker-compose-vetor.yml).
+name: hive
+
+services:
+  langfuse-retention:
+    build: ../retention-job
+    image: hive-retention-job:local
+    restart: "no"
+    environment:
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:?defina a URL base do Langfuse}
+      # Valor vem de cofre/secret do host: nunca literal em repo, log ou stdout.
+      LANGFUSE_RETENTION_AUTH: ${LANGFUSE_RETENTION_AUTH:?defina a credencial de delete via secret}
+      RETENTION_DAYS: "30"
+      RETENTION_LOCK_FILE: /tmp/hive-langfuse-retention.lock
+      RUN_ID: ${RUN_ID:-}

@@ -1,0 +1,5 @@
+# ADR-004 / ACC-20 — dono: time de IA; cadencia: diario as 03:00; cron do host + Docker Compose.
+# Instalar em /etc/cron.d/hive-retention (modo 0644, root:root). Credenciais ficam no ambiente do host.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 3 * * * root /usr/bin/docker compose -f /srv/hive/docker/docker-compose-retention.yml run --rm langfuse-retention >> /var/log/hive/retention-cron.log 2>&1
