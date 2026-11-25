@@ -11,7 +11,9 @@ import br.com.systec.hive.assistant.api.exceptions.ModelReturnedEmptyException;
 import br.com.systec.hive.assistant.api.exceptions.ModelUnavailableException;
 import br.com.systec.hive.assistant.api.exceptions.ProviderException;
 import br.com.systec.hive.assistant.api.util.ModelNotFound;
+import br.com.systec.hive.assistant.impl.diagnostics.ChatTurnSpanScope;
 import br.com.systec.hive.assistant.impl.diagnostics.FailureClassifier;
+import br.com.systec.hive.assistant.impl.diagnostics.SpanningChatTraceRecorder;
 import br.com.systec.hive.provider.api.AiProvider;
 import br.com.systec.hive.provider.api.OpencodeDiscoveryService;
 import org.slf4j.Logger;
@@ -85,7 +87,7 @@ public class TurnOutcomeMapper implements TurnOutcomeReporter {
     private final OpencodeDiscoveryService discoveryService;
 
     public TurnOutcomeMapper(ChatTraceRecorder traceRecorder, OpencodeDiscoveryService discoveryService) {
-        this.traceRecorder = traceRecorder == null ? ChatTraceRecorder.noop() : traceRecorder;
+        this.traceRecorder = new SpanningChatTraceRecorder(traceRecorder);
         this.discoveryService = discoveryService;
     }
 
@@ -133,6 +135,8 @@ public class TurnOutcomeMapper implements TurnOutcomeReporter {
             // 422-vs-502 decision.
             Throwable failure = reply.failure();
             if (failure instanceof br.com.systec.hive.commons.api.exceptions.BaseException base) {
+                // Este ramo não chama record: fecha o root aqui para não deixar trace órfão.
+                ChatTurnSpanScope.closeIfOpen();
                 throw base;
             }
             recordTurn(sessionId, tenantId, promptTemplateId, provider, model, promptTemplate, history,
@@ -156,6 +160,7 @@ public class TurnOutcomeMapper implements TurnOutcomeReporter {
         // with a null text, and `chat_message.content` is NOT NULL: a wiring mistake would surface as
         // the 409 data-integrity error this class exists to prevent, about a turn nobody diagnosed.
         if (reply.status() != TurnReply.Status.ANSWERED) {
+            ChatTurnSpanScope.closeIfOpen();
             throw new IllegalStateException("unreachable turn status: " + reply.status());
         }
 
