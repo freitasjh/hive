@@ -54,7 +54,13 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
     private final LlmRetryPolicy retryPolicy;
     private final ChatSpanSink spanSink;
 
+    /** Construtor de produção: ADR-002 liga o sink real injetado pelo bootstrap. */
     @Autowired
+    public AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory, ChatSpanSink spanSink) {
+        this(llmClientFactory, LlmRetryPolicy.defaults(), spanSink);
+    }
+
+    /** Construtor de teste sem export: mantém o comportamento anterior quando não há sink. */
     public AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory) {
         this(llmClientFactory, LlmRetryPolicy.defaults(), ChatSpanSink.noop());
     }

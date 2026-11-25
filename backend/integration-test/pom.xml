@@ -81,6 +81,15 @@
             <artifactId>java-jwt</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Decodificação do payload OTLP/HTTP protobuf capturado no fake server (OTL-01/OTL-12). -->
+        <dependency>
+            <groupId>io.opentelemetry.proto</groupId>
+            <artifactId>opentelemetry-proto</artifactId>
+            <!-- 1.11.1-alpha gera código com protobuf 4.36, mas o runtime gerenciado pelo Boot 4.1 é 4.34:
+                 usar a geração anterior evita RuntimeVersionException no decode do payload capturado. -->
+            <version>1.10.0-alpha</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

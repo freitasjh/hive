@@ -88,6 +88,17 @@ Nenhuma outra linha da Interface congelada mudou: path, header v4, auth, credenc
 - Com protobuf, o canário de redação (ADR-003/RED-11) não lê JSON cru: precisa decodificar OTLP ou validar pela Observations API v2 — custo de teste maior que o canário JSON original.
 - Rotação de `sk` é manual (criar nova chave, trocar secret, revogar antiga); chave antiga não pode ser recuperada.
 
+### Desvios de implementação registrados em 2026-11-25 (revisão pós-código; sem nova decisão arquitetural)
+
+1. **`spring-boot-starter-opentelemetry` não foi usado.** O starter traria `micrometer-registry-otlp` (metrics/logs), violando "traces somente". Usado `opentelemetry-exporter-otlp:1.62.0` direto. Nuance registrada pelo review: esse artefato é agregador e contém classes de exporter de metrics/logs, mas sem bridge/starter OTel e sem `management.*otlp.*.endpoint` não há egresso extra (`mvn dependency:tree`; docs.spring.io/spring-boot/4.1/reference/actuator/tracing.html — 2026-11-25).
+2. **`spring-boot-starter-actuator` + `micrometer-registry-prometheus` adicionados** — não existiam no pom; sem `MeterRegistry` o bean do sink falhava. Dono do endpoint `/actuator/prometheus` é o ADR-005.
+3. **Decode protobuf fixado em `1.10.0-alpha` no módulo de IT** — `1.11.1-alpha` gera protobuf 4.36.2 contra runtime 4.34.2 (`RuntimeVersionException`). Escopo de teste, wire format compatível; sem efeito em produção.
+4. **IDs do ADR-001 remapeados para novos IDs OTel** — hierarquia (`parentSpanId`/`traceId`), chaves `langfuse.*`, nomes e timestamps preservados e provados em IT. Impacto em `RED-11` (ADR-003) registrado e aceito em `TASKS.md:8`.
+5. **`enabled=true` sem endpoint/credenciais** — noop + warn **e** incremento de `chat.telemetry.export.failures` (correção do review); telemetria perdida com sinal, nunca erro de chat.
+6. **Headers Basic e `x-langfuse-ingestion-version` em código, não em properties** — consequência direta do desvio 1. Valores congelados intactos e provados em IT.
+
+> Risco fora deste escopo, encaminhado ao ADR-005: `SecurityConfig.java:84` faz `/actuator/**` `permitAll` e `application.properties` expõe `prometheus` ⇒ scrape público sem autenticação. Não altera contrato do chat nem credenciais; decisão de exposição cabe ao ADR-005.
+
 ## Fontes
 
 - Langfuse — OpenTelemetry integration (endpoint `/api/public/otel/v1/traces`, Basic `pk:sk`, header v4, JSON/protobuf, sem gRPC, propagação de atributos) — https://langfuse.com/integrations/native/opentelemetry — 2026-11-25.

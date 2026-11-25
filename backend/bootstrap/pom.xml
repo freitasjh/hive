@@ -30,6 +30,12 @@
             <artifactId>spring-boot-autoconfigure</artifactId>
             <scope>compile</scope>
         </dependency>
+        <!-- ADR-002/005: fornece MeterRegistry e o endpoint /actuator/prometheus. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
@@ -48,6 +54,19 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <!-- ADR-002: exporter OTLP/HTTP de traces somente. Starter traria também registry OTLP de
+             metrics/logs, que o ADR proíbe; as dependências diretas entregam só o exporter de traces. -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <!-- ADR-002/005: série chat_telemetry_export_failures_total no /actuator/prometheus. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -259,6 +278,11 @@
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j</artifactId>
             <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
