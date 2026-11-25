@@ -5,6 +5,10 @@ import br.com.systec.hive.ai.api.domain.TurnReply;
 import br.com.systec.hive.ai.api.domain.TurnRequest;
 import br.com.systec.hive.ai.impl.AbstractLangChain4jTurnGateway;
 import br.com.systec.hive.ai.impl.util.ProviderMessages;
+import br.com.systec.hive.assistant.impl.diagnostics.ChatSpanSink;
+import br.com.systec.hive.assistant.impl.diagnostics.ChatTurnSpanScope;
+import br.com.systec.hive.assistant.impl.diagnostics.ProviderCallSpanListener;
+import br.com.systec.hive.assistant.impl.diagnostics.SpanListeningChatModel;
 import br.com.systec.hive.provider.api.LlmClientFactory;
 import br.com.systec.hive.provider.langchain4j.LlmRetryPolicy;
 import dev.langchain4j.data.message.ChatMessage;
@@ -48,17 +52,25 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
 
     private final LlmClientFactory<ChatModel> llmClientFactory;
     private final LlmRetryPolicy retryPolicy;
+    private final ChatSpanSink spanSink;
 
     @Autowired
     public AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory) {
-        this(llmClientFactory, LlmRetryPolicy.defaults());
+        this(llmClientFactory, LlmRetryPolicy.defaults(), ChatSpanSink.noop());
     }
 
     /** Construtor de teste: política de retry sem espera. A abstrata cria o store em memória. */
     AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory, LlmRetryPolicy retryPolicy) {
+        this(llmClientFactory, retryPolicy, ChatSpanSink.noop());
+    }
+
+    /** Construtor de teste com sink de spans: a fatia de contrato não depende de exporter. */
+    public AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory, LlmRetryPolicy retryPolicy,
+                                ChatSpanSink spanSink) {
         super();
         this.llmClientFactory = llmClientFactory;
         this.retryPolicy = retryPolicy;
+        this.spanSink = spanSink;
     }
 
     /**
@@ -91,6 +103,9 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
 
     @Override
     public TurnReply execute(TurnRequest request) {
+        // ADR-001: root aberto na entrada do turno, antes de qualquer tentativa ao provider.
+        ChatTurnSpanScope.open(request.sessionId(), request.promptTemplate().templateId(),
+                request.provider(), request.model(), spanSink);
         // Fora do try, como no gateway anterior: um defeito na montagem não é falha do provider.
         String system = systemFor(request.promptTemplate().text());
         String user = userFor(request);
@@ -105,7 +120,7 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
             ChatModel client = llmClientFactory.createClientWithSession(request.provider(), request.model(),
                     request.promptTemplate().temperature(), request.promptTemplate().maxTokens(),
                     request.promptTemplate().topP(), request.apiKey(), request.baseUrl(), request.sessionId());
-            AssistantDefault proxy = proxyFor(client);
+            AssistantDefault proxy = proxyFor(new SpanListeningChatModel(client, new ProviderCallSpanListener()));
 
             // A8: uma chamada por vez por @MemoryId. Seed + proxy dentro do mesmo lock, senão dois
             // turnos poderiam reescrever a memória um do outro entre o set e a leitura do AiService.
