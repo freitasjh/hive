@@ -4,7 +4,9 @@ import br.com.systec.hive.security.api.domain.RefreshTokenData;
 import br.com.systec.hive.security.api.service.TokenCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
@@ -12,6 +14,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Implementação do cache de tokens utilizando Redis.
@@ -25,6 +28,8 @@ public class TokenCacheServiceImpl implements TokenCacheService {
     // Prefixos de chaves para garantir isolamento e organização no Redis
     private static final String REFRESH_PREFIX = "hive:auth:refresh:";
     private static final String BLACKLIST_PREFIX = "hive:auth:blacklist:";
+    // O refresh gerado é SHA-256 em hex (64 chars); sem isto um cookie com curinga casaria outras chaves.
+    private static final Pattern REFRESH_TOKEN_FORMAT = Pattern.compile("[0-9a-f]{64}");
 
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -49,6 +54,26 @@ public class TokenCacheServiceImpl implements TokenCacheService {
             return Optional.of(refreshTokenData);
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<RefreshTokenData> findRefreshTokenDataByToken(String refreshToken) {
+        if (refreshToken == null || !REFRESH_TOKEN_FORMAT.matcher(refreshToken).matches()) {
+            return Optional.empty();
+        }
+        ScanOptions options = ScanOptions.scanOptions()
+                .match(REFRESH_PREFIX + "*:" + refreshToken)
+                .count(100)
+                .build();
+        try (Cursor<String> cursor = redisTemplate.scan(options)) {
+            if (!cursor.hasNext()) {
+                return Optional.empty();
+            }
+            Object data = redisTemplate.opsForValue().get(cursor.next());
+            return data == null
+                    ? Optional.empty()
+                    : Optional.of(new ObjectMapper().convertValue(data, RefreshTokenData.class));
+        }
     }
 
     @Override

@@ -72,6 +72,16 @@ describe('PublicClientsView', () => {
     })
   })
 
+  it('exibe link seguro para a documentação pública da API', () => {
+    render(<PublicClientsView state={makeState()} actions={makeActions()} oneShot={null} />)
+    const link = screen.getByTestId('public-docs-link')
+    expect(link.tagName).toBe('A')
+    expect(link.getAttribute('href')).toBe('/hive/scalar#public')
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer')
+    expect(link.textContent).toContain('Ver documentação')
+  })
+
   it('mostra loading com aria-busy e sem tabela', () => {
     render(<PublicClientsView state={makeState({ loading: true })} actions={makeActions()} oneShot={null} />)
     expect(screen.getByTestId('public-clients-loading').getAttribute('aria-busy')).toBe('true')

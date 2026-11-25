@@ -30,6 +30,15 @@ public interface TokenCacheService {
     Optional<RefreshTokenData> getRefreshTokenData(UUID tenantId, String refreshToken);
 
     /**
+     * Localiza os dados do Refresh Token sem conhecer o tenant — usado pelo navegador nas rotas de
+     * documentação, que envia apenas o cookie HttpOnly (sem cabeçalho X-Tenant-ID).
+     *
+     * @param refreshToken valor opaco do cookie
+     * @return os dados do token, se encontrado
+     */
+    Optional<RefreshTokenData> findRefreshTokenDataByToken(String refreshToken);
+
+    /**
      * Remove o Refresh Token do cache (Revogação manual ou Logout).
      *
      * @param tenantId     Inquilino ao qual o token pertence.

@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  ExternalLink,
   KeyRound,
   Plus,
   RotateCw,
@@ -120,6 +121,17 @@ export function PublicClientsView({ state, actions, oneShot }: PublicClientsView
             className="h-11 w-full"
           />
         </div>
+        <Button type="button" variant="outline" asChild className="min-h-11">
+          <a
+            href="/hive/scalar#public"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="public-docs-link"
+          >
+            <ExternalLink aria-hidden="true" />
+            {t("admin.publicClients.docsLink")}
+          </a>
+        </Button>
         <Button
           type="button"
           data-testid="new-client-btn"

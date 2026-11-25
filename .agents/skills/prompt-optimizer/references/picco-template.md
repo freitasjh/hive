@@ -1,6 +1,6 @@
 # Template PICCO — Contrato de Saída + Exemplos (v3)
 
-Referência de `SKILL.md`. O bloco é efêmero: vai no chat e no prompt de delegação, nunca em arquivo (D1). Premissa não confirmada que sobrou do estoque vai para o ledger em `workflow-state.json.prompt_assumptions[]` — nunca para dentro do bloco.
+Referência de `SKILL.md`. O bloco é efêmero: vai no chat e no prompt de delegação, nunca em arquivo. Premissa não confirmada que sobrou do estoque vai para o ledger da conversa — nunca para dentro do bloco.
 
 ## O Template
 
@@ -168,5 +168,6 @@ Não vou assumir o que ficou em branco. Escolher por você é palpite caro.
 - [ ] Zero instrução de raciocínio
 - [ ] `<acceptance>` tem comando/verificação, não adjetivo
 - [ ] `<context>` lista só o que o usuário AFIRMOU
+- [ ] Brain indisponível foi declarado, sem path simulado
 - [ ] Rota B: `<open_questions>` vazio
 - [ ] Bloco não foi escrito em arquivo

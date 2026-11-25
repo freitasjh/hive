@@ -3,7 +3,10 @@ package br.com.systec.hive.integrationtest;
 import br.com.systec.hive.integrationtest.support.WebIntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.ArrayList;
@@ -12,6 +15,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -182,5 +186,80 @@ class OpenApiSpecIT extends WebIntegrationTest {
         mockMvc.perform(get("/v3/api-docs")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void when_canonicalPublicGroupRequestedWithRefreshCookie_then_servesTwoEndpoints() throws Exception {
+        String username = "cookie-spec-" + UUID.randomUUID();
+        seedTenantAndUser(UUID.randomUUID(), username, PASSWORD);
+        String refreshCookie = loginAndGetRefreshCookie(username);
+
+        MvcResult result = mockMvc.perform(get("/v3/api-docs/public")
+                        .cookie(new Cookie("refreshToken", refreshCookie)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode document = objectMapper.readTree(result.getResponse().getContentAsString());
+        List<String> paths = new ArrayList<>();
+        document.path("paths").fieldNames().forEachRemaining(paths::add);
+        assertThat(paths).containsExactlyInAnyOrder(
+                "/v1/public/auth/token", "/v1/public/v1/chat/completions");
+        assertThat(document.path("components").path("securitySchemes").has("bearer-key")).isTrue();
+        assertThat(document.path("components").path("securitySchemes").has("apiKeyAuth")).isTrue();
+    }
+
+    @Test
+    void when_groupQueryAliasRequestedWithRefreshCookie_then_servesPublicGroup() throws Exception {
+        String username = "cookie-alias-" + UUID.randomUUID();
+        seedTenantAndUser(UUID.randomUUID(), username, PASSWORD);
+        String refreshCookie = loginAndGetRefreshCookie(username);
+
+        mockMvc.perform(get("/v3/api-docs")
+                        .param("group", "public")
+                        .cookie(new Cookie("refreshToken", refreshCookie)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void when_scalarRequestedWithRefreshCookie_then_served() throws Exception {
+        String username = "cookie-scalar-" + UUID.randomUUID();
+        seedTenantAndUser(UUID.randomUUID(), username, PASSWORD);
+        String refreshCookie = loginAndGetRefreshCookie(username);
+
+        mockMvc.perform(get("/scalar")
+                        .cookie(new Cookie("refreshToken", refreshCookie)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void when_docsRequestedWithInvalidRefreshCookie_then_unauthorized() throws Exception {
+        mockMvc.perform(get("/v3/api-docs/public")
+                        .cookie(new Cookie("refreshToken", "not-a-token")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void when_publicApiRequestedWithRefreshCookie_then_publicChainStillRequiresItsOwnCredential() throws Exception {
+        String username = "cookie-public-" + UUID.randomUUID();
+        seedTenantAndUser(UUID.randomUUID(), username, PASSWORD);
+        String refreshCookie = loginAndGetRefreshCookie(username);
+
+        mockMvc.perform(post("/v1/public/v1/chat/completions")
+                        .cookie(new Cookie("refreshToken", refreshCookie))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"model\":\"x\",\"messages\":[]}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private String loginAndGetRefreshCookie(String username) throws Exception {
+        MvcResult result = mockMvc.perform(post("/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"" + username + "\",\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String setCookie = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
+        assertThat(setCookie).contains("refreshToken=");
+        return setCookie.substring(setCookie.indexOf("refreshToken=") + "refreshToken=".length(),
+                setCookie.indexOf(';'));
     }
 }

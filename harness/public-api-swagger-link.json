@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "demand": "public-api-swagger-link",
+  "agent": "qa-engineer",
+  "phase": "Testing",
+  "gitSha": "f19e8a64b520f93b4016e43109a8238870b1cdc6",
+  "commands": [
+    {
+      "cmd": "npm --prefix frontend test -- src/modules/hive/admin/public-clients/PublicClientsView.test.tsx (vitest run)",
+      "exitCode": 0,
+      "durationMs": 1295,
+      "stdoutHash": "3c5ee19170ab58eb4d3030693095946b521b69f47bb0224be7ef0058d6d9bc36"
+    },
+    {
+      "cmd": "chrome-devtools MCP: new_page -> snapshot -> list_console_messages -> list_network_requests -> take_screenshot @1280x800 e @375x812; click target=_blank; validacao do destino em 8080 somente com cookie",
+      "exitCode": 0,
+      "durationMs": 420000,
+      "stdoutHash": "afddfc764392f5c2691ea014827e106b0a3955d13683626795f65be6f2112c0e"
+    },
+    {
+      "cmd": "curl -sS -o /dev/null -w '%{http_code}' /hive/v3/api-docs/public (sem cookie / cookie invalido) e /hive/v1/public/auth/token",
+      "exitCode": 0,
+      "durationMs": 120,
+      "stdoutHash": "afddfc764392f5c2691ea014827e106b0a3955d13683626795f65be6f2112c0e"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 12, "failed": 0, "skipped": 0 },
+    "it": { "passed": 0, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 12, "failed": 0, "skipped": 0 }
+  },
+  "e2e": {
+    "browser": "chrome-devtools MCP",
+    "verdict": "GREEN",
+    "reexecution": "2026-11-24 — apos correcao backend; veredito anterior AMBER atualizado",
+    "adminUrl": "http://localhost:5173/#providers/public-clients",
+    "destinationUrl": "http://localhost:5173/hive/scalar#public",
+    "destinationValidatedAt": "http://localhost:8080/hive/scalar#public",
+    "validationOrigin": "origem do backend 8080 (operador aceitou risco de origens distintas no dev)",
+    "tokenInUrl": false,
+    "viewports": ["1280x800", "375x812 mobile/touch"],
+    "viewportsEvidence": {
+      "1280x800": {
+        "linkRect": { "w": 166.75, "h": 44, "x": 708, "y": 196 },
+        "minHeight": "44px",
+        "overflow": { "scrollWidth": 1280, "innerWidth": 1280 },
+        "consoleErrors": 0,
+        "consoleWarns": 0,
+        "devToolsIssues": 1,
+        "wcagViolations": 0,
+        "network4xx5xx": 0,
+        "clientsList": "GET /hive/v1/public-api/clients?page=0&size=20 [200]"
+      },
+      "375x812": {
+        "deviceScaleFactor": 1,
+        "isMobile": true,
+        "hasTouch": true,
+        "linkRect": { "w": 166.75, "h": 44, "x": 62.98, "y": 192 },
+        "overflow": { "scrollWidth": 375, "bodyScrollWidth": 375, "innerWidth": 375 },
+        "consoleErrors": 0,
+        "consoleWarns": 0,
+        "network4xx5xx": 0
+      }
+    },
+    "focusVisible": {
+      "at1280": true,
+      "at375": true,
+      "computedBoxShadow": "ring 3px oklab(0.708 0 0 / 0.5) 0px 0px 0px 3px",
+      "method": "focus no search-q + Tab via press_key; document.activeElement = public-docs-link; :focus-visible true"
+    },
+    "linkDom": {
+      "dataTestId": "public-docs-link",
+      "href": "/hive/scalar#public",
+      "resolvedHref": "http://localhost:5173/hive/scalar#public",
+      "target": "_blank",
+      "rel": "noopener noreferrer",
+      "text": "Ver documentação",
+      "icon": "ExternalLink (aria-hidden)"
+    },
+    "destination": {
+      "cookieOnly": {
+        "status": "PASS",
+        "detail": "Nova aba aberta pelo link em /hive/scalar#public (sem token na URL). Validado na origem 8080 com cookie HttpOnly refreshToken emitido por login na propria origem, sem header Authorization e sem X-Tenant-ID: GET /hive/scalar#public [200], GET /hive/v3/api-docs/public [200], alias GET /hive/v3/api-docs?group=public [200]. Sidebar do group public com Public Auth e Public Chat; POST /v1/public/auth/token e POST /v1/public/v1/chat/completions presentes."
+      },
+      "spec": {
+        "status": 200,
+        "paths": ["/v1/public/v1/chat/completions", "/v1/public/auth/token"],
+        "securitySchemes": ["bearer-key", "apiKeyAuth"],
+        "aliasStatus": 200
+      },
+      "negativeChecks": {
+        "semCookie": 401,
+        "cookieInvalido": 401,
+        "publicChainSemCredencial": 401,
+        "detalhe": "Nenhum header Bearer foi usado em nenhuma verificacao de destino nesta reexecucao."
+      },
+      "consoleNoise": "Tela Admin: 0 ERROR/0 WARN; 1 [issue] de Autofill do Chrome no search-q (classificado acima, nao violacao WCAG). Destino: GET /hive/favicon.svg [401] e issues de a11y do Scalar — ruido conhecido/fora do H3.",
+      "devLimitation": "Sources do Scalar sao absolutas (http://localhost:8080/hive/v3/api-docs/**); abrindo o link a partir de 5173 o HTML carrega, mas o spec falha por CORS no preflight. Operador aprovou validar na origem 8080. Em origem unica/producao o item desaparece.",
+      "devLimitationIp": "Login via proxy Vite grava remoteIp 127.0.0.1; navegacao direta em 8080 pelo browser chega como ::1 e o filtro rejeita com 'Cookie de refresh da documentação com IP divergente'. Validacao feita com login na origem 8080; em origem unica/producao nao ha divergencia."
+    }
+  },
+  "frontend_evidence": {
+    "stories": ["n/a — feature sem Storybook; verificada por H3 em browser real"],
+    "screenshots": [
+      "/tmp/opencode/qa2-swagger-admin-1280.png",
+      "/tmp/opencode/qa2-swagger-admin-375.png",
+      "/tmp/opencode/qa2-swagger-admin-375-focus.png",
+      "/tmp/opencode/qa2-swagger-dest-8080.png",
+      "/tmp/opencode/qa2-swagger-dest-public.png"
+    ],
+    "a11y": {
+      "violations": 0,
+      "scope": "tela Admin #providers/public-clients, 1280x800 e 375x812; contagem de violacoes WCAG 2.1 AA / nomes acessiveis — nao contagem de avisos do DevTools",
+      "method": "chrome-devtools: snapshot + list_console_messages (tipo issue) + get_console_message(msgid=4) + varredura DOM; 23 controles interativos visiveis, 0 sem nome acessivel; foco visivel ring 3px; sem overflow",
+      "chromeDevToolsIssues": 1,
+      "issueOrigin": "(a) elemento real da tela Admin, porem aviso de preenchimento automatico (Autofill), nao violacao WCAG",
+      "issueDetail": {
+        "msgid": 4,
+        "message": "A form field element should have an id or name attribute",
+        "explanationDoChrome": "This isn't strictly needed, but still recommended even if you have an autocomplete attribute on the same element.",
+        "affectedResource": "uid=24_30 -> input[type=search][data-testid=search-q] (campo 'Buscar por rótulo ou client ID…')",
+        "accessibleName": "Buscar por rótulo ou client ID… via aria-label; snapshot expoe 'searchbox \"Buscar por rótulo ou client ID…\"'",
+        "rule": "campo de formulario sem id e sem name — heuristica de autofill do Chrome, nao WCAG 4.1.2 (nome/role/value satisfeitos por aria-label)",
+        "minimalOptionalFix": "adicionar 1 atributo name=\"q\" (ou id=\"search-q\") ao <Input> em PublicClientsView.tsx; nao implementado — fora do escopo de escrita deste agente"
+      }
+    }
+  },
+  "evaluation": {
+    "h1": { "status": "N/A", "detail": "H3 independente; suiteFull canonica nao reexecutada pelo QA. Contexto declara backend 540 testes e 161 IT sem falhas; nao medidos nesta sessao. Front do feature: 12/12 medidos." },
+    "h2": { "status": "N/A", "detail": "sem dev novo nesta reexecucao; tela Admin sem falhas pre-existentes." },
+    "h3": {
+      "status": "GREEN",
+      "detail": "Admin PASS em 1280x800 e 375x812: console 0 ERROR/0 WARN, rede 0 4xx/5xx, sem overflow, alvo 44px, foco visivel ring 3px, href/target/rel corretos; a11y 0 violacoes WCAG (23 controles com nome acessivel), 1 issue de Autofill do Chrome no search-q classificado como aviso, nao violacao. Link abre nova aba sem token na URL. Destino PASS na origem 8080 com cookie de refresh: /hive/scalar#public 200, spec 200 com 2 paths e bearer-key+apiKeyAuth, alias ?group=public 200, sidebar Public Auth + Public Chat. Negativos 401 (sem cookie, cookie invalido, chain publica). Duas limitacoes de dev documentadas (CORS em origem dividida e IP ::1 vs 127.0.0.1), aceitas pelo operador e ausentes em origem unica."
+    },
+    "h4": { "status": "N/A", "detail": "avaliacao de negocio/logica/performance fora do escopo deste H3; correcao coberta por OpenApiSpecIT 15/0/0 segundo contexto." },
+    "h5": { "status": "PASS", "detail": "backend e vite encerrados por PID nas duas subidas (1971160/1971213 e 2026377/2026433), sempre filtrando comm java/node-MainThread; socket de cliente do Chrome preservado; 8080/5173 sem listeners; nenhum pkill -f; 5432/6379/5174/IDE/Kafka intactos." },
+    "h6": { "status": "N/A", "detail": "report de H3 isolado; nao e evidencia de conclusao de fase." },
+    "h3Evidence": {
+      "browser": "chrome-devtools MCP",
+      "reviewedScreenshots": [
+        { "path": "/tmp/opencode/qa2-swagger-admin-1280.png", "bytes": 94499, "sha256": "b395a5148df076188aff42b22752d90b934d110254b8611c65171bbb99cdcf5f" },
+        { "path": "/tmp/opencode/qa2-swagger-admin-375.png", "bytes": 47548, "sha256": "cb1c63052ce3d3eb0d85741057eaf8fe2e624f47c4067618e84762aedc731b57" },
+        { "path": "/tmp/opencode/qa2-swagger-admin-375-focus.png", "bytes": 47856, "sha256": "458d142cfb0ef1c5622000d8796f6ea471e38d204cbcee2dc68e65695381c904" },
+        { "path": "/tmp/opencode/qa2-swagger-dest-8080.png", "bytes": 22948, "sha256": "376921f2c409a66f4ff838862a55e365039640bb0a0bbfe16f8b8fd8b24001c4" },
+        { "path": "/tmp/opencode/qa2-swagger-dest-public.png", "bytes": 118640, "sha256": "92f1cc8d04a03a8d1bd612ed23604308f2f74ad51542e67a567e818487cb5061" }
+      ],
+      "provas": [
+        "snapshot Admin: link 'Ver documentação' na aba API pública; DOM href=/hive/scalar#public, target=_blank, rel=noopener noreferrer, 44px",
+        "console Admin apos reload com token valido: 2 debug (vite), 1 info (React DevTools), 0 error, 0 warn; 1 [issue] rastreada por get_console_message(msgid=4) ate uid=24_30 = input[type=search][data-testid=search-q] — aviso de Autofill, nome acessivel presente via aria-label, 0 violacoes WCAG",
+        "rede Admin: GET /hive/v1/public-api/clients?page=0&size=20 [200]; nenhum 4xx/5xx; 375x812 sem overflow e :focus-visible true com ring 3px",
+        "click do link abriu nova aba em http://localhost:5173/hive/scalar#public sem token na URL",
+        "antes do login na origem 8080: /hive/scalar#public [401] com 'Cookie de refresh da documentação com IP divergente' no log (remoteIp 127.0.0.1 do proxy vs ::1 do browser)",
+        "apos login na origem 8080 (POST /hive/v1/auth/login 200, cookie HttpOnly): /hive/scalar#public [200], /v3/api-docs/public [200], /v3/api-docs?group=public [200]",
+        "snapshot do destino: group 'public' selecionado; links Public Auth e Public Chat; URL sem token",
+        "fetch no browser sem header: spec paths ['/v1/public/v1/chat/completions','/v1/public/auth/token']; schemes ['bearer-key','apiKeyAuth']",
+        "curl: sem cookie 401; cookie invalido 401; GET /v1/public/auth/token sem credencial 401"
+      ]
+    },
+    "bugs_identified": [
+      "INFORMATIVO / DEV: sources do Scalar usam URLs absolutas para 8080; com front 5173 e back 8080 o spec falha por CORS na aba aberta pelo link. Risco aceito pelo operador; validacao feita em 8080; ausente em origem unica.",
+      "INFORMATIVO / DEV: checagem de IP do cookie de refresh diferencia 127.0.0.1 (login via proxy Vite) de ::1 (browser direto em 8080). Validacao feita com login na propria origem 8080; ausente em origem unica.",
+      "CORRIGIDO NO RELATORIO (sem codigo alterado): [issue] do DevTools nao era violacao WCAG. A msg msgid=4 aponta para input[type=search][data-testid=search-q] na tela Admin; Chrome recomenda id/name para Autofill e diz explicitamente 'This isn't strictly needed'. aria-label ja da nome acessivel; 23/23 controles visiveis nomeados; logo a11y.violations = 0. Correcao minima opcional, NAO implementada: 1 atributo name=\"q\" (ou id=\"search-q\") no <Input> de PublicClientsView.tsx:113-121.",
+      "OPERACIONAL: backend/frontend nao estavam no ar; subidos pelo QA com classpath local (Jackson 2.19.2 annotations + 2.21.7 core/databind) e vite com VITE_HIVE_API_PROXY=8080. Backend recompilado pelo engenheiro antes desta reexecucao (classes com isDocsRequest/authenticateWithRefreshCookie conferidas via javap)."
+    ],
+    "confirmacoes": {
+      "escopoEscrita": "somente harness/public-api-swagger-link.json no repo; nenhum codigo, .spec, workflow-state.json ou config alterado pelo QA",
+      "estadoPre": "git HEAD f19e8a6 (main) com correcao backend e 3 arquivos do front modificados no working tree; nenhum commit/checkout/merge pelo QA",
+      "suite": "counts refletem somente PublicClientsView.test.tsx (12/12); 540 testes backend e 161 ITs sao numeros declarados no contexto, nao medidos nesta reexecucao",
+      "segredo": "nenhum Bearer injetado nesta reexecucao; destino validado apenas com cookie HttpOnly de refresh; token nunca em URL, arquivo ou relatorio"
+    }
+  },
+  "brainStore": [
+    "estudos/projetos/projetos/hive/public-api-swagger-link-h3-2026-11-24",
+    "estudos/projetos/projetos/hive/public-api-swagger-link-h3-green-2026-11-24",
+    "estudos/projetos/projetos/hive/public-api-swagger-link-a11y-issue-origem-2026-11-24"
+  ],
+  "cleanup": {
+    "ports": ["8080", "5173"],
+    "portsStatus": "sem listeners proprios em 8080/5173 apos a execucao",
+    "killedProcesses": [1971160, 1971213, 2026377, 2026433],
+    "preserved": "socket de cliente do Chrome (PID 1973226) preservado em ambas as rodadas; 5432 (Postgres), 6379 (Redis), 5174 (vite de atlas-agenda), IDE/JPS e Kafka intactos",
+    "pagesClosed": [6, 7, 8],
+    "note": "lsof -ti :PORTA + filtro por comm (java/node-MainThread) antes do kill; nenhum pkill -f"
+  },
+  "selfReported": true
+}

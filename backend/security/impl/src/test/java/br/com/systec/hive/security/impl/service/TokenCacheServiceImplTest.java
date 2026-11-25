@@ -6,7 +6,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Duration;
@@ -107,5 +109,32 @@ class TokenCacheServiceImplTest {
         service.revokeAllUserTokens(tenantId, userId);
 
         verify(redisTemplate).delete(key);
+    }
+
+    @Test
+    void when_findRefreshTokenDataByToken_withStoredToken_then_returnData() {
+        UUID tenantId = UUID.randomUUID();
+        String token = "b".repeat(64);
+        String key = "hive:auth:refresh:" + tenantId + ":" + token;
+        RefreshTokenData data = new RefreshTokenData(UUID.randomUUID(), tenantId, "jti", null, null, "ip", "ua");
+        @SuppressWarnings("unchecked")
+        Cursor<String> cursor = mock(Cursor.class);
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+        when(cursor.hasNext()).thenReturn(true, false);
+        when(cursor.next()).thenReturn(key);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(key)).thenReturn(data);
+
+        Optional<RefreshTokenData> result = service.findRefreshTokenDataByToken(token);
+
+        assertTrue(result.isPresent());
+        assertEquals(tenantId, result.get().tenantId());
+        verify(cursor).close();
+    }
+
+    @Test
+    void when_findRefreshTokenDataByToken_withMalformedToken_then_emptyWithoutRedisScan() {
+        assertTrue(service.findRefreshTokenDataByToken("*").isEmpty());
+        verify(redisTemplate, never()).scan(any(ScanOptions.class));
     }
 }
