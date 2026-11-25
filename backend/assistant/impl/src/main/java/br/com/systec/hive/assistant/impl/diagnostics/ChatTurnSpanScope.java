@@ -60,6 +60,7 @@ public final class ChatTurnSpanScope {
         if (turn == null) {
             return;
         }
+        TextCarrier.start();
         turn.attempt++;
         Map<String, String> attributes = new LinkedHashMap<>(turn.baseAttributes);
         SpanAttributeMapper.typeAndTrace(attributes, "generation");
@@ -78,6 +79,7 @@ public final class ChatTurnSpanScope {
         putNumber(attempt.attributes, "usage.input", inputTokens);
         putNumber(attempt.attributes, "usage.output", outputTokens);
         putNumber(attempt.attributes, "usage.total", totalTokens);
+        attachText(attempt);
         attempt.endNano = nowNanos();
         detachCurrentAttempt();
     }
@@ -92,6 +94,7 @@ public final class ChatTurnSpanScope {
         if (label != null) {
             attempt.attributes.put(SpanAttributeMapper.KEY_STATUS_MESSAGE, label);
         }
+        attachText(attempt);
         attempt.endNano = nowNanos();
         detachCurrentAttempt();
     }
@@ -134,6 +137,20 @@ public final class ChatTurnSpanScope {
         Turn turn = CURRENT.get();
         if (turn != null) {
             turn.currentAttempt = null;
+        }
+    }
+
+    /** Fail-closed é atômico: falha na redação descarta input e output, mantendo os metadados. */
+    private static void attachText(MutableSpan attempt) {
+        TextCarrier.RedactedText text = TextCarrier.take();
+        if (text.failed()) {
+            return;
+        }
+        if (text.input() != null) {
+            attempt.attributes.put(SpanAttributeMapper.KEY_INPUT, text.input());
+        }
+        if (text.output() != null) {
+            attempt.attributes.put(SpanAttributeMapper.KEY_OUTPUT, text.output());
         }
     }
 

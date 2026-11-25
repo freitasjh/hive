@@ -21,6 +21,9 @@ public final class SpanAttributeMapper {
     public static final String KEY_ATTEMPT = "langfuse.observation.metadata.attempt";
     public static final String KEY_LEVEL = "langfuse.observation.level";
     public static final String KEY_STATUS_MESSAGE = "langfuse.observation.status_message";
+    // ADR-003: texto redigido, somente no filho generation. Não entram no conjunto ADR-001 acima.
+    public static final String KEY_INPUT = "langfuse.observation.input";
+    public static final String KEY_OUTPUT = "langfuse.observation.output";
 
     public static final Set<String> FROZEN_LANGFUSE_KEYS = Set.of(
             KEY_TYPE, KEY_TRACE_NAME, KEY_SESSION, KEY_USER, KEY_TENANT, KEY_TURN,

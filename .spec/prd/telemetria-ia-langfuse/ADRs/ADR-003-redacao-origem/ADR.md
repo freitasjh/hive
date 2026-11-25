@@ -68,6 +68,7 @@ O produto exige prompt/resposta no trace em produção, mas `ChatTrace.java:15` 
 | Fallback de entropia para segredos sem prefixo | **INFERNÊNCIA** | Não congelar; validar por teste antes de propor nova emenda |
 | DLP externo (GCP/AWS/Presidio) como alternativa | **INFERNÊNCIA** do deepsearch | Descartado: texto bruto sairia do backend, violando RF3/RB1; nenhuma afirmação de capacidade de vendor assumida como fato |
 | Data de adoção do CNPJ alfanumérico | Fonte governamental (jul/2026) sobre docs de HV (jan/2026) | Regra própria cobre ambos os formatos; divergência registrada, não resolvida a favor do HV |
+| Redação do CNPJ: 🟡 **com pontuação é redigido por shape; DV é validado somente em sequência nua de 14 posições** (code-review ADR-003, 2026-11-25) | Decisão operacional registrada, não bloqueante | `validCnpj()` permanece como está para o formato nu; a fixture canônica numérica `12.345.678/0001-90` tem DV `90`, mas o cálculo oficial dá `95` — redigir o formato pontuado é fail-safe para RF3. Não exige volta ao `architect`; uma emenda futura pode passar a exigir DV também no formato pontuado se a fixture for corrigida |
 
 ### Impacto nas tasks (para o `engineer`, sem alteração aqui)
 
