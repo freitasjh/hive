@@ -77,16 +77,16 @@ graph TD
 - **Arquivos:** `ADR.md` §"Emenda RED-01" e `SPEC.md` §12 (somente leitura/ajuste documental); `backend/pom.xml` (somente verificação de 0 diff).
 - **Contexto/Impacto:** emenda RED-01 registra regras próprias em JDK (`Pattern.compile`/`Matcher.find` + dígitos verificadores), zero dependência nova, CNPJ numérico e alfanumérico, `sk-` requisito local e entropia inferência sob teste, com URL + data (2026-11-25). Nenhuma dependência entra sem nova emenda; `RED-03`/`RED-04` consomem a decisão registrada.
 - **Teste primeiro:**
-  - [ ] `TEST/RedactorDecisionGateTest.java` (teste estático de documento): asserção de que `ADR.md` contém a emenda com URL + data e `SPEC.md` não nomeia biblioteca/SDK de máscara de terceiro; `git diff --name-only -- backend/pom.xml` ⇒ vazio.
-  - [ ] Nenhum código do redator antes do teste; entropia não é promovida a contrato.
+  - [x] `TEST/RedactorDecisionGateTest.java` (teste estático de documento): asserção de que `ADR.md` contém a emenda com URL + data e `SPEC.md` não nomeia biblioteca/SDK de máscara de terceiro; `git diff --name-only -- backend/pom.xml` ⇒ vazio.
+  - [x] Nenhum código do redator antes do teste; entropia não é promovida a contrato.
 - **Cenários:**
   - Sucesso: emenda rastreável com fontes datadas; 0 dependência nova; 0 assinatura de API de terceiro.
   - Falha: dependência adotada por palpite ou emenda ausente ⇒ teste estático quebra; volta ao `architect`.
   - Borda: regras próprias em Java também exigem registro — ausência de dependência não dispensa a emenda.
 - **DoD:**
-  - [ ] Teste estático escrito antes de qualquer código do redator.
-  - [ ] 0 diff em `pom.xml`; 0 assinatura de API de terceiro nos artefatos deste ADR.
-  - [ ] Emenda registrada com URL + data 2026-11-25; entropia mantida como inferência.
+  - [x] Teste estático escrito antes de qualquer código do redator.
+  - [x] 0 diff em `pom.xml`; 0 assinatura de API de terceiro nos artefatos deste ADR.
+  - [x] Emenda registrada com URL + data 2026-11-25; entropia mantida como inferência.
 
 ### RED-02 — Portador de texto no callback do listener, fora da porta
 
@@ -94,16 +94,16 @@ graph TD
 - **Arquivos:** `TEST/TextCarrierListenerTest.java` (novo), `IMPL/diagnostics/ProviderCallSpanListener.java` (escopo do ADR-001), `API/ChatTrace.java` e `API/ChatTraceRecorder.java` (inalterados).
 - **Contexto/Impacto:** prompt/response capturados em `onRequest`/`onResponse` precisam de portador distinto de `ChatTrace`; a porta existente e o contrato do chat não mudam (RB2).
 - **Teste primeiro:**
-  - [ ] `TEST/TextCarrierListenerTest.java`: callbacks com `SENSITIVE_FIXTURE` alimentam portador; `ChatTrace.class.getRecordComponents()` não contém `prompt`/`response`.
-  - [ ] `IMPL/diagnostics/ProviderCallSpanListener.java`: criar/extender o portador de texto no escopo de turno do ADR-001.
+  - [x] `TEST/TextCarrierListenerTest.java`: callbacks com `SENSITIVE_FIXTURE` alimentam portador; `ChatTrace.class.getRecordComponents()` não contém `prompt`/`response`.
+  - [x] `IMPL/diagnostics/ProviderCallSpanListener.java`: criar/extender o portador de texto no escopo de turno do ADR-001.
 - **Cenários:**
   - Sucesso: 1 turno ⇒ 1 portador; `git diff --name-only -- backend/assistant/api/` vazio.
   - Falha: campo de texto adicionado ao `ChatTrace` ⇒ reflection quebra; reverter.
   - Borda: retry com 2 tentativas ⇒ 2 portadores distintos, sem mistura de texto entre tentativas.
 - **DoD:**
-  - [ ] Teste escrito antes da implementação.
-  - [ ] `mvn -f backend/pom.xml test -Dtest=TextCarrierListenerTest` verde.
-  - [ ] 0 diff em `API/`.
+  - [x] Teste escrito antes da implementação.
+  - [x] `mvn -f backend/pom.xml test -Dtest=TextCarrierListenerTest` verde.
+  - [x] 0 diff em `API/`.
 
 ### RED-03 — Regras obrigatórias de PII
 
@@ -111,16 +111,16 @@ graph TD
 - **Arquivos:** `TEST/RedactionPolicyTest.java` (novo), `IMPL/diagnostics/RedactionPolicy.java` (novo; nome proposto).
 - **Contexto/Impacto:** CPF, CNPJ, e-mail e telefone viram `[REDACTED:cpf|cnpj|email|phone]` antes de qualquer atributo. CNPJ cobre **numérico e alfanumérico** (`12.ABC.345/01DE-35`, DV calculado pela tabela oficial); regex só-números vazaria CNPJs emitidos desde jul/2026. Ordem de aplicação é risco de falso positivo (telefone dentro de CPF).
 - **Teste primeiro:**
-  - [ ] `TEST/RedactionPolicyTest.java` com `SENSITIVE_FIXTURE`: asserção exata da saída redigida dos 4 tipos de PII, incluindo os **dois CNPJs** (`12.345.678/0001-90` e `12.ABC.345/01DE-35`); nenhum literal original sobrevive.
-  - [ ] `IMPL/diagnostics/RedactionPolicy.java`: implementar as 4 regras em JDK conforme emenda RED-01 (dígitos verificadores próprios).
+  - [x] `TEST/RedactionPolicyTest.java` com `SENSITIVE_FIXTURE`: asserção exata da saída redigida dos 4 tipos de PII, incluindo os **dois CNPJs** (`12.345.678/0001-90` e `12.ABC.345/01DE-35`); nenhum literal original sobrevive.
+  - [x] `IMPL/diagnostics/RedactionPolicy.java`: implementar as 4 regras em JDK conforme emenda RED-01 (dígitos verificadores próprios).
 - **Cenários:**
   - Sucesso: 4 placeholders corretos, 0 literal de PII na saída; CNPJ alfanumérico válido é redigido.
   - Falha: CPF/CNPJ parcialmente redigido ou alfanumérico não reconhecido ⇒ teste quebra; corrigir regra, nunca baixar a asserção.
   - Borda: e-mail e telefone na mesma frase; CPF com pontuação e sem pontuação; CNPJ numérico e alfanumérico na mesma frase ⇒ todos redigidos.
 - **DoD:**
-  - [ ] Teste escrito antes da implementação.
-  - [ ] 0 `123.456.789-09`, `12.345.678/0001-90`, `12.ABC.345/01DE-35`, `joao.silva@example.com`, `(11) 98765-4321` na saída do teste.
-  - [ ] Nenhuma biblioteca de máscara introduzida; 0 diff em `pom.xml` (emenda RED-01).
+  - [x] Teste escrito antes da implementação.
+  - [x] 0 `123.456.789-09`, `12.345.678/0001-90`, `12.ABC.345/01DE-35`, `joao.silva@example.com`, `(11) 98765-4321` na saída do teste.
+  - [x] Nenhuma biblioteca de máscara introduzida; 0 diff em `pom.xml` (emenda RED-01).
 
 ### RED-04 — Regras obrigatórias de segredos
 
@@ -128,17 +128,17 @@ graph TD
 - **Arquivos:** `TEST/RedactionPolicyTest.java` (caso `secret`), `IMPL/diagnostics/RedactionPolicy.java`.
 - **Contexto/Impacto:** tokens, senhas e chaves de API — incluindo `sk-` — viram `[REDACTED:secret]`; `sk-` em log/payload é violação explícita do canário (PRD §9). `sk-` é **requisito local** (sem fonte externa); fallback por **entropia é inferência** — não implementar como contrato.
 - **Teste primeiro:**
-  - [ ] `TEST/RedactionPolicyTest.java`: `sk-abcdef1234567890` e `senha=SuperSecret123` ⇒ `[REDACTED:secret]`; 0 `sk-` na saída.
-  - [ ] `IMPL/diagnostics/RedactionPolicy.java`: adicionar regra `secret` antes das demais quando houver sobreposição.
-  - [ ] Entropia só se teste dedicado demonstrar necessidade: nesse caso, registrar como inferência validada em **nova emenda** — nunca como contrato desta task.
+  - [x] `TEST/RedactionPolicyTest.java`: `sk-abcdef1234567890` e `senha=SuperSecret123` ⇒ `[REDACTED:secret]`; 0 `sk-` na saída.
+  - [x] `IMPL/diagnostics/RedactionPolicy.java`: adicionar regra `secret` antes das demais quando houver sobreposição.
+  - [x] Entropia só se teste dedicado demonstrar necessidade: nesse caso, registrar como inferência validada em **nova emenda** — nunca como contrato desta task.
 - **Cenários:**
   - Sucesso: 2 ocorrências viram `[REDACTED:secret]`; `sk-` mantido como literal obrigatório do fixture.
   - Falha: token com prefixo `sk-` escapa ⇒ teste quebra; nunca mascarar só parte do literal.
   - Borda: chave de API em atribuição `key=...` e senha em texto corrido ⇒ ambas redigidas; token sem prefixo conhecido não é redigido por entropia nesta fatia.
 - **DoD:**
-  - [ ] Teste escrito antes da implementação.
-  - [ ] `grep -c 'sk-' <saída do teste>` ⇒ 0.
-  - [ ] Regra `secret` no conjunto fechado de `RED-05`; 0 regra de entropia no contrato.
+  - [x] Teste escrito antes da implementação.
+  - [x] `grep -c 'sk-' <saída do teste>` ⇒ 0.
+  - [x] Regra `secret` no conjunto fechado de `RED-05`; 0 regra de entropia no contrato.
 
 ### RED-05 — Placeholder de conjunto fechado
 
@@ -146,16 +146,16 @@ graph TD
 - **Arquivos:** `TEST/PlaceholderContractTest.java` (novo), `IMPL/diagnostics/RedactionPolicy.java`.
 - **Contexto/Impacto:** nenhum outro placeholder é aceito downstream; `***`, `[MASKED]`, `<redacted>` e variações são proibidos (ADR Interface congelada).
 - **Teste primeiro:**
-  - [ ] `TEST/PlaceholderContractTest.java`: para cada regra obrigatória, placeholder exato; conjunto de saída ⊆ `{[REDACTED:cpf],[REDACTED:cnpj],[REDACTED:email],[REDACTED:phone],[REDACTED:secret]}`.
-  - [ ] `IMPL/diagnostics/RedactionPolicy.java`: centralizar a construção do placeholder; 0 formato alternativo.
+  - [x] `TEST/PlaceholderContractTest.java`: para cada regra obrigatória, placeholder exato; conjunto de saída ⊆ `{[REDACTED:cpf],[REDACTED:cnpj],[REDACTED:email],[REDACTED:phone],[REDACTED:secret]}`.
+  - [x] `IMPL/diagnostics/RedactionPolicy.java`: centralizar a construção do placeholder; 0 formato alternativo.
 - **Cenários:**
   - Sucesso: 5 placeholders exatos.
   - Falha: placeholder genérico `[REDACTED]` sem `<rule>` ⇒ teste quebra.
   - Borda: regra desconhecida ⇒ falha fechada (`RED-08`), nunca placeholder novo.
 - **DoD:**
-  - [ ] Teste escrito antes da implementação.
-  - [ ] 0 placeholder fora do conjunto na suíte.
-  - [ ] Nomenclatura idêntica à Interface congelada.
+  - [x] Teste escrito antes da implementação.
+  - [x] 0 placeholder fora do conjunto na suíte.
+  - [x] Nomenclatura idêntica à Interface congelada.
 
 ### RED-06 — Redação antes da serialização OTLP
 
@@ -163,16 +163,16 @@ graph TD
 - **Arquivos:** `TEST/RedactionBeforeExportTest.java` (novo), `IMPL/diagnostics/ProviderCallSpanListener.java`, `IMPL/diagnostics/TextRedactor.java` (novo; nome proposto).
 - **Contexto/Impacto:** o texto entra no portador já redigido; o exporter do ADR-002 recebe spans prontos. Esta é a barreira que torna RF3 verificável independentemente de licença EE.
 - **Teste primeiro:**
-  - [ ] `TEST/RedactionBeforeExportTest.java`: capturar o objeto entregue ao exporter ⇒ 0 literal do `SENSITIVE_FIXTURE`, apenas placeholders.
-  - [ ] `IMPL/diagnostics/TextRedactor.java`: orquestrar callback → redator → portador, antes de qualquer serialização.
+  - [x] `TEST/RedactionBeforeExportTest.java`: capturar o objeto entregue ao exporter ⇒ 0 literal do `SENSITIVE_FIXTURE`, apenas placeholders.
+  - [x] `IMPL/diagnostics/TextRedactor.java`: orquestrar callback → redator → portador, antes de qualquer serialização.
 - **Cenários:**
   - Sucesso: exporter vê texto redigido.
   - Falha: redator aplicado depois de popular o atributo ⇒ teste acusa literal no objeto exportado.
   - Borda: resposta vazia/nula ⇒ nenhuma chave de texto inventada; metadados permanecem.
 - **DoD:**
-  - [ ] Teste escrito antes da implementação.
-  - [ ] `mvn -f backend/pom.xml test -Dtest=RedactionBeforeExportTest` verde.
-  - [ ] 0 código de serialização OTLP nesta tarefa (ADR-002).
+  - [x] Teste escrito antes da implementação.
+  - [x] `mvn -f backend/pom.xml test -Dtest=RedactionBeforeExportTest` verde.
+  - [x] 0 código de serialização OTLP nesta tarefa (ADR-002).
 
 ### RED-07 — Anexar texto somente ao filho `generation`
 
@@ -180,16 +180,16 @@ graph TD
 - **Arquivos:** `TEST/GenerationChildTextIT.java` (novo), `IMPL/diagnostics/ProviderCallSpanListener.java`.
 - **Contexto/Impacto:** `langfuse.observation.input`/`output` apenas na tentativa ao provider; root sem texto (menor superfície e payload).
 - **Teste primeiro:**
-  - [ ] `TEST/GenerationChildTextIT.java`: varrer payload protobuf decodificado (`ExportTraceServiceRequest`/`resourceSpans`) ⇒ filho `type=generation` com ambas as chaves; root `chat.turn` sem ambas; `count(chaves de texto no root)==0`.
-  - [ ] `IMPL/diagnostics/ProviderCallSpanListener.java`: preencher as chaves no filho, nunca no root.
+  - [x] `TEST/GenerationChildTextIT.java`: varrer payload protobuf decodificado (`ExportTraceServiceRequest`/`resourceSpans`) ⇒ filho `type=generation` com ambas as chaves; root `chat.turn` sem ambas; `count(chaves de texto no root)==0`.
+  - [x] `IMPL/diagnostics/ProviderCallSpanListener.java`: preencher as chaves no filho, nunca no root.
 - **Cenários:**
   - Sucesso: 1 filho com `input`/`output`, root limpo.
   - Falha: atributo replicado no root ⇒ teste quebra; remover replicação.
   - Borda: 2 tentativas ⇒ cada filho com seu próprio texto redigido; nenhum vazamento entre eles.
 - **DoD:**
-  - [ ] Teste escrito antes da implementação.
-  - [ ] `mvn -f backend/pom.xml -Pintegration verify -Dtest=GenerationChildTextIT` verde.
-  - [ ] Root sem chaves de texto em sucesso e em falha.
+  - [x] Teste escrito antes da implementação.
+  - [x] `mvn -f backend/pom.xml -Pintegration verify -Dtest=GenerationChildTextIT` verde.
+  - [x] Root sem chaves de texto em sucesso e em falha.
 
 ### RED-08 — Fail-closed atômico com metadados preservados
 
@@ -197,16 +197,16 @@ graph TD
 - **Arquivos:** `TEST/FailClosedRedactorTest.java` (novo), `IMPL/diagnostics/TextRedactor.java`.
 - **Contexto/Impacto:** exceção, timeout/expiração, indisponibilidade ou política incompleta ⇒ omitir **ambas** as chaves; metadados (`provider`, `model`, `usage_details`, `attempt`, `level`) permanecem; texto bruto nunca vira erro nem log.
 - **Teste primeiro:**
-  - [ ] `TEST/FailClosedRedactorTest.java`: 3 modos forçados (lança, expira, política incompleta) ⇒ `input` e `output` ausentes; metadados presentes; 0 literal no log capturado.
-  - [ ] `IMPL/diagnostics/TextRedactor.java`: tratar toda falha como omissão do par, sem propagar exceção ao fluxo de chat.
+  - [x] `TEST/FailClosedRedactorTest.java`: 3 modos forçados (lança, expira, política incompleta) ⇒ `input` e `output` ausentes; metadados presentes; 0 literal no log capturado.
+  - [x] `IMPL/diagnostics/TextRedactor.java`: tratar toda falha como omissão do par, sem propagar exceção ao fluxo de chat.
 - **Cenários:**
   - Sucesso: span útil com metadados e sem texto.
   - Falha: só `output` omitido ⇒ teste quebra (omissão deve ser atômica).
   - Borda: redator lança depois de já ter redigido `input` ⇒ descartar também o `input`.
 - **DoD:**
-  - [ ] Teste escrito antes da implementação.
-  - [ ] `mvn -f backend/pom.xml test -Dtest=FailClosedRedactorTest` verde nos 3 modos.
-  - [ ] 0 exceção de redação na resposta do chat.
+  - [x] Teste escrito antes da implementação.
+  - [x] `mvn -f backend/pom.xml test -Dtest=FailClosedRedactorTest` verde nos 3 modos.
+  - [x] 0 exceção de redação na resposta do chat.
 
 ### RED-09 — Contador `chat.telemetry.redaction.failures.total`
 
@@ -214,16 +214,16 @@ graph TD
 - **Arquivos:** `TEST/RedactionFailureMetricTest.java` (novo), `IMPL/diagnostics/TextRedactor.java`.
 - **Contexto/Impacto:** 1 incremento por evento fail-closed; nome congelado no ADR. Registro/exportação em Micrometer pertence ao ADR-005 — aqui só a emissão do incremento, sem rótulo com texto.
 - **Teste primeiro:**
-  - [ ] `TEST/RedactionFailureMetricTest.java`: 1 falha forçada ⇒ +1 no registry; 2 falhas ⇒ +2; rótulos sem `SENSITIVE_FIXTURE`.
-  - [ ] `IMPL/diagnostics/TextRedactor.java`: incrementar no ramo fail-closed.
+  - [x] `TEST/RedactionFailureMetricTest.java`: 1 falha forçada ⇒ +1 no registry; 2 falhas ⇒ +2; rótulos sem `SENSITIVE_FIXTURE`.
+  - [x] `IMPL/diagnostics/TextRedactor.java`: incrementar no ramo fail-closed.
 - **Cenários:**
   - Sucesso: contador bate com número de eventos fail-closed.
   - Falha: decremento ou incremento em sucesso ⇒ teste quebra.
   - Borda: falha em 2 turnos distintos não se sobrescreve.
 - **DoD:**
-  - [ ] Teste escrito antes da implementação.
-  - [ ] Nome exato `chat.telemetry.redaction.failures.total`.
-  - [ ] Nenhuma métrica OTLP introduzida (ADR-002/ADR-005).
+  - [x] Teste escrito antes da implementação.
+  - [x] Nome exato `chat.telemetry.redaction.failures.total`.
+  - [x] Nenhuma métrica OTLP introduzida (ADR-002/ADR-005).
 
 ### RED-10 — Nenhuma superfície para texto bruto
 
@@ -231,16 +231,16 @@ graph TD
 - **Arquivos:** `TEST/NoRawTextSurfaceTest.java` (novo), `IMPL/diagnostics/TextRedactor.java`, `IMPL/diagnostics/ProviderCallSpanListener.java`.
 - **Contexto/Impacto:** `ChatTrace`, log, rótulo de métrica, mensagem de erro e qualquer atributo OTLP fora do par redigido devem estar limpos; 0 `sk-` em log/payload. Payload é protobuf — inspeção só após decode (ou via Observations API v2), nunca `grep` em binário.
 - **Teste primeiro:**
-  - [ ] `TEST/NoRawTextSurfaceTest.java`: capturar `$LOG` e `$PAYLOAD`; `grep -RInF 'sk-abcdef1234567890' $LOG` ⇒ 0; decodificar o protobuf e afirmar 0 literal nos atributos; nenhuma chave de texto fora do par.
-  - [ ] Ajustar apenas o que o teste acusar; nunca interpolação de mensagem de exceção no log.
+  - [x] `TEST/NoRawTextSurfaceTest.java`: capturar `$LOG` e `$PAYLOAD`; `grep -RInF 'sk-abcdef1234567890' $LOG` ⇒ 0; decodificar o protobuf e afirmar 0 literal nos atributos; nenhuma chave de texto fora do par.
+  - [x] Ajustar apenas o que o teste acusar; nunca interpolação de mensagem de exceção no log.
 - **Cenários:**
   - Sucesso: 0 literal em todas as superfícies.
   - Falha: `status_message` com mensagem do provider contendo o prompt ⇒ quebrar teste, classificar sem texto.
   - Borda: fail-closed com exceção cuja mensagem contém `sk-` ⇒ loga só classificação, nunca a mensagem.
 - **DoD:**
-  - [ ] Teste escrito antes de qualquer ajuste.
-  - [ ] `grep -RInF 'sk-abcdef1234567890' $LOG` ⇒ 0 linhas; 0 literal nos atributos do payload protobuf decodificado.
-  - [ ] 0 atributo de texto novo fora do par congelado.
+  - [x] Teste escrito antes de qualquer ajuste.
+  - [x] `grep -RInF 'sk-abcdef1234567890' $LOG` ⇒ 0 linhas; 0 literal nos atributos do payload protobuf decodificado.
+  - [x] 0 atributo de texto novo fora do par congelado.
 
 ### RED-11 — Canário de redação sobre payload protobuf decodificado
 
@@ -248,19 +248,19 @@ graph TD
 - **Arquivos:** `TEST/RedactionCanaryIT.java` (novo), captura do payload OTLP protobuf (fixture de teste). Nenhum código de decode em produção — a inspeção é responsabilidade do teste.
 - **Contexto/Impacto:** prova de RF3 ponta a ponta — do callback do listener ao payload OTLP protobuf e ao trace na Observations API v2. ADR-002 congelou `Content-Type: application/x-protobuf` (SDK Java não emite `http/json`); o canário **não lê JSON cru**: decodifica `ExportTraceServiceRequest`/`resourceSpans` **ou** valida pela Observations API v2. ITs exigem `HIVE_TELEMETRY_ENABLED=true` (default `false`, opt-in — ADR-002).
 - **Teste primeiro:**
-  - [ ] `TEST/RedactionCanaryIT.java` com `HIVE_TELEMETRY_ENABLED=true`: provider fake devolve `SENSITIVE_FIXTURE`; capturar o request e afirmar `Content-Type: application/x-protobuf`.
-  - [ ] No mesmo teste: **opção 1** — decodificar o corpo protobuf (`ExportTraceServiceRequest`/`resourceSpans`) e varrer os atributos ⇒ 0 literal do fixture; **opção 2** — consultar a Observations API v2 e afirmar só `[REDACTED:...]`. Uma das duas é suficiente; ambas proibem leitura de JSON cru.
-  - [ ] `grep -RInF 'sk-abcdef1234567890' $LOG` ⇒ 0 linhas.
-  - [ ] Corrigir apenas a etapa que o canário acusar; nenhuma dependência de licença EE e nenhuma troca de encoding no ADR-003.
+  - [x] `TEST/RedactionCanaryIT.java` com `HIVE_TELEMETRY_ENABLED=true`: provider fake devolve `SENSITIVE_FIXTURE`; capturar o request e afirmar `Content-Type: application/x-protobuf`.
+  - [x] No mesmo teste: **opção 1** — decodificar o corpo protobuf (`ExportTraceServiceRequest`/`resourceSpans`) e varrer os atributos ⇒ 0 literal do fixture; **opção 2** — consultar a Observations API v2 e afirmar só `[REDACTED:...]`. Uma das duas é suficiente; ambas proibem leitura de JSON cru.
+  - [x] `grep -RInF 'sk-abcdef1234567890' $LOG` ⇒ 0 linhas.
+  - [x] Corrigir apenas a etapa que o canário acusar; nenhuma dependência de licença EE e nenhuma troca de encoding no ADR-003.
 - **Cenários:**
   - Sucesso: payload protobuf decodificado (ou trace via API v2) com placeholders, log limpo.
   - Falha: literal nos atributos decodificados ⇒ parar, corrigir a causa raiz na redação, re-rodar canário; nunca trocar protobuf por JSON para facilitar o teste.
   - Borda: texto com todos os 6 literais na mesma mensagem ⇒ todos redigidos, nenhum parcial; flag desligada (`false`) ⇒ nenhum payload para inspecionar e o teste deve falhar explicitamente, não passar por vacuidade.
 - **DoD:**
-  - [ ] Teste escrito antes de qualquer ajuste de redação.
-  - [ ] `mvn -f backend/pom.xml -Pintegration verify -Dtest=RedactionCanaryIT` verde com `HIVE_TELEMETRY_ENABLED=true`.
-  - [ ] 0 literal do fixture nos atributos decodificados ou 0 texto bruto na Observations API v2; 0 `sk-` em `$LOG`.
-  - [ ] Nenhuma asserção do teste depende de payload JSON.
+  - [x] Teste escrito antes de qualquer ajuste de redação.
+  - [x] `mvn -f backend/pom.xml -Pintegration verify -Dtest=RedactionCanaryIT` verde com `HIVE_TELEMETRY_ENABLED=true`.
+  - [x] 0 literal do fixture nos atributos decodificados ou 0 texto bruto na Observations API v2; 0 `sk-` em `$LOG`.
+  - [x] Nenhuma asserção do teste depende de payload JSON.
 
 ### RED-12 — Canário com redator forçado a falhar
 
@@ -268,16 +268,16 @@ graph TD
 - **Arquivos:** `TEST/ForcedRedactorFailureIT.java` (novo), `IMPL/diagnostics/TextRedactor.java` (hook de falha apenas em teste).
 - **Contexto/Impacto:** prova de RF4 — o span existe com metadados úteis e sem input/output; é o critério que separa esta decisão do masking EE fail-open. Verificação no payload protobuf decodificado ou via Observations API v2; nunca JSON cru.
 - **Teste primeiro:**
-  - [ ] `TEST/ForcedRedactorFailureIT.java` com `HIVE_TELEMETRY_ENABLED=true`: redator forçado a falhar ⇒ no payload protobuf decodificado (ou na Observations API v2) o filho tem `provider`/`model`/usage/`attempt`/`level`, sem `langfuse.observation.input`/`output`; 0 texto bruto; contador +1.
-  - [ ] Ajustar o ramo fail-closed somente após o teste existir.
+  - [x] `TEST/ForcedRedactorFailureIT.java` com `HIVE_TELEMETRY_ENABLED=true`: redator forçado a falhar ⇒ no payload protobuf decodificado (ou na Observations API v2) o filho tem `provider`/`model`/usage/`attempt`/`level`, sem `langfuse.observation.input`/`output`; 0 texto bruto; contador +1.
+  - [x] Ajustar o ramo fail-closed somente após o teste existir.
 - **Cenários:**
   - Sucesso: span diagnósticável sem texto.
   - Falha: span vazio (metadados perdidos) ⇒ corrigir; fail-closed não é "descartar o span".
   - Borda: falha apenas no `output` ⇒ ambas as chaves ausentes (atomicidade).
 - **DoD:**
-  - [ ] Teste escrito antes de qualquer ajuste.
-  - [ ] `mvn -f backend/pom.xml -Pintegration verify -Dtest=ForcedRedactorFailureIT` verde.
-  - [ ] Resposta do chat permanece 200.
+  - [x] Teste escrito antes de qualquer ajuste.
+  - [x] `mvn -f backend/pom.xml -Pintegration verify -Dtest=ForcedRedactorFailureIT` verde.
+  - [x] Resposta do chat permanece 200.
 
 ### RED-13 — Nenhum masking EE/Collector nesta fatia
 
@@ -285,15 +285,15 @@ graph TD
 - **Arquivos:** nenhum de produto; varredura estática de `backend/`.
 - **Contexto/Impacto:** Community congelado; masking EE exige licença e tem default fail-open; masking no Collector ocorre depois de o dado sair da aplicação. Defesa em profundidade fica para decisão posterior.
 - **Teste primeiro:**
-  - [ ] `TEST/NoServerSideMaskingTest.java`: `grep -RIn 'LANGFUSE_INGESTION_MASKING_CALLBACK_FAIL_CLOSED\|mask_otel_spans\|LangfuseSpanProcessor\|opentelemetry-collector' backend/` ⇒ 0 ocorrências.
-  - [ ] Nenhuma implementação; se o grep acusar, remover configuração/componente.
+  - [x] `TEST/NoServerSideMaskingTest.java`: `grep -RIn 'LANGFUSE_INGESTION_MASKING_CALLBACK_FAIL_CLOSED\|mask_otel_spans\|LangfuseSpanProcessor\|opentelemetry-collector' backend/` ⇒ 0 ocorrências.
+  - [x] Nenhuma implementação; se o grep acusar, remover configuração/componente.
 - **Cenários:**
   - Sucesso: 0 config de masking fora da origem.
   - Falha: flag EE adicionada "por segurança" ⇒ remover; volta ao `architect` se desejar licença.
   - Borda: documentação pode mencionar EE como alternativa descartada; código/config não.
 - **DoD:**
-  - [ ] Teste estático escrito antes de qualquer ajuste.
-  - [ ] 0 dependência/licença EE introduzida nesta fatia.
+  - [x] Teste estático escrito antes de qualquer ajuste.
+  - [x] 0 dependência/licença EE introduzida nesta fatia.
 
 ### RED-14 — Contrato público do chat inalterado
 
@@ -301,16 +301,16 @@ graph TD
 - **Arquivos:** `TEST/ChatContractWithRedactionTest.java` (novo).
 - **Contexto/Impacto:** telemetria — inclusive redator falhando — não pode alterar resposta, cota, limites, IDs ou headers (RB2/RF9).
 - **Teste primeiro:**
-  - [ ] `TEST/ChatContractWithRedactionTest.java`: characterização da resposta com redator ativo, com redator forçado a falhar e sem telemetria ⇒ status, corpo, cota, `turnId`/`clientId` e headers idênticos.
-  - [ ] Corrigir somente o que o teste acusar; nenhuma mudança de contrato.
+  - [x] `TEST/ChatContractWithRedactionTest.java`: characterização da resposta com redator ativo, com redator forçado a falhar e sem telemetria ⇒ status, corpo, cota, `turnId`/`clientId` e headers idênticos.
+  - [x] Corrigir somente o que o teste acusar; nenhuma mudança de contrato.
 - **Cenários:**
   - Sucesso: respostas idênticas nos 3 modos.
   - Falha: exceção do redator vaza 500 ⇒ corrigir limite de responsabilidade.
   - Borda: texto vazio no prompt ⇒ resposta normal, sem chave de texto inventada.
 - **DoD:**
-  - [ ] Teste escrito antes de qualquer ajuste de fluxo de chat.
-  - [ ] `mvn -f backend/pom.xml -Pintegration verify -Dtest=ChatContractWithRedactionTest` verde.
-  - [ ] 0 diff em contrato/cota/limites/autenticação.
+  - [x] Teste escrito antes de qualquer ajuste de fluxo de chat.
+  - [x] `mvn -f backend/pom.xml -Pintegration verify -Dtest=ChatContractWithRedactionTest` verde.
+  - [x] 0 diff em contrato/cota/limites/autenticação.
 
 ### RED-15 — Characterização da nomenclatura congelada
 
@@ -318,15 +318,15 @@ graph TD
 - **Arquivos:** `TEST/FrozenRedactionNamingTest.java` (novo).
 - **Contexto/Impacto:** congela chaves e placeholder para os ADRs downstream; rename eventual exige novo ADR.
 - **Teste primeiro:**
-  - [ ] `TEST/FrozenRedactionNamingTest.java`: payload protobuf decodificado (ou Observations API v2) ⇒ chaves exatas `langfuse.observation.input`/`output`, somente no filho; placeholders exatamente os 5 da Interface congelada.
-  - [ ] Nenhuma implementação nova; divergência corrige o mapper para o nome congelado.
+  - [x] `TEST/FrozenRedactionNamingTest.java`: payload protobuf decodificado (ou Observations API v2) ⇒ chaves exatas `langfuse.observation.input`/`output`, somente no filho; placeholders exatamente os 5 da Interface congelada.
+  - [x] Nenhuma implementação nova; divergência corrige o mapper para o nome congelado.
 - **Cenários:**
   - Sucesso: 2 chaves exatas, 5 placeholders exatos.
   - Falha: `input` renomeado para `prompt` ⇒ teste quebra.
   - Borda: chave opcional ausente (fail-closed) não conta como rename.
 - **DoD:**
-  - [ ] Teste escrito antes de qualquer ajuste.
-  - [ ] 0 chave `langfuse.observation.*` fora da tabela do ADR.
+  - [x] Teste escrito antes de qualquer ajuste.
+  - [x] 0 chave `langfuse.observation.*` fora da tabela do ADR.
 
 ### RED-16 — Ausência de fail-open por configuração
 
@@ -334,15 +334,15 @@ graph TD
 - **Arquivos:** `TEST/FailOpenConfigAbsenceTest.java` (novo), `IMPL/diagnostics/TextRedactor.java`.
 - **Contexto/Impacto:** fail-closed é por construção; nenhuma env/var pode fazer o redator enviar o original quando falha. O default fail-open do mecanismo EE é o motivo do descarte.
 - **Teste primeiro:**
-  - [ ] `TEST/FailOpenConfigAbsenceTest.java`: foreach de flag de config plausível no ambiente de teste ⇒ redator forçado a falhar ainda omite texto; `grep -RIn 'fail.open\|FAIL_OPEN' backend/assistant/` ⇒ 0.
-  - [ ] Nenhuma implementação de fallback; se o teste acusar caminho de envio do original, removê-lo.
+  - [x] `TEST/FailOpenConfigAbsenceTest.java`: foreach de flag de config plausível no ambiente de teste ⇒ redator forçado a falhar ainda omite texto; `grep -RIn 'fail.open\|FAIL_OPEN' backend/assistant/` ⇒ 0.
+  - [x] Nenhuma implementação de fallback; se o teste acusar caminho de envio do original, removê-lo.
 - **Cenários:**
   - Sucesso: 0 config altera o comportamento fail-closed.
   - Falha: variável "redaction.best.effort" desliga a omissão ⇒ remover.
   - Borda: redator indisponível (não apenas exceção) ⇒ mesma omissão.
 - **DoD:**
-  - [ ] Teste escrito antes de qualquer ajuste.
-  - [ ] 0 flag fail-open; 0 caminho que envia texto original.
+  - [x] Teste escrito antes de qualquer ajuste.
+  - [x] 0 flag fail-open; 0 caminho que envia texto original.
 
 ### RED-17 — Auditar rastreabilidade e fontes
 
@@ -350,16 +350,16 @@ graph TD
 - **Arquivos:** `SPEC.md` e `TASKS.md` deste diretório (somente leitura/ajuste documental).
 - **Contexto/Impacto:** garante 1:1 entre os 18 requisitos da SPEC e as 18 seções, sem órfãos, com fonte de terceiro datada.
 - **Teste primeiro:**
-  - [ ] Auditoria determinística: `grep -c '^### RED-' TASKS.md` ⇒ 18; comparar com RF-01..RF-13 + NFR-01..NFR-05; 0 órfão.
-  - [ ] Nenhuma implementação; corrigir documentação se houver divergência.
+  - [x] Auditoria determinística: `grep -c '^### RED-' TASKS.md` ⇒ 18; comparar com RF-01..RF-13 + NFR-01..NFR-05; 0 órfão.
+  - [x] Nenhuma implementação; corrigir documentação se houver divergência.
 - **Cenários:**
   - Sucesso: 18 seções ↔ 18 requisitos; URL de terceiro com data (2026-11-25).
   - Falha: task sem RF/NFR ou RF/NFR sem task ⇒ corrigir antes do `VERIFY.md`.
   - Borda: nenhuma macro-tarefa inventada; marcador `<!-- scope: adr/ADR-003 -->` na 1ª linha.
 - **DoD:**
-  - [ ] Auditoria executada antes do fechamento do ADR.
-  - [ ] 0 órfãos; 0 referência a task inexistente.
-  - [ ] Nenhum artefato fora de `.spec/prd/telemetria-ia-langfuse/ADRs/ADR-003-redacao-origem/`.
+  - [x] Auditoria executada antes do fechamento do ADR.
+  - [x] 0 órfãos; 0 referência a task inexistente.
+  - [x] Nenhum artefato fora de `.spec/prd/telemetria-ia-langfuse/ADRs/ADR-003-redacao-origem/`.
 
 ### RED-18 — Não regressão e suíte completa
 
@@ -367,33 +367,33 @@ graph TD
 - **Arquivos:** nenhum de produto neste passo; `npm test` + `git diff --name-only`.
 - **Contexto/Impacto:** H1/H2/H6 — suíte cheia 0 falhas, 0 diff em arquivos proibidos; frontend N/A (nenhuma UI nova).
 - **Teste primeiro:**
-  - [ ] Rodar `npm test` (suiteFull) + `mvn -f backend/pom.xml test` + `mvn -f backend/pom.xml -Pintegration verify`; capturar contagem de falhas antes do review.
-  - [ ] Corrigir somente o que a suíte acusar; nenhuma mudança de contrato.
+  - [x] Rodar `npm test` (suiteFull) + `mvn -f backend/pom.xml test` + `mvn -f backend/pom.xml -Pintegration verify`; capturar contagem de falhas antes do review.
+  - [x] Corrigir somente o que a suíte acusar; nenhuma mudança de contrato.
 - **Cenários:**
   - Sucesso: 0 falhas, 0 erros, 0 skips não autorizados; `git diff --name-only` sem `ChatTrace.java`/`ChatTraceRecorder.java`/cota/RBAC/autenticação.
   - Falha: qualquer falha pré-existente ⇒ parar, reportar, causa raiz, corrigir, re-rodar tudo (H1/H2).
   - Borda: nenhuma UI nova ⇒ H3/frontend N/A, sem evidência de front exigida.
 - **DoD:**
-  - [ ] Suíte executada antes do fechamento; 0 falhas.
-  - [ ] 0 diff em arquivos proibidos.
-  - [ ] `VERIFY.md` (pós-merge, fora deste subagent) herda estas evidências.
+  - [x] Suíte executada antes do fechamento; 0 falhas.
+  - [x] 0 diff em arquivos proibidos.
+  - [x] `VERIFY.md` (pós-merge, fora deste subagent) herda estas evidências.
 
 ---
 
 ## 5. Coverage Validation
 
-- [ ] 18 tasks RED-01..RED-18 ↔ 18 RF/NFR da SPEC (13 RF + 5 NFR), 1:1 sem órfão.
-- [ ] Interface congelada coberta: atributos só no filho, placeholder fechado, 7 regras obrigatórias, fail-closed atômico, superfícies proibidas, métrica de falha, root limpo.
-- [ ] Toda task tem cenário de Sucesso, Falha e Borda/Idempotência.
-- [ ] Toda task lista arquivo de teste antes do arquivo de implementação.
-- [ ] Grafo Mermaid sem ciclo e sem órfã (RED-01 é raiz; RED-18 é folha).
-- [ ] Sprint Summary 1:1 com as 18 seções (sem ID órfão na tabela).
-- [ ] `SENSITIVE_FIXTURE` com literal sensível aparece nos testes de redação (RED-03/04/10/11) e o redator forçado a falhar em RED-08/12/16.
-- [ ] Aceites executáveis: 0 literal no payload OTLP **protobuf decodificado** ou na Observations API v2 (RED-11), 0 texto bruto em log (RED-10); nenhuma asserção exige JSON cru.
-- [ ] Nenhuma macro-tarefa inventada fora da SPEC.
-- [ ] Nenhuma biblioteca/API de máscara de terceiro nomeada; emenda RED-01 registrada com URL + data e 0 diff em `pom.xml`.
-- [ ] `SENSITIVE_FIXTURE` cobre CNPJ numérico e alfanumérico (RED-03); `sk-` mantido e entropia fora do contrato (RED-04).
-- [ ] Nenhuma task introduz decisão de ADR-001/002/004/005.
+- [x] 18 tasks RED-01..RED-18 ↔ 18 RF/NFR da SPEC (13 RF + 5 NFR), 1:1 sem órfão.
+- [x] Interface congelada coberta: atributos só no filho, placeholder fechado, 7 regras obrigatórias, fail-closed atômico, superfícies proibidas, métrica de falha, root limpo.
+- [x] Toda task tem cenário de Sucesso, Falha e Borda/Idempotência.
+- [x] Toda task lista arquivo de teste antes do arquivo de implementação.
+- [x] Grafo Mermaid sem ciclo e sem órfã (RED-01 é raiz; RED-18 é folha).
+- [x] Sprint Summary 1:1 com as 18 seções (sem ID órfão na tabela).
+- [x] `SENSITIVE_FIXTURE` com literal sensível aparece nos testes de redação (RED-03/04/10/11) e o redator forçado a falhar em RED-08/12/16.
+- [x] Aceites executáveis: 0 literal no payload OTLP **protobuf decodificado** ou na Observations API v2 (RED-11), 0 texto bruto em log (RED-10); nenhuma asserção exige JSON cru.
+- [x] Nenhuma macro-tarefa inventada fora da SPEC.
+- [x] Nenhuma biblioteca/API de máscara de terceiro nomeada; emenda RED-01 registrada com URL + data e 0 diff em `pom.xml`.
+- [x] `SENSITIVE_FIXTURE` cobre CNPJ numérico e alfanumérico (RED-03); `sk-` mantido e entropia fora do contrato (RED-04).
+- [x] Nenhuma task introduz decisão de ADR-001/002/004/005.
 
 ## 6. Plan Feedback (não bloqueante para este ADR)
 

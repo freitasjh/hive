@@ -204,6 +204,14 @@ Data da aprovação: 2026-11-25.
 - [x] Data da assinatura: 2026-11-25.
 - [x] Escopo aprovado: 9 RFs / 5 ADRs candidatos / teto de 5 respeitado.
 - [x] Premissas respondidas (§7): PII+segredos, 30 dias, Admin Hive + Suporte / time de IA, 100% com flag, alertas v4 fora, Community + controles externos.
-- [ ] `prd_version: 2` confirmado no ato — ADRs `unit: adr` com `SPEC.md`/`TASKS.md` e `VERIFY.md` após merge, conforme `.agents/rules/prd-adr-pipeline.md:28-33`
+- [x] `prd_version: 2` confirmado no ato — ADRs `unit: adr` com `SPEC.md`/`TASKS.md` e `VERIFY.md` após merge, conforme `.agents/rules/prd-adr-pipeline.md:28-33`
+
+## 17. Archive (2026-11-26)
+
+- **Status:** arquivado em `.spec/archive/20261126-prd-telemetria-ia-langfuse/` após 5/5 ADRs merged (PRs #15–#19) e `VERIFY.md` APPROVED ✅ em todos.
+- **Duração:** aprovado em 2026-11-25, implementado e arquivado em 2026-11-26 (~2 dias).
+- **Commits de código:** `c9769fd` (001), `fc16d3b` (002), `8b5be7e` (003), `a9632a0` (004), `b5aee24` (005).
+- **Evidência final:** `npm test` exit 0 (414 front / 621 back / 29 job); `mvn -Pintegration verify` 181 ITs, 0 falhas; code review APPROVED 0 🔴 em todos os 5 ADRs.
+- **Delta em docs vivos:** nenhum — nenhuma alteração em `.agents/rules/**` ou `AGENTS.md` neste PRD.
 
 **Trava:** nenhum `ADRs/**`, `RESEARCH.md`, `ADR-INDEX.md`, código, dependency, branch ou `workflow-state.json` deve nascer antes desta assinatura. Aprovação é ato humano; este documento apenas a solicita.
