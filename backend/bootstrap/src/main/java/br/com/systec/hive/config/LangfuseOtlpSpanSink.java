@@ -40,7 +40,7 @@ public final class LangfuseOtlpSpanSink implements ChatSpanSink, AutoCloseable {
     private final Counter failures;
 
     LangfuseOtlpSpanSink(MeterRegistry registry, String endpoint, String authorization) {
-        this.failures = Counter.builder(LangfuseOtlpExporterConfig.FAILURE_METRIC_LOGICAL)
+        this.failures = Counter.builder(LangfuseOtlpExporterConfig.FAILURE_METRIC_LOGICAL).tag("sink", "langfuse")
                 .description("Falhas de export OTLP de telemetria de chat")
                 .register(registry);
         OtlpHttpSpanExporter exporter = OtlpHttpSpanExporter.builder()

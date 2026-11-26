@@ -24,6 +24,9 @@ public final class SpanAttributeMapper {
     // ADR-003: texto redigido, somente no filho generation. Não entram no conjunto ADR-001 acima.
     public static final String KEY_INPUT = "langfuse.observation.input";
     public static final String KEY_OUTPUT = "langfuse.observation.output";
+    // ADR-005: chaves de custo inferido — modelo efetivo e buckets excludentes; nenhum preço enviado.
+    public static final String KEY_MODEL_NAME = "langfuse.observation.model.name";
+    public static final String KEY_USAGE_DETAILS = "langfuse.observation.usage_details";
 
     public static final Set<String> FROZEN_LANGFUSE_KEYS = Set.of(
             KEY_TYPE, KEY_TRACE_NAME, KEY_SESSION, KEY_USER, KEY_TENANT, KEY_TURN,

@@ -63,7 +63,7 @@ class LangfuseOtlpBestEffortIT {
             assertThat(reply.promptChars()).isEqualTo(baseline.promptChars());
             assertThat(calls.get()).isEqualTo(baselineCalls.get());
             await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
-                    assertThat(registry.scrape()).contains("chat_telemetry_export_failures_total 1.0"));
+                    assertThat(registry.scrape()).contains("chat_telemetry_export_failures_total{sink=\"langfuse\"} 1.0"));
             assertThat(registry.scrape()).doesNotContain("chat.telemetry.export.failures.total");
         }
     }

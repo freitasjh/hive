@@ -8,6 +8,8 @@ import dev.langchain4j.model.chat.listener.ChatModelRequestContext;
 import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
 import dev.langchain4j.model.output.TokenUsage;
 
+import java.lang.reflect.Method;
+
 /**
  * Interface congelada do LangChain4j 1.19.0: uma filha por tentativa. O texto passa pelo redator
  * antes de entrar no portador de turno — o exportador (ADR-002) nunca vê o original.
@@ -40,7 +42,28 @@ public final class ProviderCallSpanListener implements ChatModelListener {
         ChatTurnSpanScope.attemptSucceeded(
                 usage == null ? null : usage.inputTokenCount(),
                 usage == null ? null : usage.outputTokenCount(),
-                usage == null ? null : usage.totalTokenCount());
+                usage == null ? null : usage.totalTokenCount(),
+                cachedTokensOf(usage));
+    }
+
+    /**
+     *shortcut: reflexão evita dependência do SDK OpenAI no módulo; trocar por adaptador tipado se o cache virar contrato LangChain4j.
+     */
+    private static Integer cachedTokensOf(TokenUsage usage) {
+        if (usage == null) {
+            return null;
+        }
+        try {
+            Method detailsMethod = usage.getClass().getMethod("inputTokensDetails");
+            Object details = detailsMethod.invoke(usage);
+            if (details == null) {
+                return null;
+            }
+            Object cached = details.getClass().getMethod("cachedTokens").invoke(details);
+            return cached instanceof Integer value ? value : null;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
+        }
     }
 
     @Override

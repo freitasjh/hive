@@ -1,6 +1,8 @@
 package br.com.systec.hive.config;
 
 import br.com.systec.hive.assistant.impl.diagnostics.ChatSpanSink;
+import br.com.systec.hive.assistant.impl.diagnostics.RedactionPolicy;
+import br.com.systec.hive.assistant.impl.diagnostics.TextRedactor;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
@@ -9,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -55,8 +58,21 @@ public class LangfuseOtlpExporterConfig {
     private String sk;
 
     @Bean
-    ChatSpanSink langfuseChatSpanSink(MeterRegistry meterRegistry) {
-        return create(meterRegistry, enabled, endpoint, pk, sk);
+    ChatMetricsRecorder chatMetricsRecorder(MeterRegistry meterRegistry) {
+        return new ChatMetricsRecorder(meterRegistry);
+    }
+
+    /** Métricas sempre registradas, mesmo com a flag OTLP desligada (ADR-005 MET-08). */
+    @Bean
+    @Primary
+    ChatSpanSink langfuseChatSpanSink(MeterRegistry meterRegistry, ChatMetricsRecorder recorder) {
+        return recorder.decorating(create(meterRegistry, enabled, endpoint, pk, sk));
+    }
+
+    /** O contador local do ADR-003 passa a alimentar a série Micrometer do ADR-005. */
+    @Bean
+    TextRedactor textRedactor(ChatMetricsRecorder recorder) {
+        return new TextRedactor(RedactionPolicy::redact, recorder::redactionFailure);
     }
 
     /** Fábrica estática para o IT: nenhuma credencial é literal, os valores vêm de secret/env. */
@@ -66,7 +82,7 @@ public class LangfuseOtlpExporterConfig {
         }
         if (!isValidEndpoint(endpoint) || pk == null || pk.isBlank() || sk == null || sk.isBlank()) {
             // Configuração incompleta é falha de export, nunca erro de chat (RF9).
-            Counter.builder(FAILURE_METRIC_LOGICAL)
+            Counter.builder(FAILURE_METRIC_LOGICAL).tag("sink", "langfuse")
                     .description("Falhas de export OTLP de telemetria de chat")
                     .register(registry)
                     .increment();

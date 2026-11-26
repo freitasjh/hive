@@ -18,7 +18,21 @@ class RedactionFailureMetricTest {
         redactor.captureOutput(SensitiveFixture.RAW);
 
         assertThat(redactor.failureCount()).isEqualTo(1);
-        assertThat(TextRedactor.FAILURE_METRIC).isEqualTo("chat.telemetry.redaction.failures.total");
+        assertThat(TextRedactor.FAILURE_METRIC).isEqualTo("chat.telemetry.redaction.failures");
+    }
+
+    @Test
+    void when_redactionFails_then_micrometerCallbackRunsOncePerFailClosedEvent() {
+        int[] callbacks = {0};
+        TextRedactor redactor = new TextRedactor(text -> {
+            throw new IllegalStateException("forced");
+        }, () -> callbacks[0]++);
+
+        TextCarrier.start();
+        redactor.captureInput(SensitiveFixture.RAW);
+        redactor.captureOutput(SensitiveFixture.RAW);
+
+        assertThat(callbacks[0]).isEqualTo(1);
     }
 
     @Test
