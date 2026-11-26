@@ -45,7 +45,7 @@ class RedactorDecisionGateTest {
     }
 
     private static Path adrDir() {
-        Path dir = repoRoot().resolve(".spec/prd/telemetria-ia-langfuse/ADRs/ADR-003-redacao-origem");
+        Path dir = repoRoot().resolve(".spec/archive/20261126-prd-telemetria-ia-langfuse/ADRs/ADR-003-redacao-origem");
         assertThat(Files.isDirectory(dir)).isTrue();
         return dir;
     }

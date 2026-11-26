@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** ACC-01..10, 13, 16, 18..23 — varreduras estaticas e documentais (somente leitura de .spec/**). */
 class StaticConfigTest {
     private static final Path ROOT = Paths.get(System.getProperty("repo.root", "..")).toAbsolutePath().normalize();
-    private static final Path ADR = ROOT.resolve(".spec/prd/telemetria-ia-langfuse/ADRs/ADR-004-acesso-retencao");
+    private static final Path ADR = ROOT.resolve(".spec/archive/20261126-prd-telemetria-ia-langfuse/ADRs/ADR-004-acesso-retencao");
     private static final Path PROXY = ROOT.resolve("proxy/langfuse-proxy.conf.template");
     private static final Path PROXY_DOC = ROOT.resolve("proxy/README.md");
     private static final Path COMPOSE = ROOT.resolve("docker/docker-compose-retention.yml");
