@@ -2,6 +2,9 @@ import { apiRequest, unwrapData } from "./api"
 import type { AiProvider } from "./admin.types"
 import type { ChatRequestDTO, ChatResponseDTO } from "./chat.types"
 
+// Backend LangChain4jClientFactory.java:33 = 120s; 10s de margem para o provider responder.
+const CHAT_TIMEOUT_MS = 130_000
+
 export interface ChatPayloadDefaults {
   provider?: AiProvider | null
   model?: string | null
@@ -56,7 +59,11 @@ export const chatService = {
     if (!payload) {
       throw new Error("Informe uma mensagem antes de enviar.")
     }
-    const body = await apiRequest<unknown>("/chat", { method: "POST", body: payload })
+    const body = await apiRequest<unknown>("/chat", {
+      method: "POST",
+      body: payload,
+      timeoutMs: CHAT_TIMEOUT_MS,
+    })
     return unwrapData<ChatResponseDTO>(body)
   },
 }

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as api from './api'
 import { ApiError } from './api'
 import { buildChatPayload, chatService } from './chat.service'
 
@@ -149,5 +150,70 @@ describe('chatService.sendMessage', () => {
     expect(error).toMatchObject({ code: 'NETWORK_ERROR' })
     expect(JSON.stringify(error)).not.toContain('token-secreto')
     expect(errorSpy).not.toHaveBeenCalled()
+  })
+
+  it('passa timeoutMs=130000 para apiRequest no POST /chat', async () => {
+    fetchMock.mockResolvedValue(json(response))
+    const apiSpy = vi.spyOn(api, 'apiRequest')
+
+    await chatService.sendMessage({ message: 'oi' })
+
+    expect(apiSpy).toHaveBeenCalledWith('/chat', {
+      method: 'POST',
+      body: { message: 'oi' },
+      timeoutMs: 130_000,
+    })
+  })
+
+  function pendingFetch(): void {
+    fetchMock.mockImplementation((_url: string, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          const error = new Error('aborted')
+          error.name = 'AbortError'
+          reject(error)
+        })
+      })
+    )
+  }
+
+  it('não aborta /chat antes dos 130s e só então devolve TIMEOUT', async () => {
+    vi.useFakeTimers()
+    pendingFetch()
+
+    try {
+      const promise = chatService.sendMessage({ message: 'oi' })
+      void promise.catch(() => {})
+      await vi.advanceTimersByTimeAsync(129_999)
+      expect((fetchMock.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(1)
+      expect((fetchMock.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(true)
+      await expect(promise).rejects.toMatchObject({ code: 'TIMEOUT' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('abort externo continua propagando com timeout de 130s', async () => {
+    vi.useFakeTimers()
+    const external = new AbortController()
+    pendingFetch()
+
+    try {
+      const promise = api.apiRequest('/chat', {
+        method: 'POST',
+        body: { message: 'oi' },
+        timeoutMs: 130_000,
+        signal: external.signal,
+      })
+      void promise.catch(() => {})
+      external.abort()
+
+      await expect(promise).rejects.toMatchObject({ code: 'TIMEOUT' })
+      expect((fetchMock.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
