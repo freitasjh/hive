@@ -1,0 +1,181 @@
+# Langfuse v4 Community — dev/teste local (somente Langfuse; retencao e proxy ficam nos composes proprios).
+# Fonte (consultada 2026-11-26): https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml
+# Guia v4: https://langfuse.com/self-hosting/deployment/docker-compose
+# Nome de projeto fixo: nao compartilhar namespace com os stacks `hive` e `docker` existentes.
+# Portas do host usadas: 3000 (web), 9090 (MinIO), 9091 console, 8123/9000 ClickHouse, 3030 worker — todas livres em 2026-11-26.
+# Postgres e Redis NAO sao publicados: 5432, 5433, 6379 e 6380 ja estao ocupados neste host.
+#   Acesso: docker compose --env-file docker/.env.langfuse -f docker/docker-compose-langfuse.yml exec postgres psql ...
+# AI Gateway fora do escopo (exige mais 2 chaves); v4 Community = LANGFUSE_IMAGE_TAG=4.
+name: hive-langfuse
+
+services:
+  langfuse-worker:
+    image: docker.langfuse.com/langfuse/langfuse-worker:${LANGFUSE_IMAGE_TAG:-4}
+    restart: always
+    depends_on: &langfuse-depends-on
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:3030:3030
+    environment: &langfuse-worker-env
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      DATABASE_URL: '${DATABASE_URL:?defina DATABASE_URL (postgresql://postgres:SENHA@postgres:5432/postgres)}'
+      SALT: '${SALT:?defina SALT com: openssl rand -hex 16}'
+      ENCRYPTION_KEY: '${ENCRYPTION_KEY:?defina ENCRYPTION_KEY com: openssl rand -hex 32}'
+      TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-true}
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: ${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
+      CLICKHOUSE_MIGRATION_URL: ${CLICKHOUSE_MIGRATION_URL:-clickhouse://clickhouse:9000}
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: '${CLICKHOUSE_PASSWORD:?defina CLICKHOUSE_PASSWORD com: openssl rand -hex 16}'
+      CLICKHOUSE_CLUSTER_ENABLED: ${CLICKHOUSE_CLUSTER_ENABLED:-false}
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ${LANGFUSE_S3_EVENT_UPLOAD_BUCKET:-langfuse}
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: ${LANGFUSE_S3_EVENT_UPLOAD_REGION:-auto}
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: '${LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY:?defina igual a MINIO_ROOT_PASSWORD}'
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: ${LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT:-http://minio:9000}
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: ${LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE:-true}
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: ${LANGFUSE_S3_EVENT_UPLOAD_PREFIX:-events/}
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: ${LANGFUSE_S3_MEDIA_UPLOAD_BUCKET:-langfuse}
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: ${LANGFUSE_S3_MEDIA_UPLOAD_REGION:-auto}
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: '${LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY:?defina igual a MINIO_ROOT_PASSWORD}'
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT:-http://minio:9000}
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: ${LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE:-true}
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: ${LANGFUSE_S3_MEDIA_UPLOAD_PREFIX:-media/}
+      LANGFUSE_S3_BATCH_EXPORT_ENABLED: ${LANGFUSE_S3_BATCH_EXPORT_ENABLED:-false}
+      LANGFUSE_S3_BATCH_EXPORT_BUCKET: ${LANGFUSE_S3_BATCH_EXPORT_BUCKET:-langfuse}
+      LANGFUSE_S3_BATCH_EXPORT_PREFIX: ${LANGFUSE_S3_BATCH_EXPORT_PREFIX:-exports/}
+      LANGFUSE_S3_BATCH_EXPORT_REGION: ${LANGFUSE_S3_BATCH_EXPORT_REGION:-auto}
+      LANGFUSE_S3_BATCH_EXPORT_ENDPOINT: ${LANGFUSE_S3_BATCH_EXPORT_ENDPOINT:-http://minio:9000}
+      LANGFUSE_S3_BATCH_EXPORT_EXTERNAL_ENDPOINT: ${LANGFUSE_S3_BATCH_EXPORT_EXTERNAL_ENDPOINT:-http://localhost:9090}
+      LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY: '${LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY:?defina igual a MINIO_ROOT_PASSWORD}'
+      LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE: ${LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE:-true}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_AUTH: '${REDIS_AUTH:?defina REDIS_AUTH com: openssl rand -hex 16}'
+      REDIS_TLS_ENABLED: ${REDIS_TLS_ENABLED:-false}
+
+  langfuse-web:
+    image: docker.langfuse.com/langfuse/langfuse:${LANGFUSE_IMAGE_TAG:-4}
+    restart: always
+    depends_on: *langfuse-depends-on
+    ports:
+      - 3000:3000
+    environment:
+      <<: *langfuse-worker-env
+      NEXTAUTH_SECRET: '${NEXTAUTH_SECRET:?defina NEXTAUTH_SECRET com: openssl rand -hex 32}'
+      # Browser faz upload/download de media via host; worker usa o endpoint interno do anchor.
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT:-http://localhost:9090}
+      LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT: ${LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT:-http://minio:9000}
+
+  clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:26.3.62.3
+    restart: always
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: '${CLICKHOUSE_PASSWORD:?defina CLICKHOUSE_PASSWORD com: openssl rand -hex 16}'
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+    ports:
+      - 127.0.0.1:8123:8123
+      - 127.0.0.1:9000:9000
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+
+  minio:
+    image: cgr.dev/chainguard/minio
+    restart: always
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: '${MINIO_ROOT_PASSWORD:?defina com openssl rand -hex 16; as 3 S3 keys devem ser iguais}'
+    ports:
+      - 9090:9000
+      - 127.0.0.1:9091:9001
+    volumes:
+      - langfuse_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+      start_period: 1s
+
+  redis:
+    image: docker.io/redis:7
+    restart: always
+    command: >
+      --requirepass ${REDIS_AUTH:?defina REDIS_AUTH com: openssl rand -hex 16}
+      --maxmemory-policy noeviction
+    # Sem `ports`: 6379 e 6380 do host ja estao ocupados. Somente rede interna do compose.
+    volumes:
+      - langfuse_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+
+  postgres:
+    image: docker.io/postgres:${POSTGRES_VERSION:-17}
+    restart: always
+    # Sem `ports`: 5432 e 5433 do host ja estao ocupados. Somente rede interna do compose.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD com: openssl rand -hex 16}'
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  langfuse_postgres_data:
+    driver: local
+  langfuse_clickhouse_data:
+    driver: local
+  langfuse_clickhouse_logs:
+    driver: local
+  langfuse_minio_data:
+    driver: local
+  langfuse_redis_data:
+    driver: local
+
+# ── README rapido ────────────────────────────────────────────────────────────
+# 1) Seed de secrets (raiz do repo; arquivo .env.* e ignorado pelo git):
+#      PG=$(openssl rand -hex 16); MINIO=$(openssl rand -hex 16); ENC=$(openssl rand -hex 32)
+#      SALT=$(openssl rand -hex 16); NEXTAUTH=$(openssl rand -hex 32)
+#      CH=$(openssl rand -hex 16); REDIS=$(openssl rand -hex 16)
+#    Copie docker/langfuse.env.example para docker/.env.langfuse e substitua TODOS os
+#    __...__ : DATABASE_URL e POSTGRES_PASSWORD usam o MESMO $PG; as 3 S3 keys usam
+#    o MESMO $MINIO (root do MinIO). Nunca commitar .env.langfuse.
+#    NEXTAUTH_URL=fica http://localhost:3000 (se trocar a porta do host, troque aqui tambem).
+# 2) Validar: docker compose --env-file docker/.env.langfuse -f docker/docker-compose-langfuse.yml config --quiet
+# 3) Subir:   docker compose --env-file docker/.env.langfuse -f docker/docker-compose-langfuse.yml up -d
+# 4) Health:  curl -sf http://localhost:3000/api/public/health   # {"status":"OK","version":"..."}
+#             docker compose --env-file docker/.env.langfuse -f docker/docker-compose-langfuse.yml ps
+# 5) UI: http://localhost:3000 -> Sign up (nao ha admin padrao) -> criar org/projeto -> API keys.
+#    IT de chaves do retention-job usa essas chaves via cofre do operador (key-scope-it.sh).
+# 6) Parar: docker compose --env-file docker/.env.langfuse -f docker/docker-compose-langfuse.yml down
+#    down -v APAGA os volumes. Sem HA/backup; nao usar em producao.
