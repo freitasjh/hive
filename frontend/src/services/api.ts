@@ -188,6 +188,13 @@ async function performRefresh(): Promise<string> {
  * Renova o access token. Em caso de falha (401/404/rede/payload inválido) apaga
  * token + tenant e redireciona para `#login`. `/auth/refresh-token` é
  * `isAuthRequest`, então `apiRequest` não recursa nem redireciona por conta própria.
+ *
+ * Exceção multi-aba: `REFRESH_TOKEN_NOT_FOUND` (500 com `code` no corpo) não
+ * apaga sessão nem redireciona. `SecurityTokenServiceImpl.java:100` revoga o
+ * cookie a cada refresh; duas abas no mesmo host compartilham o cookie e a
+ * segunda refresh recebe 500. O erro é propagado ao chamador para o 401 original
+ * da chamada que disparou o refresh sobreviver em `performRequest`.
+ * Caminho: backend/security/impl/src/main/java/br/com/systec/hive/security/impl/service/SecurityTokenServiceImpl.java:100
  */
 export function refreshAccess(): Promise<string> {
   if (!inFlightRefresh) {
@@ -198,8 +205,11 @@ export function refreshAccess(): Promise<string> {
       },
       (error: unknown) => {
         inFlightRefresh = null
-        clearSession()
-        redirectToLogin()
+        // Rotação entre abas: token atual ainda é válido; preservar sessão.
+        if (!(error instanceof ApiError && error.code === 'REFRESH_TOKEN_NOT_FOUND')) {
+          clearSession()
+          redirectToLogin()
+        }
         throw error
       }
     )

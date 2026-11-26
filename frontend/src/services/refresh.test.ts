@@ -358,4 +358,90 @@ describe('refresh de access token', () => {
 
     for (const spy of spies) expect(spy).not.toHaveBeenCalled()
   })
+
+  it('refresh com REFRESH_TOKEN_NOT_FOUND preserva token/tenant, não redireciona e propaga ApiError', async () => {
+    seedSession()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      jsonResponse({
+        status: 500,
+        code: 'REFRESH_TOKEN_NOT_FOUND',
+        detail: 'refresh.token.not.found',
+      }, 500)
+    ))
+
+    const error = await refreshAccess().catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).code).toBe('REFRESH_TOKEN_NOT_FOUND')
+    expect((error as ApiError).status).toBe(500)
+    expect(getToken()).toBe(OLD_TOKEN)
+    expect(getTenantId()).toBe(TENANT)
+    expect(window.location.hash).toBe('#overview')
+  })
+
+  it('refresh 401 genérico (sem code) ainda limpa sessão e redireciona', async () => {
+    seedSession()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      jsonResponse({ status: 401, detail: 'unauthorized' }, 401)
+    ))
+
+    const error = await refreshAccess().catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).code).toBeUndefined()
+    expect(getToken()).toBeNull()
+    expect(getTenantId()).toBeNull()
+    expect(window.location.hash).toBe('#login')
+  })
+
+  it('duas refreshAccess concorrentes com REFRESH_TOKEN_NOT_FOUND: single-flight, ambas rejeitadas, sessão preservada', async () => {
+    seedSession()
+    let resolveFetch!: (response: Response) => void
+    const fetchMock = vi.fn().mockImplementation(
+      () => new Promise<Response>((resolve) => { resolveFetch = resolve })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const calls = [refreshAccess(), refreshAccess()]
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    resolveFetch(jsonResponse({
+      status: 500,
+      code: 'REFRESH_TOKEN_NOT_FOUND',
+      detail: 'refresh.token.not.found',
+    }, 500))
+    const results = await Promise.allSettled(calls)
+
+    expect(results.map((r) => r.status)).toEqual(['rejected', 'rejected'])
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        expect((result.reason as ApiError).code).toBe('REFRESH_TOKEN_NOT_FOUND')
+      }
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(getToken()).toBe(OLD_TOKEN)
+    expect(getTenantId()).toBe(TENANT)
+    expect(window.location.hash).toBe('#overview')
+  })
+
+  it('401 que dispara refresh com REFRESH_TOKEN_NOT_FOUND preserva sessão e propaga o 401 original', async () => {
+    seedSession()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ status: 401, detail: 'unauthorized' }, 401))
+      .mockResolvedValueOnce(jsonResponse({
+        status: 500,
+        code: 'REFRESH_TOKEN_NOT_FOUND',
+        detail: 'refresh.token.not.found',
+      }, 500))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const error = await apiRequest('/provider-credentials').catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).status).toBe(401)
+    expect((error as ApiError).code).toBeUndefined()
+    expect(getToken()).toBe(OLD_TOKEN)
+    expect(getTenantId()).toBe(TENANT)
+    expect(window.location.hash).toBe('#overview')
+  })
 })
