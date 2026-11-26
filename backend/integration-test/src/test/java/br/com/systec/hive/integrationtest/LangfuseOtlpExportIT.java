@@ -100,8 +100,9 @@ class LangfuseOtlpExportIT {
                 assertThat(captured.path()).doesNotContain("/v1/metrics", "/v1/logs");
             });
             assertThat(new String(request.body(), StandardCharsets.ISO_8859_1)).doesNotContain(pk, sk);
-            assertThat(registry.scrape()).contains("chat_telemetry_export_failures_total 0.0")
-                    .doesNotContain("chat_telemetry_export_failures_total 1.0");
+            assertThat(registry.scrape())
+                    .contains("chat_telemetry_export_failures_total{sink=\"langfuse\"} 0.0")
+                    .doesNotContain("chat_telemetry_export_failures_total{sink=\"langfuse\"} 1.0");
         }
     }
 

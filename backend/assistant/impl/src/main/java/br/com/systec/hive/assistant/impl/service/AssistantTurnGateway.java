@@ -57,9 +57,18 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
     private final TextRedactor redactor;
 
     /** Construtor de produção: ADR-002 liga o sink real injetado pelo bootstrap. */
-    @Autowired
     public AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory, ChatSpanSink spanSink) {
         this(llmClientFactory, LlmRetryPolicy.defaults(), spanSink, new TextRedactor());
+    }
+
+    /**
+     * Construtor de produção com o redator do bootstrap: o callback incrementa
+     * {@code chat.telemetry.redaction.failures} no Micrometer (ADR-005 MET-06).
+     */
+    @Autowired
+    public AssistantTurnGateway(LlmClientFactory<ChatModel> llmClientFactory, ChatSpanSink spanSink,
+                                TextRedactor redactor) {
+        this(llmClientFactory, LlmRetryPolicy.defaults(), spanSink, redactor);
     }
 
     /** Construtor de teste sem export: mantém o comportamento anterior quando não há sink. */

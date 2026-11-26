@@ -1,11 +1,11 @@
 <!-- scope: adr/ADR-005 -->
 # TASKS — ADR-005: Métricas operacionais Micrometer/Prometheus e custo derivado no Langfuse
 
-> Backlog TDD-ready derivado 1:1 da `SPEC.md` deste ADR (13 RF + 10 NFR = 23 requisitos → 23 tickets `MET-01..MET-23`). Teste escrito **antes** da implementação em toda tarefa. Nenhuma tarefa redefine spans/correlação (ADR-001), transporte/header/exporter/flag (ADR-002), redação (ADR-003) ou proxy/RBAC/retention (ADR-004).
+> Backlog TDD-ready derivado 1:1 da `SPEC.md` deste ADR (13 RF + 10 NFR = 23 requisitos → 23 tickets `MET-01..MET-23`). Teste escrito **antes** da implementação em toda tarefa. Nenhuma tarefa redefine spans/correlação (ADR-001), transporte/header/exporter/flag (ADR-002), redação (ADR-003) ou proxy/RBAC/retention (ADR-004). Emenda de exposição (2026-11-25): decisão B é coberta dentro de MET-08, sem ticket novo.
 >
-> **Atalhos de caminho:** `API` = `backend/assistant/api/src/main/java/br/com/systec/hive/assistant/api/diagnostics/` · `IMPL` = `backend/assistant/impl/src/main/java/br/com/systec/hive/assistant/impl/diagnostics/` · `IMPLTEST` = `backend/assistant/impl/src/test/java/br/com/systec/hive/assistant/impl/diagnostics/` · `CFG` = `backend/bootstrap/src/main/java/br/com/systec/hive/config/` · `RES` = `backend/bootstrap/src/main/resources/` · `CFGTEST` = `backend/bootstrap/src/test/java/br/com/systec/hive/config/` · `IT` = `backend/integration-test/src/test/java/br/com/systec/hive/integrationtest/` · `POM` = `backend/dependencies/pom.xml`.
+> **Atalhos de caminho:** `API` = `backend/assistant/api/src/main/java/br/com/systec/hive/assistant/api/diagnostics/` · `IMPL` = `backend/assistant/impl/src/main/java/br/com/systec/hive/assistant/impl/diagnostics/` · `IMPLTEST` = `backend/assistant/impl/src/test/java/br/com/systec/hive/assistant/impl/diagnostics/` · `CFG` = `backend/bootstrap/src/main/java/br/com/systec/hive/config/` · `RES` = `backend/bootstrap/src/main/resources/` · `CFGTEST` = `backend/bootstrap/src/test/java/br/com/systec/hive/config/` · `IT` = `backend/integration-test/src/test/java/br/com/systec/hive/integrationtest/` · `POM` = `backend/dependencies/pom.xml` · `SECCFG` = `backend/security/impl/src/main/java/br/com/systec/hive/security/impl/config/` · `SECCFGTEST` = `backend/security/impl/src/test/java/br/com/systec/hive/security/impl/config/`.
 >
-> **Congelado (não renegociar):** 7 séries e seus nomes de exposição; `chat.telemetry.export.failures` → `chat_telemetry_export_failures_total` (grafia `.total` retirada); `token_type ∈ {input,output,total}` (3 valores — cache não é 4º rótulo); `usage_details` com buckets excludentes e `input_cached_tokens` separado; zero custo enviado pelo backend; `query` como parâmetro JSON único da Metrics API v2. Fontes em `SPEC.md` §12.
+> **Congelado (não renegociar):** 7 séries e seus nomes de exposição; `chat.telemetry.export.failures` → `chat_telemetry_export_failures_total` (grafia `.total` retirada); `token_type ∈ {input,output,total}` (3 valores — cache não é 4º rótulo); `usage_details` com buckets excludentes e `input_cached_tokens` separado; zero custo enviado pelo backend; `query` como parâmetro JSON único da Metrics API v2; scrape somente loopback (`127.0.0.1`/`::1`), 403 fora, health/health/**/info `permitAll`, `/actuator/**` fora do `permitAll` e `application.properties` inalterado (emenda 2026-11-25). Fontes em `SPEC.md` §12.
 
 ## 1. Traceability Context
 
@@ -212,22 +212,25 @@ graph TD
   - [ ] Teste escrito antes do código.
   - [ ] IT verde; 0 rótulo fora do conjunto fechado de 3.
 
-### MET-08 — Exposição exclusiva em `/actuator/prometheus`
+### MET-08 — Exposição exclusiva e restrita em `/actuator/prometheus`
 
 - **RF/NFR:** RF-08 · **Prioridade:** P0 · **Risco:** Alto · **Tipo:** integração · **Depende de:** MET-01, MET-02, MET-03, MET-04, MET-05, MET-06, MET-07 · **Dependency Type:** Hard · **Paralelizável:** Não
-- **Arquivos:** `RES/application.properties` (verificar `management.endpoints.web.exposure.include=health,info,prometheus` — sem criar registry novo), `IT/ChatMetricsExposureIT.java`, `CFGTEST/ChatMetricsEndpointTest.java` (novo).
-- **Contexto/Impacto:** as sete séries são consultáveis por `curl`/MockMvc no endpoint do Actuator; nenhum endpoint próprio de métricas é adicionado.
+- **Arquivos:** `SECCFG/SecurityConfig.java` (único arquivo de código autorizado — chain `@Order(2)`), `RES/application.properties` (verificar `management.endpoints.web.exposure.include=health,info,prometheus` e `show-values=never` — **sem edição**), `IT/ChatMetricsExposureIT.java` (acesso loopback/remoto, health/info/env e scrape positivo).
+- **Registro de implementação (revisão 2026-11-26):** `SECCFGTEST/ActuatorExposureAccessTest.java` foi substituído por `IT/ChatMetricsExposureIT.java`: o módulo `security/impl` não tem `spring-boot-webmvc-test`, e o IT exercita a cadeia Spring real com `context-path=/hive` sem dependência nova. `ADR.md`/`SPEC.md` não foram alterados por esta substituição.
+- **Contexto/Impacto:** as sete séries são consultáveis por `curl`/MockMvc no endpoint do Actuator; nenhum endpoint próprio de métricas é adicionado. Decisão B (emenda 2026-11-25): só `GET /actuator/prometheus` passa a exigir `remoteAddr` ∈ {`127.0.0.1`, `::1`} via `WebExpressionAuthorizationManager("hasIpAddress('127.0.0.1') or hasIpAddress('::1')")` na chain `@Order(2)`, antes de `anyRequest()`; fora ⇒ 403 com `{"error": "Acesso negado"}` do `accessDeniedHandler` existente. `/actuator/health`, `/actuator/health/**` e `/actuator/info` seguem `permitAll`; `/actuator/**` sai da lista `permitAll` e demais caminhos caem em `authenticated()` (404 pela exposure list após autenticação; 401/403 sem credencial). Sem credencial, dependência ou rota nova; proxy `auth_request` do ADR-004 não é reutilizado (cobre só Langfuse).
 - **Teste primeiro:**
-  - [ ] Teste de configuração + scrape: `curl -s localhost:8080/actuator/prometheus` contém os 14 nomes congelados (7 lógicos caracterizados em MET-14, 7 exposição); nenhum outro.path de métrica responde 200.
-  - [ ] Ajustar exposição somente após o teste; não criar controller novo.
+  - [ ] `IT/ChatMetricsExposureIT.java`: MockMvc com `remoteAddr` `127.0.0.1` e `::1` ⇒ 200 no scrape; com `203.0.113.10` ⇒ 403 e corpo `{"error": "Acesso negado"}` — inclusive com `get("/hive/actuator/prometheus").contextPath("/hive")`, pois a produção usa `context-path=/hive` e o entry point deve comparar o path sem o prefixo do contexto.
+  - [ ] Mesmo IT: `/actuator/health`, `/actuator/health/**` e `/actuator/info` ⇒ 200 sem credencial; `/actuator/env` ⇒ 404 com usuário autenticado (e 401/403 sem credencial, pela cadeia atual).
+  - [ ] `IT/ChatMetricsExposureIT.java`: `curl -s localhost:8080/actuator/prometheus` contém os 14 nomes congelados (7 lógicos caracterizados em MET-14, 7 exposição); nenhum outro path de métrica responde 200.
+  - [ ] Ajustar `SecurityConfig.java` somente depois que os testes existirem; não criar controller, credencial ou registry novo; não editar `application.properties`.
 - **Cenários:**
-  - Sucesso: scrape 200 com as 7 séries.
-  - Falha: série ausente ⇒ corrigir registro no ponto de origem, não no endpoint.
-  - Borda: registry Prometheus ausente ⇒ falha no teste; `POM:114` já traz Actuator, adicionar somente se o teste provar ausência.
+  - Sucesso: scrape 200 em loopback com as 7 séries; health/info 200 sem credencial; env 404 com usuário autenticado.
+  - Falha: série ausente ⇒ corrigir registro no ponto de origem, não no endpoint; IP externo com 200 ⇒ corrigir a expressão na chain `@Order(2)`, nunca no proxy do ADR-004.
+  - Borda: IPv6 `::1` permitido e `203.0.113.10` negado; `/actuator/env` sem credencial ⇒ 401/403 pela cadeia atual, com credencial ⇒ 404 pela `exposure.include` (sem `show-values` novo); registry Prometheus ausente ⇒ falha no teste (`POM:114` já traz Actuator).
 - **DoD:**
-  - [ ] Teste escrito antes da configuração.
-  - [ ] `mvn -f backend/pom.xml -Pintegration verify -Dtest=ChatMetricsExposureIT` verde.
-  - [ ] 0 controller/endpoint de métricas novo.
+  - [ ] Testes escritos antes da edição de `SecurityConfig.java`.
+  - [ ] `mvn -f backend/pom.xml -Pintegration verify -Dit.test=ChatMetricsExposureIT` verde (loopback, remoto, `context-path=/hive`, health/info/env).
+  - [ ] `git diff --name-only` ⇒ 0 alteração em `RES/application.properties`, 0 controller/endpoint de métricas novo, único arquivo de código alterado é `SecurityConfig.java` na chain `@Order(2)`.
 
 ### MET-10 — Normalização de buckets de usage (decisão do operador)
 
@@ -416,7 +419,7 @@ graph TD
 
 - **RF/NFR:** NFR-08 · **Prioridade:** P0 · **Risco:** Alto · **Tipo:** qualidade · **Depende de:** MET-08, MET-12, MET-16, MET-19 · **Dependency Type:** Hard · **Paralelizável:** Não
 - **Arquivos:** nenhum de produto neste passo; suíte canônica e `git diff --name-only`.
-- **Contexto/Impacto:** métricas e custo não alteram resposta, cota, limites `m/c/t`, `turnId`/`clientId`, autenticação ou headers de rate limit — com exporter up/down e com/sem model definition.
+- **Contexto/Impacto:** métricas e custo não alteram resposta, cota, limites `m/c/t`, `turnId`/`clientId`, autenticação ou headers de rate limit — com exporter up/down e com/sem model definition. Única exceção de diff autorizada é a chain `@Order(2)` de `SecurityConfig.java` para o scrape (MET-08); regras de autenticação do chat permanecem intactas.
 - **Teste primeiro:**
   - [ ] Caracterização da resposta de chat nos estados (exporter up/down, definition presente/ausente) + `npm test` + `mvn -f backend/pom.xml -Pintegration verify` + `git diff --name-only`.
   - [ ] Corrigir somente o que o teste acusar; nenhuma mudança de contrato.
@@ -426,7 +429,7 @@ graph TD
   - Borda: nenhuma UI nova nesta fatia ⇒ H3/frontend N/A.
 - **DoD:**
   - [ ] Testes/caracterização executados antes do fechamento.
-  - [ ] 0 falhas; 0 diff em contrato/cota/RBAC/autenticação.
+  - [ ] 0 falhas; 0 diff em contrato/cota/RBAC/regras de autenticação do chat; diff em `SecurityConfig.java` restrito ao scrape.
 
 ### MET-22 — Delta Specs e escopo de escrita
 
@@ -466,6 +469,7 @@ graph TD
 
 - [ ] 23 tasks MET-01..MET-23 ↔ 23 RF/NFR da SPEC (13 RF + 10 NFR), 1:1 sem órfão.
 - [ ] Toda constraint da Interface congelada mapeada para BDD: 7 séries e 7 exposições, tipos, tags, nome canônico `chat_telemetry_export_failures_total`, `token_type` de 3 valores, `usage_details` excludente com `input_cached_tokens`, zero custo, `query` JSON com `sum_totalCost`, sem OTLP metrics, flag herdada.
+- [ ] Decisão B de exposição coberta 1:1 em MET-08: scrape loopback 200 (IPv4/IPv6), IP externo 403, health/health/**/info 200 sem credencial, env 404 com credencial, `application.properties` inalterado; nenhum ticket novo criado.
 - [ ] Toda task tem cenário de Sucesso, Falha (Failure Mode) e Borda/Idempotência.
 - [ ] Toda task lista arquivo de teste antes do arquivo de implementação/configuração.
 - [ ] Grafo Mermaid sem ciclo e sem órfã (MET-13 é raiz; MET-21/MET-22 são folhas).
@@ -480,5 +484,6 @@ graph TD
 - **Normalização (MET-10):** decisão do operador de 2026-11-25; `input_cached_tokens` existe **somente** em `usage_details`, nunca como 4º valor de `token_type` em `chat.provider.tokens` (RF-07 × RF-10). Exemplo executável 17903/17817/188/18091 vem da doc oficial (§12), não é número inventado.
 - **Ponto de prova do RF8:** MET-09 (payload sem custo) + MET-11 (`sum_totalCost`) + MET-12 (definition) formam a cadeia; MET-23 cobre o caso "sem definition = 0".
 - **Nome canônico (MET-05/MET-14):** par único `chat.telemetry.export.failures` → `chat_telemetry_export_failures_total`; ADR-002 garante o incremento, ADR-005 a definição/exposição; grafia antiga proibida.
+- **Exposição (MET-08, emenda 2026-11-25):** decisão B do architect é aplicada na chain `@Order(2)` de `SecurityConfig.java` (único arquivo de código autorizado). Proxy `auth_request` do ADR-004 (só Langfuse), Basic auth e porta de management separada foram descartados no ADR — não reabrir aqui; coletor em outro host exige nova decisão.
 - **Fora deste backlog:** código, branch, `VERIFY.md`, merge, `workflow-state.json`; nenhum arquivo de ADR-001/002/003/004, PRD, RESEARCH ou ADR-INDEX foi alterado.
-- **Gap de check (encaminhar ao orquestrador, não resolvido aqui):** `runPrdChecks('.')` reporta `ADR-01 FAIL` para `ADRs/ADR-004-acesso-retencao/ unit=adr sem SPEC.md/TASKS.md` — arquivos fora da autoridade deste subagent (constraint: só os 2 arquivos do ADR-005). Requer decisão do orquestrador/dono do ADR-004; não foi criado, alterado ou burlado nenhum check.
+- **Gap de check (encaminhar ao orquestrador, não resolvido aqui):** `runPrdChecks('.')` reporta `PRD-01 FAIL` pelo órfão pré-existente `.spec/prd/chat-model-override/PROPOSAL.md` (sem `PRD.md`); `ADR-01`/`ADR-02` seguem `PASS` após a emenda. Órfão fora da autoridade deste subagent (constraint: só os 2 arquivos do ADR-005). Requer decisão do orquestrador/dono do `chat-model-override`; nenhum check foi criado, alterado ou burlado.

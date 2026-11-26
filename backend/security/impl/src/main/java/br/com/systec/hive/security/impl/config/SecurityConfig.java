@@ -20,6 +20,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
@@ -77,17 +78,35 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/v1/auth/**", "/v1/user-accounts/create").permitAll()
                         .requestMatchers("/v1/public/**").denyAll()
+                        // ADR-005 Decisão 7: scrape somente por loopback; fora ⇒ 403 pelo accessDeniedHandler.
+                        .requestMatchers(HttpMethod.GET, "/actuator/prometheus")
+                        .access(new WebExpressionAuthorizationManager(
+                                "hasIpAddress('127.0.0.1') or hasIpAddress('::1')"))
+                        // Probes seguem públicos; os demais actuator caem em authenticated() e 404 pela exposure list.
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers(
                                 "/**.html",
                                 "/webjars/**",
                                 "/configuration/**",
-                                "/actuator/**",
                                 "/manager/**",
                                 "/notification/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 ).exceptionHandling(ex -> ex
                         .authenticationEntryPoint((req, res, excep) -> {
+                            // Decisão 7: IP fora da loopback é negação de scrape (403), não falta de token.
+                            String uri = req.getRequestURI();
+                            String contextPath = req.getContextPath();
+                            String path = contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)
+                                    ? uri.substring(contextPath.length())
+                                    : uri;
+                            if ("GET".equals(req.getMethod())
+                                    && "/actuator/prometheus".equals(path)) {
+                                res.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                                res.setContentType("application/json");
+                                res.getWriter().write("{\"error\": \"Acesso negado\"}");
+                                return;
+                            }
                             res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             res.getWriter().write("{\"error\": \"Token inválido ou expirado\"}");
                         })

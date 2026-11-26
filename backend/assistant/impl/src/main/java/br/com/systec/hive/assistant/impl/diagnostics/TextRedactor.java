@@ -11,9 +11,10 @@ import java.util.function.Function;
  */
 public final class TextRedactor {
 
-    public static final String FAILURE_METRIC = "chat.telemetry.redaction.failures.total";
+    public static final String FAILURE_METRIC = "chat.telemetry.redaction.failures";
 
     private final Function<String, String> policy;
+    private final Runnable onFailure;
     private final LongAdder failures = new LongAdder();
 
     public TextRedactor() {
@@ -22,7 +23,13 @@ public final class TextRedactor {
 
     /** Injeção de política para os canários de falha; a produção usa a política congelada. */
     public TextRedactor(Function<String, String> policy) {
+        this(policy, () -> { });
+    }
+
+    /** O callback é o registro Micrometer do ADR-005; o contador local do ADR-003 permanece. */
+    public TextRedactor(Function<String, String> policy, Runnable onFailure) {
         this.policy = Objects.requireNonNull(policy);
+        this.onFailure = Objects.requireNonNull(onFailure);
     }
 
     public void captureInput(String raw) {
@@ -53,6 +60,7 @@ public final class TextRedactor {
             // Sem getMessage(): a exceção pode carregar o texto bruto do provider.
             if (TextCarrier.markFailed()) {
                 failures.increment();
+                onFailure.run();
             }
         }
     }

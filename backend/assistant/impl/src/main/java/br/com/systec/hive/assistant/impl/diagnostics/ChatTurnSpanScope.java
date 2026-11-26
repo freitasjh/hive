@@ -64,6 +64,9 @@ public final class ChatTurnSpanScope {
         turn.attempt++;
         Map<String, String> attributes = new LinkedHashMap<>(turn.baseAttributes);
         SpanAttributeMapper.typeAndTrace(attributes, "generation");
+        if (attributes.get("model") != null) {
+            attributes.put(SpanAttributeMapper.KEY_MODEL_NAME, attributes.get("model"));
+        }
         attributes.put(SpanAttributeMapper.KEY_ATTEMPT, Integer.toString(turn.attempt));
         MutableSpan child = new MutableSpan(SpanAttributeMapper.CHILD_NAME, "generation", turn.traceId,
                 newId(16), turn.rootSpanId, false, attributes, nowNanos());
@@ -72,6 +75,11 @@ public final class ChatTurnSpanScope {
     }
 
     public static void attemptSucceeded(Integer inputTokens, Integer outputTokens, Integer totalTokens) {
+        attemptSucceeded(inputTokens, outputTokens, totalTokens, null);
+    }
+
+    public static void attemptSucceeded(Integer inputTokens, Integer outputTokens, Integer totalTokens,
+                                        Integer cachedTokens) {
         MutableSpan attempt = attemptToClose();
         if (attempt == null) {
             return;
@@ -79,6 +87,10 @@ public final class ChatTurnSpanScope {
         putNumber(attempt.attributes, "usage.input", inputTokens);
         putNumber(attempt.attributes, "usage.output", outputTokens);
         putNumber(attempt.attributes, "usage.total", totalTokens);
+        if (inputTokens != null || outputTokens != null || totalTokens != null || cachedTokens != null) {
+            attempt.attributes.put(SpanAttributeMapper.KEY_USAGE_DETAILS,
+                    UsageBucketsNormalizer.of(inputTokens, cachedTokens, outputTokens, totalTokens).usageDetails());
+        }
         attachText(attempt);
         attempt.endNano = nowNanos();
         detachCurrentAttempt();

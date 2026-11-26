@@ -52,7 +52,7 @@ class LangfuseOtlpSamplingIT {
 
             assertThat(sink).isNotInstanceOf(LangfuseOtlpSpanSink.class);
             assertThat(server.requests()).isEmpty();
-            assertThat(registry.scrape()).contains("chat_telemetry_export_failures_total 1.0");
+            assertThat(registry.scrape()).contains("chat_telemetry_export_failures_total{sink=\"langfuse\"} 1.0");
         }
     }
 

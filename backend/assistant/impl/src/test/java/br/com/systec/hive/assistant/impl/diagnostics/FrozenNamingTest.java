@@ -52,6 +52,10 @@ class FrozenNamingTest {
                 .filter(key -> key.startsWith("langfuse."))
                 .collect(Collectors.toSet());
 
-        assertThat(emitted).isNotEmpty().isSubsetOf(SpanAttributeMapper.FROZEN_LANGFUSE_KEYS);
+        // ADR-005 acrescenta duas chaves ao filho generation; o conjunto ADR-001 permanece intacto.
+        Set<String> allowed = new java.util.HashSet<>(SpanAttributeMapper.FROZEN_LANGFUSE_KEYS);
+        allowed.add(SpanAttributeMapper.KEY_MODEL_NAME);
+        allowed.add(SpanAttributeMapper.KEY_USAGE_DETAILS);
+        assertThat(emitted).isNotEmpty().isSubsetOf(allowed);
     }
 }
