@@ -15,6 +15,7 @@ unit: legacy
 > Insumo: `PRD.md` §16 (`prd_version: 2`, aprovado em 2026-11-26), `RESEARCH.md` (S1..S16), parecer `product-manager` 2026-11-26 (Q1–Q3; Q4/Q5 ficaram com o architect).
 > **Emenda 1 (2026-11-26)** — security review P1: achado F3 🟠, `passed_with_findings`, zero 🔴. Corrige D7/§6: cancel degradado **não** libera o gate; o restante do ADR permanece inalterado.
 > **Emenda 2 (2026-11-27)** — code review `ses_de2f27ae5ffet5zG6pjzCIg7BZ` (2 🔴): CR-01 distingue cancel **suportado** (liberação imediata) de **degradado** (retenção até terminal/janela) — **não revoga a Emenda 1**; AT-02 resolve a paridade do prompt com porta em `ai/api` e política injetada pelo assistant. Reabre somente este ADR.md.
+> **Emenda 3 (2026-11-27)** — BugReview `chat-sse-consumer` (1 🔴): `TurnStreamEvent.Done` passa a carregar `UUID sessionId` opcional para vincular o primeiro turno SSE na sidebar; não revoga as Emendas 1/2. Escopo: `ai/api` + `assistant/impl` + IT; contrato público inalterado.
 
 ## 1. Decisão
 
@@ -30,6 +31,7 @@ unit: legacy
 | D8 (fechamento P2) | **RF-10 — (a) aceitar como extensão compatível**: acrescentar `default createStreamingClientWithSession(...)` em `LlmStreamingClientFactory`, espelho de `LlmClientFactory.createClientWithSession(...)` (`backend/provider/api/.../LlmClientFactory.java:23-26`). **Assinatura existente `createStreamingClient(...)` permanece intacta**; o `default` é aditivo e não exige emenda da interface congelada. Implementação em `provider/langchain4j` faz override para aplicar `opencodeHeaders(sessionId)`/guards (F4 🟡). Ver §4.1. |
 | D9 (emenda 2 / CR-01 🔴) | **Cancel suportado**: se `streamingHandle().cancel()` retorna sem `UnsupportedFeatureException`, chamar `releaseGateOnce()` **imediatamente**. A biblioteca 1.19.0 **não** dispara `onCompleteResponse`/`onError` quando `isCancelled() == true` (S24); sem isso o semáforo fica em 0 e a sessão trava. **Compatível com a Emenda 1/F3**, que tratou somente o ramo degradado (`isCancelled() == false`, gate retido até terminal/janela de 5 s). CAS torna ambos os ramos idempotentes. Ver §6. |
 | D10 (emenda 2 / AT-02 🔴) | **Paridade system/user (RF-02)**: adotar **(b) porta em `ai/api` com política injetada pelo assistant**. Nova `TurnPromptPolicy` em `ai/api`; implementação em `assistant/impl` reaproveita a regra existente `systemFor` e a constante `PROMPT` — **sem duplicar texto de prompt** e sem mover política para `ai/**`. `ai/**` continua folha; nenhuma aresta nova `impl → impl`. `TurnRequest` **não** muda. Ver §4.2. |
+| D11 (emenda 3 / BugReview 🔴) | **Decisão confirmada**: `record Done(FinishReason, TokenUsage, UUID sessionId)` com construtor de 2 args delegando para `sessionId = null` (compatibilidade com chamadores/mappers existentes). `AssistantStreamServiceImpl.java:65` já tem `prepared.sessionId()` e passa o 3º argumento; o serializador assistant emite `"sessionId"` apenas quando não nulo. **Sem mudar `TurnReply`, sem persistir thinking, sem alterar o endpoint público.** Ver §4.3. |
 
 ## 2. Motivo
 
@@ -90,7 +92,10 @@ public interface AssistantStreamDefault {
 public sealed interface TurnStreamEvent permits Reasoning, Text, Done, Failed {
     record Reasoning(String text) implements TurnStreamEvent {}          // texto nunca vazio
     record Text(String text) implements TurnStreamEvent {}               // texto nunca vazio
-    record Done(FinishReason finishReason, TokenUsage usage) implements TurnStreamEvent {}
+    record Done(FinishReason finishReason, TokenUsage usage, UUID sessionId) implements TurnStreamEvent {
+        // emenda 3: compatibilidade — chamadores antigos seguem compilando sem sessionId
+        public Done(FinishReason finishReason, TokenUsage usage) { this(finishReason, usage, null); }
+    }
     record Failed(String code, Throwable cause) implements TurnStreamEvent {}
 }
 
@@ -126,6 +131,7 @@ Regras congeladas:
 7. Retry: no máximo as tentativas já configuradas em `LlmRetryPolicy`; sem retry após `Reasoning`/`Text`.
 8. Sem `Flux`, sem `langchain4j-reactor` (S8), sem bump, sem starter, sem persistência de thinking, sem moderação por chunk.
 9. **Modelo de dados**: nenhuma tabela/coleção nova, nenhuma migration; eventos são efêmeros em memória, thinking medido por contagem de chars, nunca conteúdo.
+10. **Emenda 3 — `Done.sessionId()` é identificador opcional** (`UUID`, `null` permitido); o construtor de 2 args preserva todos os chamadores existentes. O valor é propagado somente pelo caminho assistant (`prepared.sessionId()`), não é texto de thinking, não entra em `TurnReply`, log, `ChatTrace` nem JPA.
 
 ### 4.1 RF-10 — decisão (a): extensão compatível, não emenda da interface
 
@@ -146,6 +152,16 @@ Regras congeladas:
 **Módulos tocados pelo implementador (escopo):** `ai/api` (nova porta), `ai/impl` (construtor do gateway + uso da porta + `null→""` no user), `assistant/impl` (impl da política + delegação em `systemFor`), `bootstrap` (wire do bean), mais fixtures/testes que constroem `LangChain4jTurnStreamGateway`. **`publicapi/impl` inalterado**; zero aresta `impl → impl`; zero texto de prompt novo; zero mudança HTTP/SSE.
 
 **Consequência se estiver errado:** se o bean não for injetado, falha rápido no bootstrap (construtor) — melhor que divergência silenciosa; se a regra `null→""` faltar, o `@UserMessage` recebe `null` no streaming e o prompt diverge do sync. Gate: IT de paridade compara `system`/`user`/`prior` sync × streaming byte a byte.
+
+### 4.3 Emenda 3 — `Done.sessionId` para vincular o primeiro turno SSE
+
+**Problema:** BugReview `chat-sse-consumer` (1 🔴) — o frontend recebe o `done` do assistant sem `sessionId`; num primeiro turno a conversa não é vinculada na sidebar. `AssistantStreamServiceImpl.java:65` já tem `prepared.sessionId()`; `AssistantSseSerializer.java:28-42` só escreve `finish_reason`/`usage`.
+
+**Decisão (confirmada sem ajustes):** estender o record para `Done(FinishReason finishReason, TokenUsage usage, UUID sessionId)` e manter um construtor de 2 args que delega para `null`. A compatibilidade é real: mapper/tests que constroem `Done` com 2 args continuam compilando; o caminho assistant passa `prepared.sessionId()` e o serializador só inclui `"sessionId"` quando não nulo. O campo é um **identificador de sessão já conhecido pelo cliente autenticado**, não conteúdo de pensamento — nenhum risco novo de vazamento.
+
+**Escopo do implementador:** `ai/api` (record + construtor), `assistant/impl` (`AssistantStreamServiceImpl` passa o 3º args), `assistant/web/internal/v1` (`AssistantSseSerializer.done` inclui o campo quando não nulo) e IT. **Fora:** `TurnReply`, persistência de thinking, serializador público, handlers HTTP, ADR-002 §4.1. `doneWithoutUsage()` (terminal de erro) continua sem `sessionId`: nesse caminho não há nova conversa para vincular; se passar a persistir, o campo deve ser acrescentado por nova emenda.
+
+**Consequência se estiver errado:** se o construtor de 2 args for removido, quebra mappers/tests existentes (compatibilidade); se o serializador público passar a emitir `sessionId`, muda contrato OpenAI-compatible (fora do escopo). Gate: IT assere `done.sessionId == prepared.sessionId()` no assistant e nenhum campo extra no chunk final público.
 
 ## 5. Q5 — o `ReentrantLock` do PRD §10 cobre callbacks assíncronos?
 
@@ -254,7 +270,8 @@ Sem aresta nova `impl → impl`; `ai/**` folha; nenhum tipo de web/publicapi ent
 5. Testes: paridade 1:1 do prompt síncrono × streaming (RF2/AT-02, comparando `system`/`user`/`prior` byte a byte); IT RF3; erro antes/depois do 1º token; concorrência sync×stream (RF8); IT de cancel suportado (`availablePermits() == 1` imediato, sem terminal callback) **e** degradado (`== 0` imediato, `== 1` só no terminal natural ou janela de 5 s).
 6. RF-10: `grep -r 'createStreamingClientWithSession' backend/provider/**` → `default` na interface + override em `provider/langchain4j`; IT assere `sessionId`/headers do chamador no cliente de streaming (F4 🟡).
 7. AT-02: `grep -rl 'interface TurnPromptPolicy' backend/**` → 1 em `ai/api`; `grep -r 'PROMPT' backend/ai/**` → zero (política não duplicada); `grep -r 'TurnPromptPolicy' backend/bootstrap/**` → wire presente; IT de paridade sync × streaming (§4.2).
-8. `npm test` EXIT=0; `code-reviewer` sem 🔴 (CR-01/AT-02 fechados); `security-review` P4 sem F3 reaberto; zero diff MFA/contrato HTTP/migrations.
+8. Emenda 3: `grep -n 'record Done' backend/ai/api/**` → 3 args; construtor de 2 args presente delegando `null`; IT assere `done.sessionId() == prepared.sessionId()` no assistant e `sessionId` ausente no chunk final público; `grep -r 'sessionId' backend/publicapi/web/**` → nenhum campo novo no wire público.
+9. `npm test` EXIT=0; `code-reviewer` sem 🔴 (CR-01/AT-02/Emenda 3 fechados); `security-review` P4 sem F3 reaberto; zero diff MFA/contrato HTTP/migrations.
 
 ## 11. Fora desta decisão
 

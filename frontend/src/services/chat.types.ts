@@ -72,6 +72,8 @@ export interface ChatMessageDTO {
   role: string
   content: string
   createAt: string
+  /** Raciocínio incrementado pelos eventos `thinking` do stream SSE. */
+  reasoning?: string
 }
 
 export interface CreateSessionDTO {

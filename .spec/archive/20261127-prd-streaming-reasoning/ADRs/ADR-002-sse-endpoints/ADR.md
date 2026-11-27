@@ -13,6 +13,7 @@ unit: legacy
 
 > Unidade de decisão: 1 ADR = 1 branch = 1 PR (merge humano). Decision-only: `status: todo`, `unit: legacy`; sem SPEC/TASKS/código neste lote.
 > Depende de ADR-001 (evento `TurnStreamEvent`, `TurnStreamGateway`, `StreamingTurnHandle`, gate por `@MemoryId`). Insumos: `PRD.md` §16 (`prd_version: 2`), `RESEARCH.md` (S1..S16), parecer `product-manager` 2026-11-26 (Q1–Q3). Q4/Q4 respondidos aqui.
+> **Emenda 3 (2026-11-27)** — BugReview `chat-sse-consumer` (1 🔴): evento `done` do assistant passa a incluir `"sessionId"` quando não nulo, para vincular o primeiro turno na sidebar. Contrato do endpoint público inalterado; não revoga Emenda 1/ADR-001 nem E8′.
 
 ## 1. Decisão
 
@@ -26,6 +27,7 @@ unit: legacy
 | E6 | **Q3 — degradação**: sem thinking ⇒ **omitir** chunks/eventos de thinking; nunca frame vazio, nunca `reasoning_content: ""`, nunca evento `thinking` com texto nulo. `done`/`[DONE]` é o único sinal de conclusão (presente também no erro). Se o provider cancelar, não há usage nem `[DONE]` observáveis — cliente já foi embora (R6). |
 | E7 | **Q4 — ordem**: o mapper **não ordena por tipo**; emite na ordem de chegada dos callbacks `onPartialThinking`/`onPartialResponse` (S2). Sem buffer, sem reordenação, sem garantia cross-provider de "thinking sempre antes de texto". A separação em canais é a garantia; a ordem relativa é a do provider normalizado (S14). |
 | E8′ (alinhada à Emenda 1/ADR-001) | **timeout/cancel**: `new SseEmitter(120_000L)`; `onCompletion`, `onError` e `onTimeout` chamam `handle.cancel()` de ADR-001 (idempotente, degrada `UnsupportedFeatureException` — R1). `sink` não emite após terminal; emitter fechado pelo transporte. **No cancel degradado o gate NÃO é liberado**: `availablePermits() == 0` imediatamente após `cancel()`; `== 1` somente no terminal natural do provider ou após a janela de `5_000 ms` (≤120 s), o que vier primeiro (ADR-001 D7′/§6). |
+| E9 (emenda 3 / BugReview 🔴) | **`done` do assistant com `sessionId` opcional**: `AssistantSseSerializer.done(...)` inclui `"sessionId"` no payload quando `TurnStreamEvent.Done.sessionId() != null` (valor vindo de `AssistantStreamServiceImpl.java:65`, `prepared.sessionId()`). Quando nulo, o campo é **omitido** — clients antigos e o terminal `doneWithoutUsage()` seguem válidos. `POST /v1/public/v1/chat/completions` **não** ganha campo novo: `sessionId` é consumo exclusivo do serializador assistant (ADR-001 §4.3). |
 
 ## 2. Motivo
 
@@ -103,13 +105,13 @@ event: text
 data: {"type":"text","text":"..."}
 
 event: done
-data: {"type":"done","finish_reason":"stop","usage":{"prompt_tokens":12,"completion_tokens":34,"total_tokens":46}}
+data: {"type":"done","finish_reason":"stop","usage":{"prompt_tokens":12,"completion_tokens":34,"total_tokens":46},"sessionId":"<uuid do turno>"}
 
 event: error
 data: {"type":"error","error":{"code":"stream_failed","message":"..."}}
 ```
 
-`thinking` e `text` omitidos quando vazios (Q3). No erro: `error` → `done` → `complete()`; `done` sem `usage` se o provider não entregou (R6). Sem `completeWithError`.
+`thinking` e `text` omitidos quando vazios (Q3). No erro: `error` → `done` → `complete()`; `done` sem `usage` se o provider não entregou (R6). Sem `completeWithError`. **Emenda 3:** `"sessionId"` aparece no `done` somente quando `Done.sessionId()` não é nulo; o exemplo acima mostra o caso do primeiro turno assistant, em que o frontend precisa do UUID para vincular a conversa na sidebar. `doneWithoutUsage()` (terminal de erro) segue sem o campo — não cria conversa nova. O contrato público (§4.1) permanece exatamente como escrito: nenhum `sessionId` no chunk final OpenAI-compatible.
 
 ### 4.3 Regras comuns congeladas
 
@@ -181,7 +183,8 @@ Se qualquer critério acionar: **abrir ADR-003 (ou emenda deste) antes de trocar
 4. IT de `stream_options`: `{"include_usage":true,"future_flag":1}` → 200, sem 400; `unknown=false` preservado.
 5. IT de concorrência sync×stream (RF8, ADR-001 §5); IT de degradação R1 (ADR-001 §6).
 6. `grep -r 'Flux\|reactor\|reasoning_tokens' backend/**/web/** backend/**/publicapi/**` → zero (exceto documento de decisão).
-7. `npm test` EXIT=0; H3 quando aplicável; `code-reviewer` sem 🔴; zero diff de handlers HTTP, MFA e migrations.
+7. Emenda 3: IT `MockMvc` do assistant assere `done.sessionId == prepared.sessionId()` quando o gateway emite o UUID; IT de `Done` com `sessionId == null` assere campo **ausente**; IT do endpoint público assere nenhum `"sessionId"` no chunk final. `grep -n 'sessionId' backend/assistant/web/internal/v1/**/AssistantSseSerializer.java` → presente somente em `done(...)`.
+8. `npm test` EXIT=0; H3 quando aplicável; `code-reviewer` sem 🔴 (Emenda 3 fechada); zero diff de handlers HTTP, MFA e migrations.
 
 ## 11. Fora desta decisão
 

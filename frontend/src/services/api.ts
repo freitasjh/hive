@@ -45,6 +45,8 @@ export { decodeTenantId } from "./jwt"
 
 export const API_BASE = "/hive/v1"
 const DEFAULT_TIMEOUT_MS = 15_000
+// SseEmitter do assistant: 120s; 10s de margem para o provider responder.
+const STREAM_TIMEOUT_MS = 130_000
 const LOGIN_HASH = "#login"
 
 export class ApiError extends Error {
@@ -302,5 +304,198 @@ async function performRequest<T>(
   } finally {
     if (signal && onAbort) signal.removeEventListener("abort", onAbort)
     if (timer) clearTimeout(timer)
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* SSE — eventos nomeados do assistant (/v1/chat/stream)                       */
+/* -------------------------------------------------------------------------- */
+
+export interface SseFrame {
+  event: string
+  data: string
+}
+
+export interface ApiStreamOptions {
+  method?: "GET" | "POST"
+  body?: unknown
+  signal?: AbortSignal
+  timeoutMs?: number
+  headers?: Record<string, string>
+}
+
+/**
+ * Parse de frames SSE conforme WHATWG: linhas `event:`/`data:`, `data:` múltiplas
+ * concatenadas com `\n`, comentários (`:`) e campos `id`/`retry` ignorados.
+ * `flush` devolve o frame pendente quando o stream fecha sem linha em branco.
+ * Fonte: https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation
+ * (consultado em 2026-11-27).
+ */
+export function parseSseFrames(
+  buffer: string,
+  flush = false
+): { frames: SseFrame[]; rest: string } {
+  const frames: SseFrame[] = []
+  let event = ""
+  const data: string[] = []
+  let cursor = 0
+  /** Início do frame ainda não fechado; volta no rest para o próximo chunk. */
+  let frameStart = 0
+
+  const dispatch = () => {
+    if (event || data.length > 0) {
+      frames.push({ event: event || "message", data: data.join("\n") })
+    }
+    event = ""
+    data.length = 0
+    frameStart = cursor
+  }
+  const accept = (line: string) => {
+    if (line === "") {
+      dispatch()
+    } else if (line.startsWith(":")) {
+      return // heartbeat/comentário
+    } else if (line.startsWith("event:")) {
+      event = line.slice("event:".length).trim()
+    } else if (line.startsWith("data:")) {
+      // SSE remove exatamente um espaço após o dois-pontos.
+      data.push(line.slice("data:".length).replace(/^ /, ""))
+    }
+    // id:/retry:/campos desconhecidos não são usados pelo cliente.
+  }
+
+  // Só consome linhas terminadas por \n. O que sobra (inclusive um `event:`
+  // ainda sem linha em branco) volta no rest para o próximo chunk — sem isso
+  // o nome do evento se perde quando o chunk corta o `data:` no meio.
+  while (cursor < buffer.length) {
+    const end = buffer.indexOf("\n", cursor)
+    if (end === -1) break
+    accept(buffer.slice(cursor, end).replace(/\r$/, ""))
+    cursor = end + 1
+  }
+
+  if (flush) {
+    // WHATWG descarta frame incompleto no EOF; o SseEmitter do Spring fecha com
+    // linha em branco, então despachar o resto aqui não muda o wire observado.
+    if (cursor < buffer.length) accept(buffer.slice(cursor).replace(/\r$/, ""))
+    dispatch()
+    return { frames, rest: "" }
+  }
+  return { frames, rest: buffer.slice(frameStart) }
+}
+
+/** Abrir o stream com a mesma política de credenciais de `performRequest`. */
+async function streamFetch(
+  path: string,
+  options: ApiStreamOptions,
+  controller: AbortController
+): Promise<Response> {
+  const { method = "POST", body } = options
+  const headers: Record<string, string> = {
+    Accept: "text/event-stream",
+    "Cache-Control": "no-cache",
+  }
+  const token = getToken()
+  if (token && !isAuthRequest(path)) headers.Authorization = `Bearer ${token}`
+  const tenantId = getTenantId()
+  if (tenantId) headers["X-Tenant-ID"] = tenantId
+  if (body !== undefined) headers["Content-Type"] = "application/json"
+  for (const [key, value] of Object.entries(options.headers ?? {})) {
+    if (PROTECTED_HEADERS.has(key.toLowerCase())) continue
+    headers[key] = value
+  }
+
+  return fetch(buildUrl(path), {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    credentials: "include", // cookie HttpOnly do refresh
+    cache: "no-store",
+    signal: controller.signal,
+  })
+}
+
+/**
+ * Consome `text/event-stream` com `fetch` + `getReader()`. `EventSource` é
+ * proibido (não envia Authorization) e token nunca entra em query string.
+ * 401 usa o MESMO refresh single-flight de `apiRequest`, com retry único.
+ * Abort externo encerra sem erro; timeout gera ApiError(TIMEOUT). O controller
+ * é abortado ao final para cancelar o emitter no backend.
+ */
+export async function* apiStreamFrames(
+  path: string,
+  options: ApiStreamOptions = {}
+): AsyncGenerator<SseFrame> {
+  const controller = new AbortController()
+  let timedOut = false
+  let onAbort: (() => void) | undefined
+  if (options.signal) {
+    if (options.signal.aborted) controller.abort()
+    else {
+      onAbort = () => controller.abort()
+      options.signal.addEventListener("abort", onAbort, { once: true })
+    }
+  }
+  const timer =
+    options.timeoutMs === 0
+      ? undefined
+      : setTimeout(() => {
+          timedOut = true
+          controller.abort()
+        }, options.timeoutMs ?? STREAM_TIMEOUT_MS)
+
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
+  // Credencial usada no primeiro envio — congela antes do fetch, como performRequest.
+  const sentToken = getToken()
+  try {
+    let response = await streamFetch(path, options, controller)
+    if (response.status === 401 && !isAuthRequest(path)) {
+      const current = getToken()
+      if (!current) {
+        clearSession()
+        redirectToLogin()
+      } else if (current !== sentToken) {
+        // Outra aba rotacionou enquanto o stream aguardava o 401: repetir com o
+        // token vigente, sem nova refresh (blacklistaria o JTI recém-emitido).
+        if (!options.signal?.aborted) response = await streamFetch(path, options, controller)
+      } else {
+        try {
+          await refreshAccess()
+        } catch {
+          // refreshAccess já limpou sessão e redirecionou; mantém o 401 original.
+        }
+        if (!options.signal?.aborted) response = await streamFetch(path, options, controller)
+      }
+    }
+    if (!response.ok) {
+      const { detail, code } = failureMessage(response.status, undefined)
+      throw new ApiError(detail, response.status, code, detail)
+    }
+    if (!response.body) throw new ApiError("Stream indisponível.", 0, "STREAM_UNAVAILABLE")
+
+    reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const parsed = parseSseFrames(buffer + decoder.decode(value, { stream: true }))
+      buffer = parsed.rest
+      for (const frame of parsed.frames) yield frame
+    }
+    const tail = parseSseFrames(buffer + decoder.decode(), true)
+    for (const frame of tail.frames) yield frame
+  } catch (error) {
+    if (options.signal?.aborted) return
+    if (timedOut) throw new ApiError("Tempo limite atingido. Tente novamente.", 0, "TIMEOUT")
+    if (error instanceof Error && error.name === "AbortError") return
+    if (error instanceof ApiError) throw error
+    const message = error instanceof Error ? error.message : "Falha de rede."
+    throw new ApiError(redactSecrets(message || "Falha de rede."), 0, "NETWORK_ERROR")
+  } finally {
+    if (options.signal && onAbort) options.signal.removeEventListener("abort", onAbort)
+    if (timer) clearTimeout(timer)
+    if (reader) reader.releaseLock()
+    controller.abort() // cancela o emitter quando o consumidor encerra antes do fim
   }
 }

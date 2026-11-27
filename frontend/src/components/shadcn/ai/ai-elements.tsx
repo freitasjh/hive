@@ -251,10 +251,14 @@ export function Reasoning({
   durationSeconds,
   steps,
   defaultOpen = false,
+  label = "Raciocínio do modelo",
+  showMeta = true,
 }: {
   durationSeconds: number
   steps: string[]
   defaultOpen?: boolean
+  label?: string
+  showMeta?: boolean
 }) {
   const [open, setOpen] = useState(defaultOpen)
 
@@ -269,11 +273,13 @@ export function Reasoning({
         <div className="flex min-w-0 items-center gap-2">
           <BrainCircuit className="size-4 shrink-0 text-primary" />
           <span className="truncate text-xs font-semibold text-foreground">
-            Raciocínio do modelo
+            {label}
           </span>
-          <Badge variant="outline" className="font-mono text-[10px] tabular-nums">
-            {durationSeconds.toFixed(1)}s • {steps.length} etapas
-          </Badge>
+          {showMeta ? (
+            <Badge variant="outline" className="font-mono text-[10px] tabular-nums">
+              {durationSeconds.toFixed(1)}s • {steps.length} etapas
+            </Badge>
+          ) : null}
         </div>
         {open ? (
           <ChevronDown className="size-4 shrink-0 text-muted-foreground" />

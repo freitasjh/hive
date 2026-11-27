@@ -26,6 +26,22 @@ export const Default: Story = { args: { messages } }
 export const Loading: Story = { args: { loading: true } }
 export const Error: Story = { args: { error: "Não foi possível carregar o histórico." } }
 export const Generating: Story = { args: { messages, generating: true } }
+export const StreamingReasoning: Story = {
+  args: {
+    generating: true,
+    messages: [
+      { id: "1", sessionId: "s", role: "USER", content: "Resuma este texto", createAt: "2026-11-19T12:00:00Z" },
+      {
+        id: "2",
+        sessionId: "s",
+        role: "ASSISTANT",
+        content: "O texto trata de",
+        reasoning: "Mapeando o pedido\nSelecionando os pontos-chave",
+        createAt: "2026-11-19T12:01:00Z",
+      },
+    ],
+  },
+}
 export const Older: Story = { args: { messages, canLoadOlder: true } }
 export const Retry: Story = { args: { messages, retryable: true } }
 export const JumpTarget: Story = { args: { messages, targetMessageId: "2" } }

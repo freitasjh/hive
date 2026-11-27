@@ -13,6 +13,7 @@ import {
   RotateCcw,
   User,
 } from "lucide-react"
+import { Reasoning } from "@/components/shadcn/ai/ai-elements"
 import { Avatar, AvatarFallback } from "@/components/shadcn/ui/avatar"
 import { Bubble, BubbleContent } from "@/components/shadcn/ui/bubble"
 import { Button } from "@/components/shadcn/ui/button"
@@ -319,10 +320,21 @@ export function ChatThread({
                                   {message.content}
                                 </div>
                               ) : (
-                                <ChatMarkdown
-                                  content={message.content}
-                                  isAnimating={generating && index === messages.length - 1}
-                                />
+                                <>
+                                  {message.reasoning ? (
+                                    <Reasoning
+                                      durationSeconds={0}
+                                      steps={message.reasoning.split(/\n+/).filter(Boolean)}
+                                      label={t("chat.thread.reasoning")}
+                                      showMeta={false}
+                                      defaultOpen={generating && index === messages.length - 1}
+                                    />
+                                  ) : null}
+                                  <ChatMarkdown
+                                    content={message.content}
+                                    isAnimating={generating && index === messages.length - 1}
+                                  />
+                                </>
                               )}
                               {role === "ASSISTANT" ? (
                                 <MessageFooter className="gap-1 px-0">

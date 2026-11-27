@@ -28,6 +28,9 @@ public final class AssistantSseSerializer {
     public static NamedEvent done(TurnStreamEvent.Done event) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("type", "done");
+        if (event.sessionId() != null) {
+            data.put("sessionId", event.sessionId().toString());
+        }
         String reason = TurnStreamEvent.finishReasonName(event);
         data.put("finish_reason", reason == null ? "stop" : reason.toLowerCase(Locale.ROOT));
         Integer[] counts = TurnStreamEvent.tokenCounts(event);

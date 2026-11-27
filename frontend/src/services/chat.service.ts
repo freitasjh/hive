@@ -1,4 +1,4 @@
-import { apiRequest, unwrapData } from "./api"
+import { apiRequest, apiStreamFrames, unwrapData } from "./api"
 import type { AiProvider } from "./admin.types"
 import type { ChatRequestDTO, ChatResponseDTO } from "./chat.types"
 
@@ -8,6 +8,73 @@ const CHAT_TIMEOUT_MS = 130_000
 export interface ChatPayloadDefaults {
   provider?: AiProvider | null
   model?: string | null
+}
+
+export interface ChatStreamUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+/** Metadados do terminal `done`: finish_reason/usage e, desde a Emenda 3,
+ *  sessionId. timestamp/provider/model vêm quando o endpoint os expõe; o
+ *  chamador completa com o estado do turno (ver use-chat-controller). */
+export interface ChatStreamMeta {
+  type?: string
+  finishReason?: string | null
+  usage?: ChatStreamUsage
+  sessionId?: string | null
+  timestamp?: string | null
+  provider?: AiProvider | null
+  model?: string | null
+}
+
+export interface ChatStreamHandlers {
+  onThinking: (text: string) => void
+  onText: (chunk: string) => void
+  onDone: (meta: ChatStreamMeta) => void
+  onError: (code: string) => void
+}
+
+function frameRecord(raw: string): Record<string, unknown> | null {
+  if (!raw.trim() || raw.trim() === "[DONE]") return null
+  try {
+    const value: unknown = JSON.parse(raw)
+    return value && typeof value === "object" ? (value as Record<string, unknown>) : null
+  } catch {
+    return null
+  }
+}
+
+/** Código do conjunto fechado do backend; qualquer outra coisa vira stream_failed. */
+function safeStreamCode(value: unknown): string {
+  return typeof value === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(value)
+    ? value
+    : "stream_failed"
+}
+
+function streamMeta(record: Record<string, unknown>): ChatStreamMeta {
+  const usageRecord =
+    record.usage && typeof record.usage === "object"
+      ? (record.usage as Record<string, unknown>)
+      : null
+  const count = (value: unknown) =>
+    typeof value === "number" && Number.isFinite(value) ? value : 0
+  const meta: ChatStreamMeta = {}
+  if (typeof record.type === "string") meta.type = record.type
+  if (typeof record.finish_reason === "string") meta.finishReason = record.finish_reason
+  if (usageRecord) {
+    meta.usage = {
+      promptTokens: count(usageRecord.prompt_tokens),
+      completionTokens: count(usageRecord.completion_tokens),
+      totalTokens: count(usageRecord.total_tokens),
+    }
+  }
+  if (typeof record.sessionId === "string") meta.sessionId = record.sessionId
+  if (typeof record.timestamp === "string") meta.timestamp = record.timestamp
+  if (typeof record.provider === "string") meta.provider = record.provider as AiProvider
+  if (typeof record.model === "string") meta.model = record.model
+  return meta
 }
 
 /**
@@ -65,6 +132,53 @@ export const chatService = {
       timeoutMs: CHAT_TIMEOUT_MS,
     })
     return unwrapData<ChatResponseDTO>(body)
+  },
+
+  /**
+   * Consome os eventos nomeados `thinking`/`text`/`done`/`error` do assistant.
+   * Endpoint e payload são os mesmos de `sendMessage`, trocando apenas a rota.
+   * `error` e `[DONE]` são terminais: nada depois deles chega à UI.
+   */
+  async streamMessage(
+    input: ChatRequestDTO,
+    defaults: ChatPayloadDefaults | null | undefined,
+    handlers: ChatStreamHandlers,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const payload = buildChatPayload(input, defaults)
+    if (!payload) {
+      throw new Error("Informe uma mensagem antes de enviar.")
+    }
+
+    for await (const frame of apiStreamFrames("/chat/stream", {
+      method: "POST",
+      body: payload,
+      timeoutMs: CHAT_TIMEOUT_MS,
+      signal,
+    })) {
+      if (frame.data.trim() === "[DONE]") {
+        handlers.onDone({})
+        return
+      }
+      const record = frameRecord(frame.data)
+      if (!record) continue
+      const event = frame.event || (typeof record.type === "string" ? record.type : "message")
+
+      if (event === "thinking" || event === "text") {
+        const text = typeof record.text === "string" ? record.text : ""
+        if (text) (event === "thinking" ? handlers.onThinking : handlers.onText)(text)
+      } else if (event === "error") {
+        const body =
+          record.error && typeof record.error === "object"
+            ? (record.error as Record<string, unknown>)
+            : record
+        handlers.onError(safeStreamCode(body.code))
+        return
+      } else if (event === "done") {
+        handlers.onDone(streamMeta(record))
+        return
+      }
+    }
   },
 }
 
