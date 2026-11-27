@@ -23,8 +23,11 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -127,7 +130,7 @@ public class SecurityFilter extends OncePerRequestFilter {
             return false;
         }
         String clientIp = clientIp(request);
-        if (data.remoteIp() != null && !data.remoteIp().equals(clientIp)) {
+        if (data.remoteIp() != null && !sameClientIp(data.remoteIp(), clientIp)) {
             log.warn("Cookie de refresh da documentação com IP divergente");
             return false;
         }
@@ -155,6 +158,20 @@ public class SecurityFilter extends OncePerRequestFilter {
     private String clientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
         return forwarded == null || forwarded.isBlank() ? request.getRemoteAddr() : forwarded.split(",")[0].trim();
+    }
+
+    /** Compara por bytes; representações distintas do mesmo loopback valem como o mesmo cliente. Falha fecha. */
+    private boolean sameClientIp(String storedIp, String clientIp) {
+        try {
+            InetAddress stored = InetAddress.getByName(storedIp);
+            InetAddress client = InetAddress.getByName(clientIp);
+            if (stored.isLoopbackAddress() && client.isLoopbackAddress()) {
+                return true;
+            }
+            return Arrays.equals(stored.getAddress(), client.getAddress());
+        } catch (UnknownHostException e) {
+            return false;
+        }
     }
 
     private Collection<? extends GrantedAuthority> resolveAuthorities(String bearerToken, org.springframework.security.core.userdetails.UserDetails userDetails) {

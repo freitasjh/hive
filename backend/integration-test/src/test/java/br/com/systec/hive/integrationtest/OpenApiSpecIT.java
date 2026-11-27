@@ -232,6 +232,18 @@ class OpenApiSpecIT extends WebIntegrationTest {
     }
 
     @Test
+    void when_docsRequestedWithEquivalentLoopbackRepresentations_then_served() throws Exception {
+        String username = "cookie-loopback-" + UUID.randomUUID();
+        seedTenantAndUser(UUID.randomUUID(), username, PASSWORD);
+        String refreshCookie = loginWithRemoteAddrAndGetRefreshCookie(username, "0:0:0:0:0:0:0:1");
+
+        mockMvc.perform(get("/v3/api-docs/public")
+                        .with(request -> { request.setRemoteAddr("::1"); return request; })
+                        .cookie(new Cookie("refreshToken", refreshCookie)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void when_docsRequestedWithInvalidRefreshCookie_then_unauthorized() throws Exception {
         mockMvc.perform(get("/v3/api-docs/public")
                         .cookie(new Cookie("refreshToken", "not-a-token")))
@@ -249,6 +261,19 @@ class OpenApiSpecIT extends WebIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"model\":\"x\",\"messages\":[]}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    private String loginWithRemoteAddrAndGetRefreshCookie(String username, String remoteAddr) throws Exception {
+        MvcResult result = mockMvc.perform(post("/v1/auth/login")
+                        .with(request -> { request.setRemoteAddr(remoteAddr); return request; })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"" + username + "\",\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String setCookie = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
+        assertThat(setCookie).contains("refreshToken=");
+        return setCookie.substring(setCookie.indexOf("refreshToken=") + "refreshToken=".length(),
+                setCookie.indexOf(';'));
     }
 
     private String loginAndGetRefreshCookie(String username) throws Exception {

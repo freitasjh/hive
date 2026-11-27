@@ -58,8 +58,12 @@ class SecurityFilterTest {
     }
 
     private static MockHttpServletRequest request(String path) {
+        return request(path, "127.0.0.1");
+    }
+
+    private static MockHttpServletRequest request(String path, String remoteAddr) {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
-        request.setRemoteAddr("127.0.0.1");
+        request.setRemoteAddr(remoteAddr);
         return request;
     }
 
@@ -127,6 +131,59 @@ class SecurityFilterTest {
 
         assertThat(tenantSeen.get()).isEqualTo(tenantId);
         assertThat(authSeen.get()).isNotNull();
+    }
+
+    @Test
+    void when_storedIpv6CompressedAndClientIpv6Expanded_then_authenticate() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        User user = user(userId, tenantId);
+        MockHttpServletRequest req = request("/hive/scalar", "0:0:0:0:0:0:0:1");
+        req.setContextPath("/hive");
+        req.setCookies(new Cookie("refreshToken", TOKEN));
+        when(tokenCacheService.findRefreshTokenDataByToken(TOKEN))
+                .thenReturn(Optional.of(refreshData(tenantId, userId, "::1", Instant.now().plusSeconds(3600))));
+        when(userService.findById(userId)).thenReturn(user);
+        AtomicReference<Authentication> authSeen = new AtomicReference<>();
+
+        filter().doFilter(req, new MockHttpServletResponse(), capturing(new AtomicReference<>(), authSeen));
+
+        assertThat(authSeen.get()).isNotNull();
+        assertThat(authSeen.get().getPrincipal()).isSameAs(user);
+    }
+
+    @Test
+    void when_storedIpv4LoopbackAndClientIpv6Loopback_then_authenticate() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        User user = user(userId, tenantId);
+        MockHttpServletRequest req = request("/v3/api-docs/public", "::1");
+        req.setCookies(new Cookie("refreshToken", TOKEN));
+        when(tokenCacheService.findRefreshTokenDataByToken(TOKEN))
+                .thenReturn(Optional.of(refreshData(tenantId, userId, "127.0.0.1", Instant.now().plusSeconds(3600))));
+        when(userService.findById(userId)).thenReturn(user);
+        AtomicReference<Authentication> authSeen = new AtomicReference<>();
+
+        filter().doFilter(req, new MockHttpServletResponse(), capturing(new AtomicReference<>(), authSeen));
+
+        assertThat(authSeen.get()).isNotNull();
+        assertThat(authSeen.get().getPrincipal()).isSameAs(user);
+    }
+
+    @Test
+    void when_storedPublicIpAndClientLoopback_then_noAuthenticate() throws Exception {
+        UUID tenantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        MockHttpServletRequest req = request("/v3/api-docs/public", "127.0.0.1");
+        req.setCookies(new Cookie("refreshToken", TOKEN));
+        when(tokenCacheService.findRefreshTokenDataByToken(TOKEN))
+                .thenReturn(Optional.of(refreshData(tenantId, userId, "203.0.113.10", Instant.now().plusSeconds(3600))));
+        AtomicReference<Authentication> authSeen = new AtomicReference<>();
+
+        filter().doFilter(req, new MockHttpServletResponse(), capturing(new AtomicReference<>(), authSeen));
+
+        assertThat(authSeen.get()).isNull();
+        verify(userService, never()).findById(any());
     }
 
     @Test
