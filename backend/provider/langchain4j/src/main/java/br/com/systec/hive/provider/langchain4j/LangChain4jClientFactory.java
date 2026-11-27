@@ -193,7 +193,7 @@ public class LangChain4jClientFactory implements LlmClientFactory<ChatModel> {
         return builder.build();
     }
 
-    private String requireApiKey(AiProvider provider, String apiKey) {
+    static String requireApiKey(AiProvider provider, String apiKey) {
         if (apiKey == null || apiKey.isBlank()) {
             log.error("API key ausente para provider {}.", provider);
             throw new IllegalArgumentException("apiKey é obrigatória para o provider " + provider + ".");
@@ -201,7 +201,7 @@ public class LangChain4jClientFactory implements LlmClientFactory<ChatModel> {
         return apiKey.trim();
     }
 
-    private String requireBaseUrl(String baseUrl) {
+    static String requireBaseUrl(String baseUrl) {
         if (baseUrl == null || baseUrl.isBlank()) {
             throw new IllegalArgumentException("baseUrl é obrigatória para OPENAI_COMPATIBLE.");
         }
@@ -210,7 +210,7 @@ public class LangChain4jClientFactory implements LlmClientFactory<ChatModel> {
         return normalized;
     }
 
-    private String resolveOllamaBaseUrl(String baseUrl) {
+    static String resolveOllamaBaseUrl(String baseUrl) {
         if (baseUrl == null || baseUrl.isBlank()) {
             return OLLAMA_DEFAULT_BASE_URL;
         }

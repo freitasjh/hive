@@ -3,7 +3,9 @@ package br.com.systec.hive.assistant.impl.service;
 import br.com.systec.hive.ai.api.AssistantDefault;
 import br.com.systec.hive.ai.api.domain.TurnReply;
 import br.com.systec.hive.ai.api.domain.TurnRequest;
+import br.com.systec.hive.ai.api.port.TurnPromptPolicy;
 import br.com.systec.hive.ai.impl.AbstractLangChain4jTurnGateway;
+import br.com.systec.hive.ai.impl.SessionGateRegistry;
 import br.com.systec.hive.ai.impl.util.ProviderMessages;
 import br.com.systec.hive.assistant.impl.diagnostics.ChatSpanSink;
 import br.com.systec.hive.assistant.impl.diagnostics.ChatTurnSpanScope;
@@ -40,7 +42,7 @@ import java.util.List;
  * caracterização (AI-01) fixou 4 mensagens / 59 chars e 120/340/460/STOP como baseline.
  */
 @Component
-public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
+public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway implements TurnPromptPolicy {
 
     /**
      * Texto exato do seed V6 (`V6__seed_default_prompt.sql:65-67`), preservado byte a byte.
@@ -103,7 +105,8 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
      * breve, o que a conversa não pediu. Esta regra é política do assistant: fica aqui, nunca em
      * {@code ai/impl} (ADR-021, ajuste 3).
      */
-    protected final String systemFor(String text) {
+    @Override
+    public String systemFor(String text) {
         return text == null || text.isBlank() ? PROMPT : text;
     }
 
@@ -138,6 +141,15 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
         int promptChars = ProviderMessages.totalChars(prompt);
         int promptMessages = prompt.size();
 
+        // RF8/AT-01: mesmo gate do caminho de streaming, com refcount, antes de qualquer chamada
+        // ao provider. Interrompido: restaura o flag; acquire() já descarta o ref sem liberar permit.
+        SessionGateRegistry gates = gateRegistry();
+        try {
+            gates.acquire(request.sessionId());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return TurnReply.failed(promptMessages, promptChars, e);
+        }
         try {
             // Gate R2: createClientWithSession não tolera sessionId nulo. No fluxo público o campo
             // sessionId do TurnRequest carrega o UUID sintético por requisição; nenhuma coerção aqui.
@@ -147,22 +159,22 @@ public class AssistantTurnGateway extends AbstractLangChain4jTurnGateway {
             AssistantDefault proxy = proxyFor(new SpanListeningChatModel(client,
                     new ProviderCallSpanListener(redactor)));
 
-            // A8: uma chamada por vez por @MemoryId. Seed + proxy dentro do mesmo lock, senão dois
-            // turnos poderiam reescrever a memória um do outro entre o set e a leitura do AiService.
+            // A8: uma chamada por vez por @MemoryId. Seed + proxy sob o mesmo semáforo do streaming,
+            // senão dois turnos poderiam reescrever a memória um do outro entre o set e a leitura.
             //
             // O seed fica DENTRO do retry: o AiService acrescenta system e user à ChatMemory a cada
             // chamada, então sem re-sementar antes de cada tentativa o 2º attempt enviaria o user
             // duplicado e as contagens reconstruídas acima não descreveriam o prompt real.
-            synchronized (lockFor(request.sessionId())) {
-                Result<String> result = retryPolicy.call(() -> {
-                    seedMemory(request.sessionId(), prior);
-                    return proxy.chat(request.sessionId(), system, user);
-                });
-                return toReply(result, promptMessages, promptChars);
-            }
+            Result<String> result = retryPolicy.call(() -> {
+                seedMemory(request.sessionId(), prior);
+                return proxy.chat(request.sessionId(), system, user);
+            });
+            return toReply(result, promptMessages, promptChars);
         } catch (Exception e) {
             // Exceção do provider sem wrapper: a classificação do chamador lê o nome da classe.
             return TurnReply.failed(promptMessages, promptChars, e);
+        } finally {
+            gates.release(request.sessionId());
         }
     }
 

@@ -16,7 +16,7 @@ import dev.langchain4j.store.memory.chat.InMemoryChatMemoryStore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 
 /**
  * Stable half of the gateway (ADR-020 §5.2, moved to {@code ai/impl} by ADR-021): session-scoped
@@ -37,8 +37,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * <h3>A8 — concurrency</h3>
  *
  * <p>The AiServices 1.19.0 javadoc is explicit: calling the same AI Service concurrently for the
- * same {@code @MemoryId} corrupts the {@link ChatMemory}. The lock per session id is the only
- * protection; the {@code ChatMemoryProvider} is synchronous and creates no async callback
+ * same {@code @MemoryId} corrupts the {@link ChatMemory}. The shared {@link Semaphore} per session id
+ * is the only protection; the {@code ChatMemoryProvider} is synchronous and creates no async callback
  * ({@code TenantContext} uses {@code ScopedValue}, which does not propagate — K9).
  */
 public abstract class AbstractLangChain4jTurnGateway implements ChatTurnGateway {
@@ -47,7 +47,7 @@ public abstract class AbstractLangChain4jTurnGateway implements ChatTurnGateway 
     static final int MAX_MEMORY_MESSAGES = 64;
 
     private final ChatMemoryProvider chatMemoryProvider;
-    private final ConcurrentHashMap<UUID, Object> sessionLocks = new ConcurrentHashMap<>();
+    private final SessionGateRegistry gates = SessionGateRegistry.shared();
 
     protected AbstractLangChain4jTurnGateway() {
         this(new SessionChatMemoryProvider());
@@ -72,8 +72,14 @@ public abstract class AbstractLangChain4jTurnGateway implements ChatTurnGateway 
         return messages;
     }
 
-    protected final Object lockFor(UUID sessionId) {
-        return sessionLocks.computeIfAbsent(sessionId, ignored -> new Object());
+    /** RF8: the sync path takes the same owner-free permit the streaming path takes before start(). */
+    protected final Semaphore gateFor(UUID sessionId) {
+        return gates.gateFor(sessionId);
+    }
+
+    /** AT-01: turns must go through the refcounted acquire/release, not the inspection view above. */
+    protected final SessionGateRegistry gateRegistry() {
+        return gates;
     }
 
     /**
