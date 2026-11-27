@@ -88,4 +88,14 @@ class RedactionCanaryIT {
         return (LangfuseOtlpSpanSink) LangfuseOtlpExporterConfig.create(
                 RedactionFixtureSupport.registry(), true, endpoint, pk, sk);
     }
+
+    @Test
+    void when_sseErrorFrameIsBuilt_thenReasoningTokenNeverLeaksIntoError() throws Exception {
+        String token = "THINKING-REDACTION-5c11";
+        var failed = new br.com.systec.hive.ai.api.domain.TurnStreamEvent.Failed(
+                "stream_failed", new IllegalStateException("echo " + token));
+        String frame = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
+                br.com.systec.hive.publicapi.web.internal.v1.serializer.PublicSseSerializer.error(failed));
+        assertThat(frame).doesNotContain(token);
+    }
 }

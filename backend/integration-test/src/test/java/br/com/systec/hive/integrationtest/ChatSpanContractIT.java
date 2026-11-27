@@ -172,4 +172,15 @@ class ChatSpanContractIT {
             return ModelProvider.OPEN_AI;
         }
     }
+
+    @Test
+    void when_streamFailureIsRecorded_then_traceUsesClosedCodeInsteadOfThrowable() {
+        String secret = "SEGREDO-SPAN-STREAM-77ab";
+        var failed = new br.com.systec.hive.ai.api.domain.TurnStreamEvent.Failed(
+                "stream_failed", new IllegalStateException(secret));
+        ChatTrace trace = ChatTrace.builder(null, null, AiProvider.OPENAI, "model-x")
+                .failure(failed.code()).build();
+        assertThat(trace.failure()).isEqualTo("stream_failed").doesNotContain(secret);
+        assertThat(failed.toString()).doesNotContain(secret);
+    }
 }

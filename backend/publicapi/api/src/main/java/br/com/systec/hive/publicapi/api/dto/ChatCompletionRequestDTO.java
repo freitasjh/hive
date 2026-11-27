@@ -33,6 +33,9 @@ public class ChatCompletionRequestDTO {
 
     private Boolean stream;
 
+    @JsonProperty("stream_options")
+    private StreamOptionsDTO streamOptions;
+
     @JsonIgnore private Object temperature;
     @JsonIgnore private Object max_tokens;
     @JsonIgnore private Object max_completion_tokens;
@@ -55,6 +58,8 @@ public class ChatCompletionRequestDTO {
     public void setUser(String user) { this.user = user; }
     public Boolean getStream() { return stream; }
     public void setStream(Boolean stream) { this.stream = stream; }
+    public StreamOptionsDTO getStreamOptions() { return streamOptions; }
+    public void setStreamOptions(StreamOptionsDTO streamOptions) { this.streamOptions = streamOptions; }
 
     public static class ChatMessageDTO {
         @NotBlank

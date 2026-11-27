@@ -69,10 +69,10 @@ siga em frente.
   versionada, quando o MCP estiver disponível. Alternativa CLI: `ctx7
   library` / `ctx7 docs`.
 
-Se alguma ferramenta não estiver disponível, diga isso explicitamente e
-reduza o alcance: use documentação local com `arquivo:linha`, ou marque a
-subquestão como inferência com alvo de verificação. Nunca finja consulta,
-URL, data ou resultado.
+Se `websearch`/`webfetch`/Context7 nao estiverem disponiveis, use HTTPS
+read-only via cliente de linha de comando quando autorizado, registre a URL
+aberta e a data da consulta. Se nem isso existir, marque inferencia com alvo
+de verificacao. Nunca finje consulta, URL, data ou resultado.
 
 ## Exemplo de evidência extraída
 
@@ -110,8 +110,8 @@ Todos viajam juntos. Não copie apenas o `SKILL.md` para outro projeto.
   `AGENTS.md` aponta para a rule canônica sem duplicá-la.
 - **OpenCode:** `opencode.json` carrega `.agents/rules/deepsearch.md`, que é
   um ponteiro para o asset.
-- **Kiro:** `.kiro/steering/deepsearch.md` usa `inclusion: always` e aponta
-  para o asset; `.kiro/hooks/deepsearch.json` lembra o agente no envio do
-  prompt.
+- **Kiro (opcional):** se `.kiro/steering/deepsearch.md` e
+  `.kiro/hooks/deepsearch.json` existirem, apontam para o asset; ausencia nao
+  falha o self-check.
 
 Nenhuma plataforma recebe uma cópia das 6 regras. Todas leem o mesmo asset.

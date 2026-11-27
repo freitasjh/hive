@@ -69,7 +69,9 @@ class PublicChatServiceImplTest {
                 return resolve(tenantId);
             }
         };
-        return new PublicChatServiceImpl(promptTemplateService, promptGrantResolver, providerResolution, turnGateway, turnOutcomeMapper, quotaGuard);
+        PublicChatPreflight preflight = new PublicChatPreflight(promptTemplateService, promptGrantResolver,
+                providerResolution, quotaGuard);
+        return new PublicChatServiceImpl(preflight, turnGateway, turnOutcomeMapper);
     }
 
     private void auth(String name) {
@@ -106,6 +108,32 @@ class PublicChatServiceImplTest {
         m.setContent(content == null ? "hi" : content);
         r.setMessages(List.of(m));
         return r;
+    }
+
+    @Test
+    void when_syncTurnHasHighMaxTokens_then_streamCeilingDoesNotClampIt() throws Exception {
+        auth("client");
+        requestAttrs(List.of("p"), Map.of(), Map.of("m", 200, "c", 32000, "t", 256000));
+        UUID tenantId = UUID.randomUUID();
+        PromptTemplate prompt = new PromptTemplate();
+        prompt.setId(UUID.randomUUID());
+        prompt.setCode("p");
+        prompt.setVersion(1);
+        prompt.setTemplate("tpl");
+        prompt.setInferenceParams(new br.com.systec.hive.assistant.api.domain.InferenceParams(0.7, 0.9, 9999));
+        when(promptGrantResolver.resolve(any(), any(), any())).thenReturn(prompt);
+        when(turnGateway.execute(any())).thenReturn(
+                TurnReply.answered("resposta", 2, 20, 10, 5, 15, "STOP"));
+        org.mockito.ArgumentCaptor<br.com.systec.hive.ai.api.domain.TurnRequest> captor =
+                org.mockito.ArgumentCaptor.forClass(br.com.systec.hive.ai.api.domain.TurnRequest.class);
+
+        TenantContext.runWithTenant(tenantId, () -> {
+            svc().complete(req("user", "hi", "p", null, null));
+            return null;
+        });
+
+        org.mockito.Mockito.verify(turnGateway).execute(captor.capture());
+        assertThat(captor.getValue().promptTemplate().maxTokens()).isEqualTo(9999);
     }
 
     @Test

@@ -176,7 +176,7 @@ describe("SessionSidebar — histórico performático e acessível", () => {
   it("linhas deferidas seguem alcançáveis por navegação de teclado", () => {
     const sessions = Array.from({ length: 8 }, (_, index) => session(`s-${index}`, `Conversa ${index}`))
     render(<SessionSidebar {...sidebarBase} sessions={sessions} />)
-    const last = screen.getByRole("button", { name: "Conversa 7" })
+    const last = screen.getByRole("button", { name: /^Conversa 7/ })
     last.focus()
     expect(document.activeElement).toBe(last)
   })

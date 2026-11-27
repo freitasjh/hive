@@ -94,19 +94,16 @@ Ausente quando o pedido pode ser lido como mais de uma rota: "mudar X" pode ser 
 
 ## Formato de Saída da Rota A
 
-Saída única da Rota A. Não variar o heading. As seções "Já entendi" e "Regra" são obrigatórias — são elas que impedem a IA de ceder no turno seguinte e preencher a lacuna com default do modelo.
+Use o formato canônico em `assets/rota-a.md`. Ele é o único local do pacote
+que contém o template completo; este arquivo mantém as perguntas por elemento,
+as regras de conflito e o desempate.
 
-Saída:
-- `## Falta contexto — preciso de X resposta(s)` — X = número de elementos ausentes que cabe em 3
-- `Bloqueio (o que não vou assumir): [elemento ausente, ex: E2 Escopo — e por que não vou assumir]`
-- 1 a 3 perguntas numeradas, na ordem E1 > E2 > E3 > E4 > E5 > E6
-- `### Já entendi (afirmado por você)` — lista SÓ o que o usuário AFIRMOU
-- `### Regra` — "Não vou assumir o que ficou em branco. Escolher por você é palpite caro."
+Invariantes que o template precisa preservar:
 
-Regras de contagem:
-- Máximo 3 perguntas. Se só cabe 1, é E1.
-- Inferência da IA NÃO conta como afirmação: anota como `E3 parcial (inferido de "cadastro" — não conta como afirmado)`, nunca como afirmação.
-- Rota A não emite bloco PICCO. Bloco PICCO é exclusivo da Rota B.
+- no máximo 3 perguntas, ordenadas por E1 > E2 > E3 > E4 > E5 > E6;
+- `Já entendi` lista só o que o usuário afirmou;
+- `Regra` diz explicitamente que lacuna não vira default do modelo;
+- nenhum bloco PICCO na Rota A.
 
 ---
 

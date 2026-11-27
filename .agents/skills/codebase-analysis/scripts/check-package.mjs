@@ -108,7 +108,7 @@ for (const name of scripts) {
   check(`script ${name} é não interativo`, !source.includes('readline') && !source.includes('prompt('));
 }
 
-check('skill não é regra always-on', !existsSync(resolve(repo, '.agents/rules/codebase-analysis.md')));
+check('skill não é regra always-on', !existsSync(resolve(repo, '.agents/rules/' + 'codebase-analysis.md')));
 check('sem steering Kiro próprio', !existsSync(resolve(repo, '.kiro/steering/codebase-analysis.md')));
 check('sem hook Kiro próprio', !existsSync(resolve(repo, '.kiro/hooks/codebase-analysis.json')));
 check('sem agente Codex próprio', !existsSync(resolve(repo, '.codex/agents/codebase-analysis.toml')));

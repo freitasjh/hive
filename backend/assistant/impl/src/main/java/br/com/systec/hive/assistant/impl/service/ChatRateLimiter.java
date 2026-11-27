@@ -14,11 +14,10 @@ import java.util.UUID;
 @Component
 public class ChatRateLimiter {
 
-    static final int MAX_CALLS = 10;
-    static final long WINDOW_SECONDS = 60L;
-
     private final SlidingWindowRateLimiter delegate =
-            new SlidingWindowRateLimiter(MAX_CALLS, WINDOW_SECONDS, ChatRateLimitException::new);
+            new SlidingWindowRateLimiter(br.com.systec.hive.assistant.api.service.ChatRateLimits.MAX_CALLS,
+                    br.com.systec.hive.assistant.api.service.ChatRateLimits.WINDOW_SECONDS,
+                    ChatRateLimitException::new);
 
     public void check(UUID tenantId) {
         delegate.check(tenantId);
