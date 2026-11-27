@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "demand": "streaming-reasoning",
+  "agent": "orchestrator",
+  "phase": "Completed",
+  "gitSha": "0b60b1cd5dee2c887c945477b1b374a18aeebdc3",
+  "commands": [
+    {
+      "cmd": "npm test",
+      "exitCode": 0,
+      "durationMs": 104974,
+      "stdoutHash": "sha256:d5f38a7914872f23700bf720d2279407602bebeae3bc9093d87fb63c52a94e91"
+    },
+    {
+      "cmd": "node --check .opencode/plugins/gate.js && node --check .opencode/plugins/lib/gate-core.mjs",
+      "exitCode": 0,
+      "durationMs": 43,
+      "stdoutHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "unit": { "passed": 699, "failed": 0, "skipped": 0 },
+    "it": { "passed": 248, "failed": 0, "skipped": 0 },
+    "frontend": { "passed": 421, "failed": 0, "skipped": 0 }
+  },
+  "evaluation": {
+    "telas": "n/a — nenhuma UI nova neste PRD; frontend consumidor e outra sessao",
+    "negocio": "ok — reasoning_content separado do texto nos 2 endpoints",
+    "logica": "ok — gate owner-free, cancel degradado/suportado, erro tipado sem Throwable",
+    "perf": "ok — teto de 2000 frames, timeout 120s, admissao por tenant+clientId"
+  },
+  "brainStore": [
+    "sessoes/hive/2026-11-27",
+    "regras/projetos/hive/streaming-reasoning-adr-001-implementacao-2026-11-27",
+    "arquitetura/projetos/hive/streaming-reasoning-adrs-2026-11-26"
+  ],
+  "cleanup": { "ports": [] },
+  "selfReported": true,
+  "frontend_evidence": {
+    "stories": [
+      "frontend/src/modules/hive/chat/components/ChatThread.stories.tsx#StreamingReasoning",
+      "frontend/src/modules/hive/chat/components/ChatView.stories.tsx#Streaming",
+      "frontend/src/modules/hive/chat/components/ChatView.stories.tsx#StreamError"
+    ],
+    "screenshots": [
+      "harness/evidence/streaming-1280.png",
+      "harness/evidence/streaming-375.png"
+    ],
+    "a11y": {
+      "violations": 0,
+      "basis": "queries acessíveis em chat-stream-ui.test.tsx; console/network limpos no H3 do browser autenticado; 375px e 1280px capturados"
+    }
+  }
+}
