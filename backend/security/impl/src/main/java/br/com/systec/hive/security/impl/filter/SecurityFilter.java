@@ -21,7 +21,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.time.Instant;
@@ -30,7 +29,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-@Component
 public class SecurityFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(SecurityFilter.class);
 

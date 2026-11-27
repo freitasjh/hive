@@ -1,7 +1,11 @@
 package br.com.systec.hive.security.impl.config;
 
+import br.com.systec.hive.identity.api.service.UserService;
 import br.com.systec.hive.publicapi.api.service.PublicApiKeyAuthenticator;
 import br.com.systec.hive.publicapi.impl.service.PublicClientTokenIssuer;
+import br.com.systec.hive.security.api.service.AuthenticationService;
+import br.com.systec.hive.security.api.service.SecurityTokenService;
+import br.com.systec.hive.security.api.service.TokenCacheService;
 import br.com.systec.hive.security.impl.filter.PublicApiSecurityFilter;
 import br.com.systec.hive.security.impl.filter.SecurityFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -28,16 +32,21 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity()
 public class SecurityConfig {
 
-    private final SecurityFilter securityFilter;
     private final PublicClientTokenIssuer publicClientTokenIssuer;
     private final RedisTemplate<String, Object> redisTemplate;
 
-    public SecurityConfig(SecurityFilter securityFilter,
-                          PublicClientTokenIssuer publicClientTokenIssuer,
+    public SecurityConfig(PublicClientTokenIssuer publicClientTokenIssuer,
                           RedisTemplate<String, Object> redisTemplate) {
-        this.securityFilter = securityFilter;
         this.publicClientTokenIssuer = publicClientTokenIssuer;
         this.redisTemplate = redisTemplate;
+    }
+
+    @Bean
+    public SecurityFilter securityFilter(SecurityTokenService securityTokenService,
+                                         AuthenticationService authenticationService,
+                                         TokenCacheService tokenCacheService,
+                                         UserService userService) {
+        return new SecurityFilter(securityTokenService, authenticationService, tokenCacheService, userService);
     }
 
     @Bean
@@ -71,7 +80,7 @@ public class SecurityConfig {
 
     @Bean
     @org.springframework.core.annotation.Order(2)
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityFilter securityFilter) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
