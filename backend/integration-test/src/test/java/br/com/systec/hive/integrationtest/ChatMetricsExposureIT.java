@@ -1,5 +1,6 @@
 package br.com.systec.hive.integrationtest;
 
+import br.com.systec.hive.ai.impl.StreamingMetrics;
 import br.com.systec.hive.integrationtest.support.WebIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -7,6 +8,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -24,6 +26,18 @@ class ChatMetricsExposureIT extends WebIntegrationTest {
             request.setRemoteAddr(ip);
             return request;
         };
+    }
+
+    @Test
+    void when_streamingCountersAreIncremented_then_onlyFixedKeysAreAccepted() {
+        StreamingMetrics metrics = new StreamingMetrics();
+        metrics.increment(StreamingMetrics.FAILED);
+        metrics.increment(StreamingMetrics.TIMEOUT);
+        metrics.increment(StreamingMetrics.CLIENT_ABORT);
+        assertThat(metrics.get(StreamingMetrics.FAILED)).isEqualTo(1L);
+        assertThat(metrics.get(StreamingMetrics.TIMEOUT)).isEqualTo(1L);
+        assertThat(metrics.get(StreamingMetrics.CLIENT_ABORT)).isEqualTo(1L);
+        assertThatThrownBy(() -> metrics.increment("thinking-CANARIO")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

@@ -1,13 +1,20 @@
 {
+  "_note": "Estado pendente (substitui snapshots anteriores). workflow-state.json na raiz é gravável apenas por delegação a papel de implementação — permissão nativa do orchestrator nega root. Não contornar via bash.",
   "type": "feature",
-  "current_feature": "mfa-onboarding-opcional",
+  "current_feature": "streaming-reasoning",
   "current_phase": "Testing",
   "previous_phase": "Execution",
   "next_phase": "Completed",
+  "archive_status": "physical_archive_done; merge/PR humano pendente — nao promover Completed",
   "artifacts": {
     "frontend": "frontend/src/",
-    "backend": "backend/security/",
-    "invite": "frontend/src/modules/hive/auth/components/MfaSetupInvite.tsx"
+    "backend": "backend/provider, backend/ai, backend/publicapi, backend/assistant",
+    "invite": "frontend/src/modules/hive/auth/components/MfaSetupInvite.tsx",
+    "spec": ".spec/archive/20261127-prd-streaming-reasoning/",
+    "adrs": [
+      ".spec/prd/streaming-reasoning/ADRs/ADR-001-provider-streaming/",
+      ".spec/prd/streaming-reasoning/ADRs/ADR-002-sse-endpoints/"
+    ]
   },
   "code_review_status": "passed",
   "code_review": {
@@ -106,6 +113,38 @@
       "scope": "public-api-key-complementar/ADR-003 — cota propria da key e telemetria; branch adr/public-api-key-complementar/03-cota-telemetria; review APPROVED com risco de cobertura do backfill",
       "artifact": ".spec/prd/public-api-key-complementar/ADRs/ADR-003-cota-telemetria/CODE-REVIEW.md",
       "date": "2026-11-24"
+    },
+    "streaming-reasoning/ADR-002": {
+      "status": "passed",
+      "approval_status": "APPROVED",
+      "critical_issues_count": 0,
+      "must_fix_before_done": [],
+      "attention_issues": [
+        "🟠 PublicChatControllerV1:168 — turnStreamGateway.stream() sem try/catch; token de admissão pode ficar preso se lançar",
+        "🟡 frame_limit fora do conjunto fechado de FailureClassifier e sem stream.failed",
+        "🟡 handleBase deriva código do tipo em vez da mensagem (F1-driven)",
+        "🟡 getMessage() residual em handleIllegal mapeia só literais fixos",
+        "🔵 reflexão em timeoutCallback do Spring no IT"
+      ],
+      "reviewer_session": "ses_de2a1ce69ffej0rrbg604OxzNP",
+      "scope": "ADR-002 SSE endpoints — 16 tickets + 1 iteração de correção; APPROVED na iteração 2/3",
+      "artifact": "(parecer em conversa; ver handoff do reviewer)",
+      "date": "2026-11-27"
+    },
+    "streaming-reasoning/ADR-001": {
+      "status": "passed",
+      "approval_status": "APPROVED",
+      "critical_issues_count": 0,
+      "must_fix_before_done": [],
+      "attention_issues": [
+        "🟠 wire de TurnPromptPolicy/beans em bootstrap fica para ADR-002 (gateway ainda sem uso em producao)",
+        "🟡 javadoc de StreamingRetryPolicy desatualizado apos 408",
+        "🟡 diff contem mudancas de harness/flattened-poms/regex H2 fora do ADR-001"
+      ],
+      "reviewer_session": "ses_de2f27ae5ffet5zG6pjzCIg7BZ",
+      "scope": "ADR-001 batches 1+2 + iteracao 1 de correcao; APPROVED na iteracao 2/3",
+      "artifact": "(parecer em conversa; ver handoff do reviewer)",
+      "date": "2026-11-27"
     }
   },
   "code_reviews_by_bug": {
@@ -122,12 +161,43 @@
     }
   },
   "harness_status": "passed",
-  "harness_note": "Branch feature/login-tela-mfa. Backend 501 testes + IT MfaLoginFlowIT 4/4; frontend 280 testes + build 0. Login sem MFA devolve mfaSetupAvailable=true e UI mostra convite NAO-modal (MfaSetupInvite) com Configurar agora (abre MfaSetupDialog com QR) e Pular (sem persistencia). Login com MFA: desafio com tenantId, sem token/campo; verify/recovery com X-Tenant-ID do desafio. Dividas 🔵: tautologia em LoginServiceImpl:87, @JsonInclude classe-nivel em LoginResponseDTO, teto 50 prompts no seletor, X-Forwarded-For proxy, reautenticacao recente setup. H3 real nao executado por bloqueio de perfil chrome-devtools de outro agente. Arquivos publicapi/frontend de outro agente seguem fora do commit.",
+  "harness_note": "Branch feature/login-tela-mfa. Backend 501 testes + IT MfaLoginFlowIT 4/4; frontend 280 testes + build 0. Login sem MFA devolve mfaSetupAvailable=true e UI mostra convite NAO-modal (MfaSetupInvite) com Configurar agora (abre MfaSetupDialog com QR) e Pular (sem persistencia). Login com MFA: desafio com tenantId, sem token/campo; verify/recovery com X-Tenant-ID do desafio. Dividas 🔵: tautologia em LoginServiceImpl:87, @JsonInclude classe-nivel em LoginResponseDTO, teto 50 prompts no seletor, X-Forwarded-For proxy, reautenticacao recente setup. H3 real nao executado por bloqueio de perfil chrome-devtools de outro agente. Arquivos publicapi/frontend de outro agente seguem fora do commit. Arquivado em 2026-11-26 com VERIFY aprovado e override H3 registrado; dividas 🔵 mantidas. Ciclo streaming-reasoning: P0 (PRD aprovado §16, RESEARCH com 16 fontes, ADR-INDEX 1:1) e P1 (2 ADR.md decididos por architect; Q5 Semaphore(1,true) substitui ReentrantLock; R1 degradado) concluídos em 2026-11-26; aguardando SPEC/TASKS e security review. ADR-001 implementado em 3 batches na branch adr/streaming-reasoning/01-provider-streaming: 16 tickets + RF8 + ITs reais; backend 698/698, ITs 17/17, npm test 421/421; code-review APPROVED (0 criticos, apos 1 iteracao de correcao); wire de producao do gateway fica para ADR-002. ADR-002 em 16 tickets + 1 iteracao de correcao: npm test 421/421, unit 699/699, IT 248/248, security P4 passed_with_findings (0 🔴, F1/F2/F5 fechados, 2 🟡), code-review APPROVED. PRD movido para .spec/archive/20261127-prd-streaming-reasoning/ com TRACEABILITY 68/68 (100%) e VERIFY aprovado nos 2 ADRs; merge/PR humano pendente — current_phase nao promovido a Completed.",
   "gates": {
-    "P1_P2": null,
-    "P2_P3": null
+    "P1_P2": {
+      "status": "passed",
+      "evidence": "ADRs decididos por architect com fontes URL+data; spec-gate 100% (ADR-001 7/7, ADR-002 8/8, N/A motivados); security-review P1 passed_with_findings, zero 🔴; F1-F3 convertidos em RF/NFR + tasks",
+      "date": "2026-11-26"
+    },
+    "P2_P3": {
+      "status": "passed",
+      "evidence": "tasks-gate: 16 tickets por ADR, IDs únicos, tabela 1:1, BDD sucesso/falha/borda, teste antes da impl, scope markers adr/ADR-001 e adr/ADR-002; ADR-01/ADR-02 PASS",
+      "date": "2026-11-26"
+    }
   },
-  "overrides": [],
+  "security_status": "passed",
+  "security_verify": {
+    "adr": "ADR-001",
+    "status": "passed",
+    "critical_findings": 0,
+    "evidence": "IT reexecutado por security-engineer: 9/9, 0 falhas/erros/skips, PostgreSQL Testcontainers; canary de thinking zero em log/ChatTrace/spans/JPA; gate suportado libera, degradado retem ate terminal/janela 5s",
+    "debts_for_adr_002": [
+      "F2 concorrencia por tenant+clientId e ChatRateLimiter no endpoint",
+      "F5 frame OpenAiError tipado",
+      "F1-residual Failed.toString()/log cru de TurnOutcomeMapper"
+    ],
+    "date": "2026-11-27"
+  },
+  "verify": ".spec/archive/20261126-mfa-onboarding-opcional/VERIFY.md",
+  "archived": true,
+  "overrides": [
+    {
+      "gate": "H3",
+      "feature": "mfa-onboarding-opcional",
+      "reason": "H3 greenfield nao executado: perfil chrome-devtools bloqueado por outro agente na epoca do review",
+      "debt": "Executar H3 real (wipe + re-cadastro pela UI, Console/Network limpos) antes de release que dependa de MFA",
+      "date": "2026-11-26"
+    }
+  ],
   "prompt_assumptions": [],
   "prd_adr": {
     "prd_id": "public-chat-api",
@@ -146,5 +216,5 @@
       }
     }
   },
-  "last_update": "2026-11-20T00:00:00Z"
+  "last_update": "2026-11-27"
 }
