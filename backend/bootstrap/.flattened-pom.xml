@@ -34,6 +34,11 @@
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security</artifactId>
       <scope>compile</scope>
     </dependency>
@@ -50,6 +55,16 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-exporter-otlp</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -154,22 +169,46 @@
     </dependency>
     <dependency>
       <groupId>br.com.systec.hive</groupId>
-      <artifactId>hive-agent-api</artifactId>
+      <artifactId>hive-ai-api</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>br.com.systec.hive</groupId>
-      <artifactId>hive-agent-impl</artifactId>
+      <artifactId>hive-ai-impl</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>br.com.systec.hive</groupId>
-      <artifactId>hive-agent-web-internal-v1</artifactId>
+      <artifactId>hive-assistant-api</artifactId>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>br.com.systec.hive</groupId>
-      <artifactId>hive-agent-dbupdate</artifactId>
+      <artifactId>hive-assistant-impl</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>br.com.systec.hive</groupId>
+      <artifactId>hive-history-impl</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>br.com.systec.hive</groupId>
+      <artifactId>hive-assistant-web-internal-v1</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>br.com.systec.hive</groupId>
+      <artifactId>hive-history-web-internal-v1</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>br.com.systec.hive</groupId>
+      <artifactId>hive-assistant-dbupdate</artifactId>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -221,6 +260,11 @@
       <groupId>dev.langchain4j</groupId>
       <artifactId>langchain4j</artifactId>
       <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>

@@ -111,7 +111,7 @@ function validMermaidBlock(block) {
   return lines.some((line) => /^(stateDiagram-v2|erDiagram)\b/.test(line));
 }
 
-const codeRefPattern = /\S+\.(?:java|kt|kts|ts|tsx|js|jsx|vue|sql|properties|yml|yaml|xml|json):\d+/;
+const codeRefPattern = /\S+\.(?:java|kt|kts|ts|tsx|js|jsx|mjs|cjs|vue|sql|properties|yml|yaml|xml|json|toml):\d+/;
 
 function validateFile(file) {
   const errors = [];
@@ -181,21 +181,21 @@ function validateFile(file) {
     const frontendSection = section(content, '### 4.3 Frontend', '### 4.4 SQL e dados');
     const sqlSection = section(content, '### 4.4 SQL e dados', '### 4.5 Contratos e operação');
 
-    if (uniqueMatches(backendSection, /\S+\.java:\d+/g) < 2) {
-      errors.push('modo full: backend com menos de 2 referências Java distintas');
+    if (uniqueMatches(backendSection, /\S+\.(?:java|mjs|js|ts|tsx|json|yml|yaml):\d+/g) < 2) {
+      errors.push('modo full: runtime/backend com menos de 2 referências de código/config distintas');
     }
     if (frontendOutOfScope) {
       if (!/Fora do escopo/i.test(frontendSection)) {
         errors.push('frontend excluído no Gate 0 mas a seção não diz Fora do escopo — motivo');
       }
-    } else if (uniqueMatches(frontendSection, /\S+\.(?:vue|ts|tsx|js|jsx):\d+/g) < 2) {
-      errors.push('modo full: frontend com menos de 2 referências de código distintas');
+    } else if (uniqueMatches(frontendSection, /\S+\.(?:vue|ts|tsx|js|jsx|mjs|json|toml):\d+/g) < 2) {
+      errors.push('modo full: frontend/superfície de agente com menos de 2 referências distintas');
     }
-    if (uniqueMatches(sqlSection, /\S+\.sql:\d+/g) < 1) {
-      errors.push('modo full: SQL/dados sem referência a migration .sql');
+    if (uniqueMatches(sqlSection, /\S+\.(?:sql|json|mjs):\d+/g) < 1) {
+      errors.push('modo full: camada de dados sem referência a schema/estado');
     }
-    if (uniqueMatches(sqlSection, /\S+\.java:\d+/g) < 1) {
-      errors.push('modo full: SQL/dados sem referência a entidade ou repositório Java');
+    if (uniqueMatches(sqlSection, /\S+\.(?:java|mjs|js|ts|json):\d+/g) < 1) {
+      errors.push('modo full: camada de dados sem referência a leitura/escrita');
     }
 
     if (deepBackend) {

@@ -73,8 +73,11 @@ Look for the stack instead of assuming it:
 - Frontend evidence: routes/screens, component library and design tokens,
   client state, data fetching, forms, accessibility setup, browser targets.
 
-Record what you actually observe. Never ask what the project or their context
-already answers, and never reopen what they have already decided.
+Record what you actually observe. Before the first substantive reply, run
+`codebase-analysis` for local evidence and `deepsearch` for external facts
+when the change depends on a library, API, pattern or version. Their outputs
+feed PRD and ADR. Never ask what the project or their context already
+answers, and never reopen what they have already decided.
 
 ## Your First Message
 

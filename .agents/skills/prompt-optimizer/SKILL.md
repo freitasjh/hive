@@ -1,6 +1,6 @@
 ---
 name: prompt-optimizer
-description: "Portão de entrada portátil de demandas de mudança: brain antes do score, E1..E6, Rota A/Rota B, ledger de premissas e PICCO com contexto citado. Use antes de qualquer mudança não trivial; consulta factual pula o gate."
+description: "Avalia demandas de mudança antes da execução: confere objetivo, escopo, contexto, restrições, critério de aceite e intenção; pergunta o que falta e só então entrega um bloco PICCO com contexto citado. Use antes de criar, alterar, corrigir ou refatorar algo não trivial. Não use para consultas factuais, leitura de estado, análise somente leitura ou pentest autorizado."
 ---
 
 # Prompt Optimizer v4 — portátil
@@ -9,9 +9,11 @@ Portão de entrada de toda demanda de **mudança**. Consulta factual ao repo
 pula o gate. O default escolhido pelo modelo não é o default do usuário —
 lacuna preenchida em silêncio é requisito inventado.
 
-Este pacote viaja inteiro: `SKILL.md`, `references/` e `fixtures/`. Ele não
-depende de arquivos específicos de um repositório, de runner de teste nem de
-ferramentas que possam não existir no ambiente.
+## Quando usar / não usar
+
+Mudança não trivial; objetivo, escopo, contexto, restrição ou aceite incompletos; delegação que precisa decidir sem voltar a perguntar.
+Não usar para consulta factual, leitura de estado, análise somente leitura, pentest autorizado ou tarefa trivial sem mudança de contrato.
+Pacote portátil: `SKILL.md`, `assets/`, `references/`, `scripts/` e `fixtures/` viajam juntos; sem dependência de runner ou arquivo específico de repo.
 
 ## Stage 0 — contexto antes do score
 
@@ -52,11 +54,12 @@ E1 ou E2 ausentes = gate fechado.
 **Rota A (score < 6/6).** PARAR. Nenhuma outra skill, subagente ou artefato —
 nada é criado. Máximo 3 perguntas, ordenadas E1 > E2 > E3 > E4 > E5 > E6, na
 [forma canônica](references/clarifying-questions.md#formato-de-saída-da-rota-a).
+Use `assets/rota-a.md` como template canônico.
 Máximo 2 rodadas; na 2ª sem fechamento, 2 interpretações com o que muda no
 resultado e pedido de desempate.
 
 **Rota B (score = 6/6).** Re-encoding em bloco PICCO
-([template e exemplos](references/picco-template.md)) com 1 confirmação antes
+([template](assets/picco.md) e [exemplos](references/picco-template.md)) com 1 confirmação antes
 de executar. Bloco efêmero: chat + prompt de delegação, nunca arquivo.
 
 **Conflito de regra primeiro.** Violar regra do projeto é contradição, não
@@ -85,14 +88,8 @@ rastro, não autorização para executar.
 
 ## Bloco PICCO (Rota B)
 
-```xml
-<role>[critério de comportamento + o que conta como defeito — nunca persona]</role>
-<task>Entregar [E1] em [E3].</task>
-<context>[E2 + E3 + E6; cada afirmação de contexto cita arquivo:linha ou brain path]</context>
-<constraints>Sempre: [E4 positivas] · Nunca: [violações concretas]</constraints>
-<acceptance>[E5 — comando/verificação observável, não adjetivo]</acceptance>
-<open_questions><!-- Rota B: vazio --></open_questions>
-```
+Use `assets/picco.md`. O template canônico mora lá; `references/picco-template.md`
+mantém exemplos, tabela de campos e checklist.
 
 Cinco regras: **≤ 10 constraints**; **role = critério, não persona**;
 **positivas primeiro**; **`<context>` cita toda afirmação que não veio
@@ -100,6 +97,17 @@ literalmente do prompt**; **nunca escrever nem sugerir "pense passo a passo"**
 (CoT escrito degrada modelo de raciocínio). `<acceptance>` deve ser
 executável. Exemplos bons e ruins e contagem de constraints em
 `references/picco-template.md`.
+
+Use `assets/context-card.md` no Stage 0 quando precisar registrar de onde veio
+cada fato: `fato | origem | tipo | elemento | lacuna`.
+
+## Scripts disponíveis
+
+- `scripts/validate-output.mjs` — valida forma/gates da Rota A ou da Rota B.
+- `scripts/check-package.mjs` — checa integridade deste pacote.
+
+Ambos são somente leitura, não interativos e documentados por `--help`. Eles não
+fazem score semântico: o modelo continua decidindo E1..E6 e a reencoding.
 
 ## Brain (depois)
 
@@ -111,8 +119,8 @@ finja que foi gravado.
 
 ## Verificação manual
 
-Não há runner de teste neste pacote. As verificações abaixo são comportamentais
-e executadas com os fixtures incluídos.
+Use `TESTING.md`. Há validadores de forma, não runner semântico. As verificações
+comportamentais usam os fixtures incluídos.
 
 | # | Verificação | Critério |
 |---|-------------|----------|
@@ -121,10 +129,9 @@ e executadas com os fixtures incluídos.
 | V3 | Brain indisponível | Limitação declarada, nenhum path inventado |
 | V4 | Pacote portátil | Nenhuma referência obrigatória a arquivo fora de `SKILL.md`, `references/` e `fixtures/` |
 | V5 | Constraints do PICCO | ≤10, positivas primeiro, zero instrução de raciocínio |
+| V6 | `scripts/validate-output.mjs` | Rota A/B válidas passam; inválidas falham com `--expect-fail` |
+| V7 | `scripts/check-package.mjs` | Todos os checks estruturais passam |
 
 ## Arquivos do pacote
 
-`SKILL.md` · `references/clarifying-questions.md` ·
-`references/picco-template.md` · `fixtures/` (10 prompts: 7 Rota B / 3 Rota A).
-
-Todos viajam juntos. Não copie apenas o `SKILL.md` para outro projeto.
+`SKILL.md` · `assets/` · `references/` · `scripts/` · `fixtures/` (10 prompts + 4 output fixtures). Todos viajam juntos; não copie apenas o SKILL.md.
