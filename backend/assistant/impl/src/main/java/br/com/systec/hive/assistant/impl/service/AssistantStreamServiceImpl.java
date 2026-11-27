@@ -59,7 +59,11 @@ public class AssistantStreamServiceImpl implements AssistantStreamService {
                     // A storage/telemetry failure must not turn an already-streamed turn into an error.
                 }
             }
-            sink.accept(event);
+            // Só o caminho assistant carrega o sessionId no terminal; o gateway é compartilhado com o
+            // endpoint público, cujo chunk final deve permanecer sem o campo (Emenda 3).
+            sink.accept(event instanceof TurnStreamEvent.Done done
+                    ? new TurnStreamEvent.Done(done.finishReason(), done.usage(), prepared.sessionId())
+                    : event);
         };
 
         return turnStreamGateway.stream(new TurnRequest(prepared.sessionId(),

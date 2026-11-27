@@ -19,7 +19,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock(import("@/services/chat.service"), async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/chat.service")>()
-  return { ...actual, chatService: { sendMessage: mocks.send } }
+  // Sem streamMessage em runtime: exercita o fallback sendMessage (feature flag).
+  return { ...actual, chatService: { sendMessage: mocks.send } as unknown as typeof actual.chatService }
 })
 vi.mock("@/services/prompt.service", () => ({ promptService: { list: mocks.promptList } }))
 vi.mock("@/services/session.service", () => ({

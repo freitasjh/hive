@@ -83,6 +83,11 @@ const ptBR = {
   "chat.error.notFound": "Esta conversa não existe mais. Abra outra conversa.",
   "chat.error.generic": "Não foi possível enviar a mensagem. Tente novamente.",
   "chat.error.promptLoad": "Não foi possível carregar os prompts.",
+  "chat.error.stream.rateLimited": "Muitas solicitações. Aguarde um momento e tente novamente.",
+  "chat.error.stream.timeout": "A resposta demorou demais. Tente novamente.",
+  "chat.error.stream.frameLimit": "A resposta foi longa demais. Tente novamente.",
+  "chat.error.stream.failed": "Não foi possível concluir a resposta. Tente novamente.",
+  "chat.thread.reasoning": "Raciocínio do modelo",
   "chat.disclaimer": "O assistente pode cometer erros. Confira informações importantes.",
 } as const
 
@@ -168,6 +173,11 @@ const enUS: Record<ChatMessageKey, string> = {
   "chat.error.notFound": "This conversation no longer exists. Open another one.",
   "chat.error.generic": "Could not send the message. Try again.",
   "chat.error.promptLoad": "Could not load prompts.",
+  "chat.error.stream.rateLimited": "Too many requests. Wait a moment and try again.",
+  "chat.error.stream.timeout": "The answer took too long. Try again.",
+  "chat.error.stream.frameLimit": "The answer was too long. Try again.",
+  "chat.error.stream.failed": "Could not finish the answer. Try again.",
+  "chat.thread.reasoning": "Model reasoning",
   "chat.disclaimer": "The assistant can make mistakes. Check important information.",
 }
 
@@ -219,4 +229,14 @@ export function chatErrorKey(status?: number): ChatMessageKey {
   if (status === 401) return "chat.error.auth"
   if (status === 404) return "chat.error.notFound"
   return "chat.error.generic"
+}
+
+/** Códigos fechados do SSE viram mensagem segura; o payload bruto nunca é exibido. */
+export function chatStreamErrorKey(code: string): ChatMessageKey {
+  if (code === "rate_limited" || code.startsWith("http_429")) return "chat.error.stream.rateLimited"
+  if (code === "timeout") return "chat.error.stream.timeout"
+  if (code === "frame_limit") return "chat.error.stream.frameLimit"
+  if (code === "unauthorized") return "chat.error.auth"
+  if (code === "not_found" || code === "model_not_found") return "chat.error.notFound"
+  return "chat.error.stream.failed"
 }

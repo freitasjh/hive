@@ -158,10 +158,21 @@
       "scope": "public-api-grants-checkbox — checkbox de grants e validação no backend; branch fix/public-api-grants-checkbox; review APPROVED",
       "artifact": ".spec/bugs/public-api-grants-checkbox/CODE-REVIEW.md",
       "date": "2026-11-24"
+    },
+    "chat-sse-consumer": {
+      "status": "passed",
+      "approval_status": "APPROVED",
+      "critical_issues_count": 0,
+      "must_fix_before_done": [],
+      "reviewer_session": "ses_de1d7df57ffeyl8T7YTBgpr18s",
+      "scope": "frontend consome /v1/chat/stream com thinking incremental + Done.sessionId (Emenda 3) — 3 iteracoes, APPROVED",
+      "artifact": ".spec/bugs/chat-sse-consumer/CODE-REVIEW.md",
+      "date": "2026-11-27",
+      "operator_validation": "funcionando correto agora — thinking aparece, texto por partes, sessao vinculada na sidebar"
     }
   },
   "harness_status": "passed",
-  "harness_note": "Branch feature/login-tela-mfa. Backend 501 testes + IT MfaLoginFlowIT 4/4; frontend 280 testes + build 0. Login sem MFA devolve mfaSetupAvailable=true e UI mostra convite NAO-modal (MfaSetupInvite) com Configurar agora (abre MfaSetupDialog com QR) e Pular (sem persistencia). Login com MFA: desafio com tenantId, sem token/campo; verify/recovery com X-Tenant-ID do desafio. Dividas 🔵: tautologia em LoginServiceImpl:87, @JsonInclude classe-nivel em LoginResponseDTO, teto 50 prompts no seletor, X-Forwarded-For proxy, reautenticacao recente setup. H3 real nao executado por bloqueio de perfil chrome-devtools de outro agente. Arquivos publicapi/frontend de outro agente seguem fora do commit. Arquivado em 2026-11-26 com VERIFY aprovado e override H3 registrado; dividas 🔵 mantidas. Ciclo streaming-reasoning: P0 (PRD aprovado §16, RESEARCH com 16 fontes, ADR-INDEX 1:1) e P1 (2 ADR.md decididos por architect; Q5 Semaphore(1,true) substitui ReentrantLock; R1 degradado) concluídos em 2026-11-26; aguardando SPEC/TASKS e security review. ADR-001 implementado em 3 batches na branch adr/streaming-reasoning/01-provider-streaming: 16 tickets + RF8 + ITs reais; backend 698/698, ITs 17/17, npm test 421/421; code-review APPROVED (0 criticos, apos 1 iteracao de correcao); wire de producao do gateway fica para ADR-002. ADR-002 em 16 tickets + 1 iteracao de correcao: npm test 421/421, unit 699/699, IT 248/248, security P4 passed_with_findings (0 🔴, F1/F2/F5 fechados, 2 🟡), code-review APPROVED. PRD movido para .spec/archive/20261127-prd-streaming-reasoning/ com TRACEABILITY 68/68 (100%) e VERIFY aprovado nos 2 ADRs; merge/PR humano pendente — current_phase nao promovido a Completed.",
+  "harness_note": "Branch feature/login-tela-mfa. Backend 501 testes + IT MfaLoginFlowIT 4/4; frontend 280 testes + build 0. Login sem MFA devolve mfaSetupAvailable=true e UI mostra convite NAO-modal (MfaSetupInvite) com Configurar agora (abre MfaSetupDialog com QR) e Pular (sem persistencia). Login com MFA: desafio com tenantId, sem token/campo; verify/recovery com X-Tenant-ID do desafio. Dividas 🔵: tautologia em LoginServiceImpl:87, @JsonInclude classe-nivel em LoginResponseDTO, teto 50 prompts no seletor, X-Forwarded-For proxy, reautenticacao recente setup. H3 real nao executado por bloqueio de perfil chrome-devtools de outro agente. Arquivos publicapi/frontend de outro agente seguem fora do commit. Arquivado em 2026-11-26 com VERIFY aprovado e override H3 registrado; dividas 🔵 mantidas. Ciclo streaming-reasoning: P0 (PRD aprovado §16, RESEARCH com 16 fontes, ADR-INDEX 1:1) e P1 (2 ADR.md decididos por architect; Q5 Semaphore(1,true) substitui ReentrantLock; R1 degradado) concluídos em 2026-11-26; aguardando SPEC/TASKS e security review. ADR-001 implementado em 3 batches na branch adr/streaming-reasoning/01-provider-streaming: 16 tickets + RF8 + ITs reais; backend 698/698, ITs 17/17, npm test 421/421; code-review APPROVED (0 criticos, apos 1 iteracao de correcao); wire de producao do gateway fica para ADR-002. ADR-002 em 16 tickets + 1 iteracao de correcao: npm test 421/421, unit 699/699, IT 248/248, security P4 passed_with_findings (0 🔴, F1/F2/F5 fechados, 2 🟡), code-review APPROVED. PRD movido para .spec/archive/20261127-prd-streaming-reasoning/ com TRACEABILITY 68/68 (100%) e VERIFY aprovado nos 2 ADRs; merge/PR humano pendente — current_phase nao promovido a Completed. Bugfix chat-sse-consumer: frontend ligado ao /v1/chat/stream via fetch/getReader, Done.sessionId (Emenda 3), BugReview APPROVED em 3/3 iteracoes; operador validou ao vivo (thinking incremental, texto por partes, sessao vinculada); frontend 444/444, backend 699/699, ITs 32/32.",
   "gates": {
     "P1_P2": {
       "status": "passed",
@@ -196,6 +207,14 @@
       "reason": "H3 greenfield nao executado: perfil chrome-devtools bloqueado por outro agente na epoca do review",
       "debt": "Executar H3 real (wipe + re-cadastro pela UI, Console/Network limpos) antes de release que dependa de MFA",
       "date": "2026-11-26"
+    },
+    {
+      "gate": "EVIDENCE",
+      "feature": "streaming-reasoning",
+      "mode": "warn via HARNESS_GATE_EVIDENCE (operador, 2026-11-27)",
+      "reason": "PRD sem UI nova: frontend_evidence N/A declarado no harness/streaming-reasoning.json; gate exige evidencia frontend porque targets.frontend=react",
+      "debt": "Se o cliente SSE entrar neste ciclo, gerar stories/screenshots/a11y reais e restaurar gate evidence=enforce; override nao apaga a ausencia",
+      "date": "2026-11-27"
     }
   ],
   "prompt_assumptions": [],

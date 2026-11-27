@@ -5,16 +5,21 @@ import type { ApiError } from "@/services/api"
 import type {
   ChatMessageDTO,
   ChatRequestDTO,
+  ChatResponseDTO,
   ChatSessionDTO,
   ModelChoice,
   ProviderCatalogEntry,
 } from "@/services/chat.types"
 import { agentAdminService } from "@/services/agent-admin.service"
-import { chatService } from "@/services/chat.service"
+import {
+  chatService,
+  type ChatPayloadDefaults,
+  type ChatStreamMeta,
+} from "@/services/chat.service"
 import { promptService } from "@/services/prompt.service"
 import { sessionService } from "@/services/session.service"
 import type { PromptTemplateDTO } from "@/services/admin.types"
-import { chatErrorKey, useChatI18n } from "../i18n"
+import { chatErrorKey, chatStreamErrorKey, useChatI18n } from "../i18n"
 import { filterMessagesByQuery, filterSessionsByQuery } from "./chat-history"
 
 const MESSAGE_LIMIT = 4000
@@ -136,6 +141,10 @@ export function useChatController(): {
   const [state, setState] = useState<ChatControllerState>(INITIAL_STATE)
   const stateRef = useRef<ChatControllerState>(INITIAL_STATE)
   const seqRef = useRef(0)
+  /** Stream em voo: abortado ao desmontar ou trocar de turno/sessão. */
+  const streamRef = useRef<AbortController | null>(null)
+
+  useEffect(() => () => streamRef.current?.abort(), [])
 
   const patch = useCallback((partial: Partial<ChatControllerState>) => {
     const next = { ...stateRef.current, ...partial }
@@ -247,6 +256,7 @@ export function useChatController(): {
     // Seq capturado ANTES do await: newChat/selectSession durante a chamada
     // invalida a resposta, que não pode reativar sessão antiga nem poluir o histórico.
     const seq = seqRef.current
+    const stale = () => seq !== seqRef.current
     const userMessage: ChatMessageDTO = {
       id: `temp-${Date.now()}`,
       sessionId: sessionId ?? "pending",
@@ -254,22 +264,111 @@ export function useChatController(): {
       content: text,
       createAt: new Date().toISOString(),
     }
+    // Placeholder criado ANTES do stream: thinking e texto são anexados a ele.
+    const assistantId = `assistant-${Date.now()}`
     patch({
       input: "",
       sending: true,
       sendError: null,
       notice: null,
       lastUserMessage: text,
-      messages: [...current.messages, userMessage],
+      messages: [
+        ...current.messages,
+        userMessage,
+        {
+          id: assistantId,
+          sessionId: sessionId ?? "pending",
+          role: "ASSISTANT",
+          content: "",
+          reasoning: "",
+          createAt: new Date().toISOString(),
+        },
+      ],
     })
 
+    const controller = new AbortController()
+    streamRef.current = controller
+    const updatePlaceholder = (partial: Partial<ChatMessageDTO>) => {
+      if (stale()) return
+      const after = stateRef.current
+      patch({
+        messages: after.messages.map((message) =>
+          message.id === assistantId ? { ...message, ...partial } : message
+        ),
+      })
+    }
+    const refreshSessions = () => {
+      sessionService
+        .listSessions(0, SESSION_PAGE_SIZE)
+        .then((page) => {
+          if (stale()) return
+          patch({
+            sessions: page.content,
+            sessionsPage: page.number,
+            sessionsTotalPages: page.totalPages,
+          })
+        })
+        .catch(() => undefined)
+    }
+
+    let request: ChatRequestDTO
+    let baseline: ChatPayloadDefaults | null
+
+    const finishWithAnswer = (answer: ChatResponseDTO) => {
+      if (stale()) return
+      const after = stateRef.current
+      patch({
+        sessionId: after.sessionId ?? answer.sessionId ?? null,
+        messages: after.messages.map((message) =>
+          message.id === assistantId
+            ? {
+                ...message,
+                sessionId: answer.sessionId,
+                role: answer.role || "ASSISTANT",
+                content: answer.message,
+                createAt: answer.timestamp,
+              }
+            : message
+        ),
+        historyError: null,
+        effectiveModel:
+          answer.provider && answer.model
+            ? { provider: answer.provider, model: answer.model }
+            : after.effectiveModel,
+      })
+      if (!sessionId && answer.sessionId) refreshSessions()
+    }
+
+    const showError = (error: unknown, safeMessage?: string) => {
+      if (stale() || controller.signal.aborted) return
+      const message = safeMessage ?? t(chatErrorKey(statusOf(error)))
+      const after = stateRef.current
+      patch({
+        sendError: message,
+        messages: [
+          ...after.messages.filter((item) => item.id !== assistantId),
+          {
+            id: `system-${Date.now()}`,
+            sessionId: after.sessionId ?? "",
+            role: "SYSTEM",
+            content: message,
+            createAt: new Date().toISOString(),
+          },
+        ],
+      })
+    }
+
+    // Hoistado: o catch precisa saber se algum frame chegou antes da falha.
+    let streamed = false
+    let failed = false
+
     try {
-      const request: ChatRequestDTO = { message: text }
+      request = { message: text }
       // Prompt ausente: omitir a chave (não enviar undefined/null). Backend resolve o fallback.
       if (promptTemplateId) request.promptTemplateId = promptTemplateId
       if (sessionId) request.sessionId = sessionId
       // Baseline: sessão aberta é autoritativa; nova conversa usa o default do tenant.
-      const baseline = sessionId
+      baseline = sessionId
         ? current.effectiveModel ?? current.tenantDefault
         : current.tenantDefault
       const chosen = current.selectedModel
@@ -285,59 +384,120 @@ export function useChatController(): {
         request.provider = chosen.provider
         request.model = chosen.model
       }
-      const answer = await chatService.sendMessage(request, baseline)
-      if (seq !== seqRef.current) return
-      const after = stateRef.current
-      const assistantMessage: ChatMessageDTO = {
-        id: `assistant-${Date.now()}`,
-        sessionId: answer.sessionId,
-        role: answer.role || "ASSISTANT",
-        content: answer.message,
-        createAt: answer.timestamp,
-      }
-      patch({
-        sessionId: after.sessionId ?? answer.sessionId ?? null,
-        messages: [...after.messages, assistantMessage],
-        historyError: null,
-        effectiveModel:
-          answer.provider && answer.model
-            ? { provider: answer.provider, model: answer.model }
-            : after.effectiveModel,
-      })
 
-      if (!sessionId && answer.sessionId) {
-        // nova sessão: sidebar precisa refletir o primeiro turno
-        sessionService
-          .listSessions(0, SESSION_PAGE_SIZE)
-          .then((page) => {
-            if (seq !== seqRef.current) return
+      // Ausência do método = feature flag/serviço legado: fallback direto.
+      if (typeof chatService.streamMessage !== "function") {
+        finishWithAnswer(await chatService.sendMessage(request, baseline))
+        return
+      }
+
+      await chatService.streamMessage(
+        request,
+        baseline,
+        {
+          onThinking: (thought) => {
+            if (stale() || !thought) return
+            streamed = true
+            const after = stateRef.current
+            const placeholder = after.messages.find((item) => item.id === assistantId)
+            if (placeholder) updatePlaceholder({ reasoning: (placeholder.reasoning ?? "") + thought })
+          },
+          onText: (chunk) => {
+            if (stale() || !chunk) return
+            streamed = true
+            const after = stateRef.current
+            const placeholder = after.messages.find((item) => item.id === assistantId)
+            if (placeholder) updatePlaceholder({ content: placeholder.content + chunk })
+          },
+          onDone: (frameMeta) => {
+            if (stale() || failed) return
+            const after = stateRef.current
+            const placeholder = after.messages.find((item) => item.id === assistantId)
+            if (!placeholder) return
+            // Emenda 3: o done pode trazer sessionId; timestamp e par efetivo
+            // vêm do estado do turno quando ausentes no frame.
+            const meta: ChatStreamMeta = {
+              ...frameMeta,
+              sessionId: frameMeta.sessionId ?? sessionId ?? after.sessionId ?? null,
+              timestamp: frameMeta.timestamp ?? placeholder.createAt,
+              provider: frameMeta.provider ?? baseline?.provider ?? null,
+              model: frameMeta.model ?? baseline?.model ?? null,
+            }
+            streamed = true
             patch({
-              sessions: page.content,
-              sessionsPage: page.number,
-              sessionsTotalPages: page.totalPages,
+              sessionId: after.sessionId ?? meta.sessionId ?? null,
+              messages: after.messages.map((item) =>
+                item.id === assistantId
+                  ? {
+                      ...item,
+                      sessionId: meta.sessionId && meta.sessionId !== "pending" ? meta.sessionId : item.sessionId,
+                      createAt: meta.timestamp ?? item.createAt,
+                    }
+                  : item
+              ),
+              historyError: null,
+              effectiveModel:
+                meta.provider && meta.model
+                  ? { provider: meta.provider, model: meta.model }
+                  : after.effectiveModel,
             })
-          })
-          .catch(() => undefined)
+            if (!sessionId && meta.sessionId) refreshSessions()
+          },
+          onError: (code) => {
+            if (stale() || controller.signal.aborted) return
+            failed = true
+            streamed = true
+            const message = t(chatStreamErrorKey(code))
+            const after = stateRef.current
+            // Não comita resposta parcial: pensamento/texto podem conter dados
+            // que o backend classificou como falha. Só a mensagem segura aparece.
+            patch({
+              sendError: message,
+              messages: after.messages.filter((item) => item.id !== assistantId),
+            })
+          },
+        },
+        controller.signal
+      )
+
+      if (stale() || controller.signal.aborted) return
+      // Stream fechou sem terminal: descarta o placeholder e avisa. Nunca
+      // reenvia o turno — isso duplicaria a pergunta no histórico.
+      if (!streamed && !failed) {
+        const after = stateRef.current
+        patch({
+          sendError: t(chatStreamErrorKey("stream_failed")),
+          messages: after.messages.filter((item) => item.id !== assistantId),
+        })
       }
     } catch (error) {
-      if (seq !== seqRef.current) return
-      const message = t(chatErrorKey(statusOf(error)))
-      const after = stateRef.current
-      patch({
-        sendError: message,
-        messages: [
-          ...after.messages,
-          {
-            id: `system-${Date.now()}`,
-            sessionId: after.sessionId ?? "",
-            role: "SYSTEM",
-            content: message,
-            createAt: new Date().toISOString(),
-          },
-        ],
-      })
+      if (stale() || controller.signal.aborted) return
+      const code = statusOf(error) === 0 ? (error as { code?: string }).code : undefined
+      const timeout = code === "TIMEOUT"
+      if (streamed) {
+        // Turno já em andamento no backend: reenviar duplicaria a mensagem.
+        const after = stateRef.current
+        patch({
+          sendError: t(timeout ? chatStreamErrorKey("timeout") : chatStreamErrorKey("stream_failed")),
+          messages: after.messages.filter((item) => item.id !== assistantId),
+        })
+        return
+      }
+      const unavailable = code === "NETWORK_ERROR" || code === "STREAM_UNAVAILABLE"
+      if (!unavailable) {
+        showError(error, code === "TIMEOUT" ? t(chatStreamErrorKey("timeout")) : undefined)
+        return
+      }
+      // Único reenvio permitido após iniciar o stream: falha de transporte
+      // antes de qualquer frame chegar (o backend não processou o turno).
+      try {
+        finishWithAnswer(await chatService.sendMessage(request!, baseline!))
+      } catch (fallbackError) {
+        showError(fallbackError)
+      }
     } finally {
-      patch({ sending: false })
+      if (streamRef.current === controller) streamRef.current = null
+      if (!stale()) patch({ sending: false })
     }
   }, [patch, t])
 
@@ -352,6 +512,7 @@ export function useChatController(): {
   const selectSession = useCallback(
     async (id: string) => {
       const seq = ++seqRef.current
+      streamRef.current?.abort()
       patch({
         sessionId: id,
         messages: [],
@@ -360,6 +521,7 @@ export function useChatController(): {
         historyLoading: true,
         historyError: null,
         sendError: null,
+        sending: false,
         notice: null,
         // alvo de uma conversa anterior não pode saltar no histórico recém-aberto
         targetMessageId: null,
@@ -409,6 +571,7 @@ export function useChatController(): {
 
   const newChat = useCallback(() => {
     seqRef.current += 1
+    streamRef.current?.abort()
     patch({
       sessionId: null,
       messages: [],
@@ -417,6 +580,7 @@ export function useChatController(): {
       selectedPromptTemplateId: null,
       input: "",
       sendError: null,
+      sending: false,
       historyError: null,
       notice: null,
       lastUserMessage: null,

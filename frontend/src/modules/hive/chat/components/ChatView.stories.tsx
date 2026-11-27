@@ -107,6 +107,41 @@ export const EmptySessions: Story = {
   args: { state: { ...state, sessions: [], filteredSessions: [], sessionsTotalPages: 1 } },
 }
 export const Disabled: Story = { args: { state: { ...state, sending: true, input: "oi" } } }
+export const Streaming: Story = {
+  decorators: [(Story) => <div className="mx-auto w-[375px]"><Story /></div>],
+  args: {
+    state: {
+      ...state,
+      sessionId: S,
+      sending: true,
+      messages: [
+        { id: "m1", sessionId: S, role: "USER", content: "Resuma este texto", createAt: "" },
+        {
+          id: "m2",
+          sessionId: S,
+          role: "ASSISTANT",
+          content: "O texto trata de",
+          reasoning: "Mapeando o pedido\nSelecionando os pontos-chave",
+          createAt: "",
+        },
+      ],
+    },
+  },
+}
+export const StreamError: Story = {
+  decorators: [(Story) => <div className="mx-auto w-[1280px]"><Story /></div>],
+  args: {
+    state: {
+      ...state,
+      sessionId: S,
+      sendError: "Muitas solicitações. Aguarde um momento e tente novamente.",
+      messages: [
+        { id: "m1", sessionId: S, role: "USER", content: "Resuma este texto", createAt: "" },
+        { id: "m2", sessionId: S, role: "ASSISTANT", content: "", reasoning: "Mapeando o pedido", createAt: "" },
+      ],
+    },
+  },
+}
 export const Success: Story = {
   args: {
     state: {

@@ -3,6 +3,8 @@ package br.com.systec.hive.ai.api.domain;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
 
+import java.util.UUID;
+
 /**
  * One event per provider callback (ADR-001 D3). The events are ephemeral: no text is persisted and
  * no frame is emitted for a callback the provider never made.
@@ -17,7 +19,15 @@ public sealed interface TurnStreamEvent permits TurnStreamEvent.Reasoning, TurnS
 
     record Text(String text) implements TurnStreamEvent { }
 
-    record Done(FinishReason finishReason, TokenUsage usage) implements TurnStreamEvent { }
+    /**
+     * {@code sessionId} is optional: the 2-arg constructor preserves every existing caller (and
+     * the public wire, which must never expose it).
+     */
+    record Done(FinishReason finishReason, TokenUsage usage, UUID sessionId) implements TurnStreamEvent {
+        public Done(FinishReason finishReason, TokenUsage usage) {
+            this(finishReason, usage, null);
+        }
+    }
 
     /**
      * Only the closed-set code is rendered. The cause stays in memory for classification; its
